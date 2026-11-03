@@ -1,0 +1,231 @@
+{
+  "format": "DXF R2010",
+  "units": "Millimeters",
+  "model_space_count": 10,
+  "note": "DXF input handles may change on import/save: obtain actual handles using query_objects. Compare by type/layer/geometry.",
+  "paper_line_input_handle": "40",
+  "objects": [
+    {
+      "name": "line_nonzero_z",
+      "dxf_handle": "31",
+      "dxf_type": "LINE",
+      "expected": {
+        "type": "Line",
+        "start": [
+          1,
+          2,
+          3
+        ],
+        "end": [
+          11,
+          22,
+          33
+        ]
+      }
+    },
+    {
+      "name": "circle",
+      "dxf_handle": "32",
+      "dxf_type": "CIRCLE",
+      "expected": {
+        "type": "Circle",
+        "center": [
+          30,
+          20,
+          0
+        ],
+        "radius": 5
+      }
+    },
+    {
+      "name": "arc",
+      "dxf_handle": "33",
+      "dxf_type": "ARC",
+      "expected": {
+        "type": "Arc",
+        "center": [
+          50,
+          20,
+          2
+        ],
+        "radius": 7,
+        "start_angle_ocs": 0.5235987755982988,
+        "end_angle_ocs": 2.6179938779914944,
+        "sweep_angle": 2.0943951023931953,
+        "start_point": [
+          56.06217782649107,
+          23.5,
+          2.0
+        ],
+        "end_point": [
+          43.93782217350893,
+          23.5,
+          2.0
+        ]
+      }
+    },
+    {
+      "name": "polyline_bulge_width",
+      "dxf_handle": "34",
+      "dxf_type": "LWPOLYLINE",
+      "expected": {
+        "type": "Polyline",
+        "closed": true,
+        "elevation": 4,
+        "points_wcs": [
+          [
+            0.0,
+            40.0,
+            4.0
+          ],
+          [
+            20.0,
+            40.0,
+            4.0
+          ],
+          [
+            20.0,
+            55.0,
+            4.0
+          ]
+        ],
+        "vertices_xyseb": [
+          [
+            0,
+            40,
+            1,
+            2,
+            0.5
+          ],
+          [
+            20,
+            40,
+            2,
+            1,
+            0
+          ],
+          [
+            20,
+            55,
+            0,
+            0,
+            -0.25
+          ]
+        ]
+      }
+    },
+    {
+      "name": "text_justification",
+      "dxf_handle": "35",
+      "dxf_type": "TEXT",
+      "expected": {
+        "type": "Text",
+        "text": "nanoCAD 26 check",
+        "height": 3,
+        "width_factor": 0.8,
+        "rotation": 0.2617993877991494,
+        "alignment_point": [
+          40,
+          45,
+          2
+        ]
+      }
+    },
+    {
+      "name": "mtext_formatting",
+      "dxf_handle": "36",
+      "dxf_type": "MTEXT",
+      "expected": {
+        "type": "MText",
+        "contents": "First line\\P{\\C1;Red text}",
+        "plain_text": "First line\nRed text",
+        "location": [
+          70,
+          45,
+          3
+        ],
+        "text_height": 3,
+        "width": 35
+      }
+    },
+    {
+      "name": "off_layer_still_in_query",
+      "dxf_handle": "37",
+      "dxf_type": "LINE",
+      "expected": {
+        "type": "Line",
+        "layer": "OFF_LAYER"
+      }
+    },
+    {
+      "name": "unsupported_block",
+      "dxf_handle": "3C",
+      "dxf_type": "INSERT",
+      "expected": {
+        "type": "Unknown",
+        "inspect_error": "UNSUPPORTED_ENTITY_TYPE"
+      }
+    },
+    {
+      "name": "tilted_arc",
+      "dxf_handle": "3E",
+      "dxf_type": "ARC",
+      "expected": {
+        "type": "Arc",
+        "center": [
+          -10.0,
+          -10.606601717798213,
+          17.67766952966369
+        ],
+        "normal": [
+          0.0,
+          0.7071067811865475,
+          0.7071067811865475
+        ],
+        "start_point": [
+          -14.0,
+          -10.606601717798213,
+          17.67766952966369
+        ],
+        "end_point": [
+          -10.0,
+          -13.435028842544405,
+          20.50609665440988
+        ],
+        "sweep_angle": 1.5707963267948966
+      }
+    },
+    {
+      "name": "tilted_polyline",
+      "dxf_handle": "3F",
+      "dxf_type": "LWPOLYLINE",
+      "expected": {
+        "type": "Polyline",
+        "normal": [
+          0.0,
+          0.7071067811865475,
+          0.7071067811865475
+        ],
+        "elevation": 10,
+        "points_wcs": [
+          [
+            0.0,
+            7.0710678118654755,
+            7.0710678118654755
+          ],
+          [
+            -5.0,
+            7.0710678118654755,
+            7.0710678118654755
+          ],
+          [
+            -5.0,
+            3.5355339059327378,
+            10.606601717798213
+          ]
+        ]
+      }
+    }
+  ],
+  "generator": "ezdxf 1.4.4"
+}

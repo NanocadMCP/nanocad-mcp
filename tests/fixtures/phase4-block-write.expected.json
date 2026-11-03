@@ -1,0 +1,512 @@
+{
+  "scope": "Offline fixture/oracle only; no native block creation/insertion is implemented or tested yet.",
+  "initial_model_count": 2,
+  "existing_insert_handle": "55",
+  "reference_handle": "59",
+  "base_point": [
+    10,
+    20
+  ],
+  "members": [
+    {
+      "type": "Line",
+      "start": [
+        10,
+        20
+      ],
+      "end": [
+        20,
+        20
+      ]
+    },
+    {
+      "type": "Circle",
+      "center": [
+        15,
+        17
+      ],
+      "radius": 2
+    },
+    {
+      "type": "Arc",
+      "center": [
+        20,
+        25
+      ],
+      "radius": 3,
+      "start_angle": 0,
+      "sweep_angle": 1.5707963267948966
+    },
+    {
+      "type": "Polyline",
+      "vertices": [
+        {
+          "point": [
+            10,
+            30
+          ],
+          "bulge": 0
+        },
+        {
+          "point": [
+            15,
+            30
+          ],
+          "bulge": 0
+        },
+        {
+          "point": [
+            15,
+            35
+          ],
+          "bulge": 0
+        }
+      ],
+      "closed": false
+    },
+    {
+      "type": "Text",
+      "text": "Label",
+      "position": [
+        10,
+        25
+      ],
+      "height": 1.5,
+      "text_style": "Standard"
+    }
+  ],
+  "attributes": [
+    {
+      "tag": "NAME",
+      "default_text": "Default name",
+      "position": [
+        12,
+        23
+      ],
+      "height": 1,
+      "text_style": "Standard"
+    },
+    {
+      "tag": "CODE",
+      "default_text": "K-1",
+      "position": [
+        12,
+        26
+      ],
+      "height": 1,
+      "text_style": "Standard"
+    }
+  ],
+  "definition_name": "P4B_BASE",
+  "proposed_definition_name": "MCP_Block_Pump",
+  "definition_handles": {
+    "P4B_BASE": "33",
+    "P4B_CONSTANT": "3D",
+    "P4B_NESTED": "42",
+    "P4B_INCH": "47",
+    "P4B_NONZERO_Z": "4B",
+    "P4B_DUP_TAG": "4F"
+  },
+  "placements": [
+    {
+      "role": "a",
+      "position": [
+        100,
+        200
+      ],
+      "rotation": 1.5707963267948966,
+      "scale": 2,
+      "matrix_to_wcs": [
+        1.2246467991473532e-16,
+        -2.0,
+        0,
+        140.0,
+        2.0,
+        1.2246467991473532e-16,
+        0,
+        180.0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "line_world": [
+        [
+          100,
+          200,
+          0
+        ],
+        [
+          100,
+          220,
+          0
+        ]
+      ],
+      "circle_world": {
+        "center": [
+          106,
+          210,
+          0
+        ],
+        "radius": 4
+      },
+      "attribute_world": {
+        "NAME": [
+          94,
+          204,
+          0
+        ],
+        "CODE": [
+          88,
+          204,
+          0
+        ]
+      },
+      "attribute_height": 2,
+      "attribute_values": {
+        "NAME": "Pump A",
+        "CODE": "A-02"
+      }
+    },
+    {
+      "role": "b",
+      "position": [
+        -30,
+        40
+      ],
+      "rotation": -1.5707963267948966,
+      "scale": 0.5,
+      "matrix_to_wcs": [
+        3.061616997868383e-17,
+        0.5,
+        0,
+        -40.0,
+        -0.5,
+        3.061616997868383e-17,
+        0,
+        45.0,
+        0,
+        0,
+        0.5,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "line_world": [
+        [
+          -30,
+          40,
+          0
+        ],
+        [
+          -30,
+          35,
+          0
+        ]
+      ],
+      "circle_world": {
+        "center": [
+          -31.5,
+          37.5,
+          0
+        ],
+        "radius": 1.0
+      },
+      "attribute_world": {
+        "NAME": [
+          -28.5,
+          39,
+          0
+        ],
+        "CODE": [
+          -27,
+          39,
+          0
+        ]
+      },
+      "attribute_height": 0.5,
+      "attribute_values": {
+        "NAME": "Pump B",
+        "CODE": "B-02"
+      }
+    }
+  ],
+  "analytic_and_ezdxf_checks": [
+    {
+      "role": "a",
+      "method": "analytic",
+      "local_point": [
+        10,
+        20
+      ],
+      "wcs": [
+        100,
+        200,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "ezdxf",
+      "local_point": [
+        10,
+        20
+      ],
+      "wcs": [
+        100,
+        200,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "analytic",
+      "local_point": [
+        20,
+        20
+      ],
+      "wcs": [
+        100,
+        220,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "ezdxf",
+      "local_point": [
+        20,
+        20
+      ],
+      "wcs": [
+        100,
+        220,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "analytic",
+      "local_point": [
+        15,
+        17
+      ],
+      "wcs": [
+        106,
+        210,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "ezdxf",
+      "local_point": [
+        15,
+        17
+      ],
+      "wcs": [
+        106,
+        210,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "analytic",
+      "local_point": [
+        12,
+        23
+      ],
+      "wcs": [
+        94,
+        204,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "ezdxf",
+      "local_point": [
+        12,
+        23
+      ],
+      "wcs": [
+        94,
+        204,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "analytic",
+      "local_point": [
+        12,
+        26
+      ],
+      "wcs": [
+        88,
+        204,
+        0
+      ]
+    },
+    {
+      "role": "a",
+      "method": "ezdxf",
+      "local_point": [
+        12,
+        26
+      ],
+      "wcs": [
+        88,
+        204,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "analytic",
+      "local_point": [
+        10,
+        20
+      ],
+      "wcs": [
+        -30,
+        40,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "ezdxf",
+      "local_point": [
+        10,
+        20
+      ],
+      "wcs": [
+        -30,
+        40,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "analytic",
+      "local_point": [
+        20,
+        20
+      ],
+      "wcs": [
+        -30,
+        35,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "ezdxf",
+      "local_point": [
+        20,
+        20
+      ],
+      "wcs": [
+        -30,
+        35,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "analytic",
+      "local_point": [
+        15,
+        17
+      ],
+      "wcs": [
+        -31.5,
+        37.5,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "ezdxf",
+      "local_point": [
+        15,
+        17
+      ],
+      "wcs": [
+        -31.5,
+        37.5,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "analytic",
+      "local_point": [
+        12,
+        23
+      ],
+      "wcs": [
+        -28.5,
+        39,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "ezdxf",
+      "local_point": [
+        12,
+        23
+      ],
+      "wcs": [
+        -28.5,
+        39,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "analytic",
+      "local_point": [
+        12,
+        26
+      ],
+      "wcs": [
+        -27,
+        39,
+        0
+      ]
+    },
+    {
+      "role": "b",
+      "method": "ezdxf",
+      "local_point": [
+        12,
+        26
+      ],
+      "wcs": [
+        -27,
+        39,
+        0
+      ]
+    }
+  ],
+  "source_definition_origin": [
+    10.0,
+    20.0,
+    0.0
+  ],
+  "source_definition_units": 4,
+  "coverage_limits": [
+    "Native flags and transformations pending runtime verification.",
+    "Paper Space geometry is not observable through current tools."
+  ]
+}

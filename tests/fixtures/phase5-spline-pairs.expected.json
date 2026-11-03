@@ -1,0 +1,243 @@
+{
+  "handles": {
+    "straight": "2F",
+    "cross": "30",
+    "far": "31",
+    "part": "32",
+    "bezier": "33",
+    "bezier_same": "34",
+    "above": "35",
+    "bezier_cross": "36",
+    "quarter": "37",
+    "quarter_same": "38",
+    "quarter_tangent": "39",
+    "quarter_far": "3A",
+    "spatial": "3B",
+    "spatial_parallel": "3C",
+    "pierce": "3D",
+    "over_pair_budget": "3E"
+  },
+  "intersections": [
+    {
+      "name": "straight cross",
+      "a": "straight",
+      "b": "cross",
+      "points": [
+        [
+          5,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "straight separated",
+      "a": "straight",
+      "b": "far",
+      "points": []
+    },
+    {
+      "name": "cubic cross",
+      "a": "bezier",
+      "b": "bezier_cross",
+      "points": [
+        [
+          22,
+          3,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "rational tangent",
+      "a": "quarter",
+      "b": "quarter_tangent",
+      "points": [
+        [
+          47.071067811865476,
+          7.0710678118654755,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "spatial pierce",
+      "a": "spatial",
+      "b": "pierce",
+      "points": [
+        [
+          5,
+          0,
+          22.5
+        ]
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "name": "straight cross",
+      "a": "straight",
+      "b": "cross",
+      "points": [
+        [
+          5,
+          0,
+          0
+        ]
+      ],
+      "length": 0
+    },
+    {
+      "name": "straight separated",
+      "a": "straight",
+      "b": "far",
+      "points": [],
+      "length": 0
+    },
+    {
+      "name": "cubic cross",
+      "a": "bezier",
+      "b": "bezier_cross",
+      "points": [
+        [
+          22,
+          3,
+          0
+        ]
+      ],
+      "length": 0
+    },
+    {
+      "name": "line-like partial overlap",
+      "a": "straight",
+      "b": "part",
+      "points": null,
+      "length": 4,
+      "ends": [
+        [
+          3,
+          0,
+          0
+        ],
+        [
+          7,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "coincident cubic",
+      "a": "bezier",
+      "b": "bezier_same",
+      "points": null,
+      "length": 8,
+      "ends": [
+        [
+          20,
+          0,
+          0
+        ],
+        [
+          24,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "coincident rational quarter",
+      "a": "quarter",
+      "b": "quarter_same",
+      "points": null,
+      "length": 15.707963267948966,
+      "ends": [
+        [
+          50,
+          0,
+          0
+        ],
+        [
+          40,
+          10,
+          0
+        ]
+      ]
+    }
+  ],
+  "distance": [
+    {
+      "name": "straight finite separated",
+      "a": "straight",
+      "b": "far",
+      "distance": 4,
+      "points": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          14,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "cubic interior minimum",
+      "a": "bezier",
+      "b": "above",
+      "distance": 2,
+      "points": [
+        [
+          22,
+          3,
+          0
+        ],
+        [
+          22,
+          5,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "rational endpoint minimum",
+      "a": "quarter",
+      "b": "quarter_far",
+      "distance": 4,
+      "points": [
+        [
+          50,
+          0,
+          0
+        ],
+        [
+          54,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "rational tangent",
+      "a": "quarter",
+      "b": "quarter_tangent",
+      "distance": 0
+    },
+    {
+      "name": "line-like overlap",
+      "a": "straight",
+      "b": "part",
+      "distance": 0
+    },
+    {
+      "name": "spatial parallel nonunique minimum",
+      "a": "spatial",
+      "b": "spatial_parallel",
+      "distance": 3
+    }
+  ],
+  "oracle": "Analytic line/Bezier/rational quarter circle; cubic speed polynomial integrates exactly to8. Native arrays compared in WCS with1e-7 and lengths1e-6."
+}

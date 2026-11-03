@@ -1,0 +1,5148 @@
+{
+  "scope": "Offline physical DXF tags, not native API behavior or rendering proof.",
+  "native_executed": false,
+  "source_sha256": "F5EC3DCDF83DE8B1548D2D38522E4946AB7E8DD45A3F562CF8279DE087E7DC04",
+  "dxf_version": "AC1018",
+  "model_count": 2,
+  "model_handles": [
+    "36",
+    "37"
+  ],
+  "linetypes": {
+    "ByBlock": {
+      "handle": "24",
+      "description": "",
+      "pattern_length": 0.0,
+      "dash_count": 0,
+      "alignment_code": 65,
+      "elements": [],
+      "has_xdata": false
+    },
+    "ByLayer": {
+      "handle": "25",
+      "description": "",
+      "pattern_length": 0.0,
+      "dash_count": 0,
+      "alignment_code": 65,
+      "elements": [],
+      "has_xdata": false
+    },
+    "Continuous": {
+      "handle": "26",
+      "description": "",
+      "pattern_length": 0.0,
+      "dash_count": 0,
+      "alignment_code": 65,
+      "elements": [],
+      "has_xdata": false
+    },
+    "MCP_DASH_DOT": {
+      "handle": "30",
+      "description": "Dash, gap and dot",
+      "pattern_length": 10.0,
+      "dash_count": 4,
+      "alignment_code": 65,
+      "elements": [
+        {
+          "index": 0,
+          "length": 5.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 5.0,
+            "74": "0"
+          }
+        },
+        {
+          "index": 1,
+          "length": -2.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -2.0,
+            "74": "0"
+          }
+        },
+        {
+          "index": 2,
+          "length": 0.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.0,
+            "74": "0"
+          }
+        },
+        {
+          "index": 3,
+          "length": -3.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -3.0,
+            "74": "0"
+          }
+        }
+      ],
+      "has_xdata": true
+    },
+    "MCP_TEXT_REL": {
+      "handle": "32",
+      "description": "Text GAS",
+      "pattern_length": 10.0,
+      "dash_count": 3,
+      "alignment_code": 65,
+      "elements": [
+        {
+          "index": 0,
+          "length": 5.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 5.0,
+            "74": "0"
+          }
+        },
+        {
+          "index": 1,
+          "length": -2.0,
+          "text": "GAS",
+          "shape_number": 0,
+          "offset": [
+            0.3,
+            -0.2
+          ],
+          "dxf_rotation_degrees": 30.0,
+          "scale_encoded": 0.75,
+          "flags": 2,
+          "style_handle": "2F",
+          "style_name": "MCP_Text",
+          "physical_tags": {
+            "49": -2.0,
+            "74": "2",
+            "75": "0",
+            "340": "2F",
+            "46": "0.75",
+            "50": "30",
+            "44": "0.3",
+            "45": "-0.2",
+            "9": "GAS"
+          }
+        },
+        {
+          "index": 2,
+          "length": -3.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -3.0,
+            "74": "0"
+          }
+        }
+      ],
+      "has_xdata": false
+    },
+    "MCP_TEXT_UCS": {
+      "handle": "33",
+      "description": "Text WATER",
+      "pattern_length": 10.0,
+      "dash_count": 3,
+      "alignment_code": 65,
+      "elements": [
+        {
+          "index": 0,
+          "length": 5.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 5.0,
+            "74": "0"
+          }
+        },
+        {
+          "index": 1,
+          "length": -2.0,
+          "text": "WATER",
+          "shape_number": 0,
+          "offset": [
+            0.3,
+            -0.2
+          ],
+          "dxf_rotation_degrees": -45.0,
+          "scale_encoded": 1.25,
+          "flags": 3,
+          "style_handle": "2F",
+          "style_name": "MCP_Text",
+          "physical_tags": {
+            "49": -2.0,
+            "74": "3",
+            "75": "0",
+            "340": "2F",
+            "46": "1.25",
+            "50": "-45",
+            "44": "0.3",
+            "45": "-0.2",
+            "9": "WATER"
+          }
+        },
+        {
+          "index": 2,
+          "length": -3.0,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -3.0,
+            "74": "0"
+          }
+        }
+      ],
+      "has_xdata": false
+    },
+    "MCP_BOUNDARY_256": {
+      "handle": "34",
+      "description": "256 elements",
+      "pattern_length": 128.0,
+      "dash_count": 256,
+      "alignment_code": 65,
+      "elements": [
+        {
+          "index": 0,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 1,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 2,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 3,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 4,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 5,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 6,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 7,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 8,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 9,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 10,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 11,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 12,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 13,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 14,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 15,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 16,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 17,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 18,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 19,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 20,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 21,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 22,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 23,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 24,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 25,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 26,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 27,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 28,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 29,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 30,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 31,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 32,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 33,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 34,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 35,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 36,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 37,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 38,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 39,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 40,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 41,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 42,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 43,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 44,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 45,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 46,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 47,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 48,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 49,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 50,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 51,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 52,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 53,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 54,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 55,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 56,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 57,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 58,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 59,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 60,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 61,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 62,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 63,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 64,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 65,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 66,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 67,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 68,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 69,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 70,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 71,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 72,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 73,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 74,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 75,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 76,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 77,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 78,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 79,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 80,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 81,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 82,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 83,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 84,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 85,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 86,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 87,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 88,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 89,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 90,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 91,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 92,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 93,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 94,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 95,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 96,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 97,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 98,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 99,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 100,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 101,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 102,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 103,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 104,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 105,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 106,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 107,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 108,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 109,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 110,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 111,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 112,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 113,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 114,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 115,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 116,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 117,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 118,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 119,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 120,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 121,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 122,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 123,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 124,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 125,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 126,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 127,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 128,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 129,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 130,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 131,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 132,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 133,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 134,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 135,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 136,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 137,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 138,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 139,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 140,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 141,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 142,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 143,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 144,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 145,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 146,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 147,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 148,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 149,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 150,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 151,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 152,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 153,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 154,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 155,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 156,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 157,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 158,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 159,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 160,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 161,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 162,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 163,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 164,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 165,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 166,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 167,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 168,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 169,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 170,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 171,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 172,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 173,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 174,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 175,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 176,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 177,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 178,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 179,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 180,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 181,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 182,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 183,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 184,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 185,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 186,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 187,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 188,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 189,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 190,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 191,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 192,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 193,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 194,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 195,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 196,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 197,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 198,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 199,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 200,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 201,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 202,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 203,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 204,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 205,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 206,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 207,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 208,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 209,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 210,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 211,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 212,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 213,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 214,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 215,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 216,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 217,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 218,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 219,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 220,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 221,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 222,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 223,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 224,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 225,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 226,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 227,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 228,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 229,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 230,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 231,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 232,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 233,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 234,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 235,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 236,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 237,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 238,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 239,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 240,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 241,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 242,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 243,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 244,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 245,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 246,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 247,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 248,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 249,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 250,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 251,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 252,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 253,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 254,
+          "length": 0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": 0.5,
+            "74": "0"
+          }
+        },
+        {
+          "index": 255,
+          "length": -0.5,
+          "text": "",
+          "shape_number": 0,
+          "offset": [
+            0.0,
+            0.0
+          ],
+          "dxf_rotation_degrees": 0.0,
+          "scale_encoded": null,
+          "flags": 0,
+          "style_handle": null,
+          "style_name": null,
+          "physical_tags": {
+            "49": -0.5,
+            "74": "0"
+          }
+        }
+      ],
+      "has_xdata": false
+    }
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "initial_count": 4,
+  "parent_node_count": 12,
+  "mirror_node_count": 4,
+  "root_layer": "P4_ROOT",
+  "mirror_layer": "P4_MIRROR",
+  "unsupported_layer": "P4_UNSUPPORTED",
+  "parent_matrix": [
+    0,
+    -3,
+    0,
+    109,
+    2,
+    0,
+    0,
+    46,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1
+  ],
+  "nested_line_world": [
+    [
+      [
+        103,
+        68,
+        0
+      ],
+      [
+        103,
+        74,
+        0
+      ]
+    ],
+    [
+      [
+        76,
+        38,
+        0
+      ],
+      [
+        67,
+        38,
+        0
+      ]
+    ]
+  ],
+  "mirror_line_world": [
+    [
+      198,
+      22,
+      0
+    ],
+    [
+      192,
+      22,
+      0
+    ]
+  ],
+  "local_child_line": {
+    "start": [
+      1,
+      2,
+      0
+    ],
+    "end": [
+      4,
+      2,
+      0
+    ]
+  },
+  "local_child_circle": {
+    "center": [
+      2,
+      3,
+      0
+    ],
+    "radius": 1
+  },
+  "root_attribute": {
+    "tag": "NAME",
+    "text": "Pump A-01",
+    "position": [
+      100,
+      50,
+      0
+    ]
+  },
+  "constant_attribute": {
+    "tag": "CONST",
+    "text": "Constant",
+    "constant": true
+  },
+  "table_records": {
+    "layers": {
+      "name": "P4_LOCKED",
+      "properties": {
+        "is_locked": true,
+        "is_off": false,
+        "is_frozen": false,
+        "color": {
+          "method": "aci",
+          "aci": 3
+        }
+      }
+    },
+    "linetypes": {
+      "name": "P4_DASH",
+      "properties": {
+        "description": "Phase 4 dash",
+        "pattern_length": 1,
+        "dash_count": 2
+      }
+    },
+    "text_styles": {
+      "name": "P4_TEXT",
+      "properties": {
+        "width_factor": 0.8,
+        "is_vertical": false,
+        "is_shape_file": false
+      }
+    },
+    "dimension_styles": {
+      "name": "P4_DIM",
+      "properties": {
+        "dimension_scale": 1,
+        "text_height": 2.5,
+        "arrow_size": 1.5
+      }
+    },
+    "blocks": {
+      "name": "P4_PARENT",
+      "properties": {
+        "name": "P4_PARENT",
+        "origin": [
+          2,
+          3,
+          0
+        ],
+        "units": "Millimeters",
+        "is_xref": false
+      }
+    },
+    "layouts": {
+      "name": "P4_PAPER",
+      "properties": {
+        "is_model": false
+      }
+    },
+    "viewports": {
+      "properties": {
+        "center": [
+          100,
+          75,
+          0
+        ],
+        "width": 120,
+        "height": 80,
+        "view_center": [
+          20,
+          30
+        ],
+        "view_height": 40
+      }
+    }
+  },
+  "scope": "Static repeated nested blocks, nonzero base point, nonuniform scale, mirrored insertion, attributes, seven structure sections. No xref loading or dynamic parameter evaluation."
+}

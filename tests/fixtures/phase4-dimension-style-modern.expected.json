@@ -1,0 +1,4204 @@
+{
+  "scope": "Offline physical DXF tags and ezdxf roundtrip; no native nanoCAD result.",
+  "native_executed": false,
+  "dxf_version": "AC1027",
+  "source_sha256": "B1D27A3D4882777FEBBADEDC08E04522E917D78697F47AB5EDE81F11D96FFB07",
+  "units": "Millimeters",
+  "model_count": 2,
+  "model_handles": [
+    "4C",
+    "4D"
+  ],
+  "styles": {
+    "P4D_Base": {
+      "handle": "48",
+      "owner": "4",
+      "fields": {
+        "Dimadec": {
+          "sdk_property": "Dimadec",
+          "path": "variables.dimadec",
+          "source_attribute": "dimadec",
+          "source_value": 1,
+          "group_code": 179,
+          "encoded_value": 1
+        },
+        "Dimalt": {
+          "sdk_property": "Dimalt",
+          "path": "variables.dimalt",
+          "source_attribute": "dimalt",
+          "source_value": 1,
+          "group_code": 170,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimaltd": {
+          "sdk_property": "Dimaltd",
+          "path": "variables.dimaltd",
+          "source_attribute": "dimaltd",
+          "source_value": 4,
+          "group_code": 171,
+          "encoded_value": 4
+        },
+        "Dimaltf": {
+          "sdk_property": "Dimaltf",
+          "path": "variables.dimaltf",
+          "source_attribute": "dimaltf",
+          "source_value": 0.03937007874,
+          "group_code": 143,
+          "encoded_value": 0.03937007874
+        },
+        "Dimaltrnd": {
+          "sdk_property": "Dimaltrnd",
+          "path": "variables.dimaltrnd",
+          "source_attribute": "dimaltrnd",
+          "source_value": 0.01,
+          "group_code": 148,
+          "encoded_value": 0.01
+        },
+        "Dimalttd": {
+          "sdk_property": "Dimalttd",
+          "path": "variables.dimalttd",
+          "source_attribute": "dimalttd",
+          "source_value": 2,
+          "group_code": 274,
+          "encoded_value": 2
+        },
+        "Dimalttz": {
+          "sdk_property": "Dimalttz",
+          "path": "variables.dimalttz",
+          "source_attribute": "dimalttz",
+          "source_value": 3,
+          "group_code": 286,
+          "encoded_value": 3
+        },
+        "Dimaltu": {
+          "sdk_property": "Dimaltu",
+          "path": "variables.dimaltu",
+          "source_attribute": "dimaltu",
+          "source_value": 2,
+          "group_code": 273,
+          "encoded_value": 2
+        },
+        "Dimaltz": {
+          "sdk_property": "Dimaltz",
+          "path": "variables.dimaltz",
+          "source_attribute": "dimaltz",
+          "source_value": 8,
+          "group_code": 285,
+          "encoded_value": 8
+        },
+        "Dimarcsym": {
+          "sdk_property": "Dimarcsym",
+          "path": "variables.dimarcsym",
+          "source_attribute": "dimarcsym",
+          "source_value": 2,
+          "group_code": 90,
+          "encoded_value": 2
+        },
+        "Dimasz": {
+          "sdk_property": "Dimasz",
+          "path": "arrow_size",
+          "source_attribute": "dimasz",
+          "source_value": 3.0,
+          "group_code": 41,
+          "encoded_value": 3.0
+        },
+        "Dimatfit": {
+          "sdk_property": "Dimatfit",
+          "path": "variables.dimatfit",
+          "source_attribute": "dimatfit",
+          "source_value": 2,
+          "group_code": 289,
+          "encoded_value": 2
+        },
+        "Dimaunit": {
+          "sdk_property": "Dimaunit",
+          "path": "variables.dimaunit",
+          "source_attribute": "dimaunit",
+          "source_value": 3,
+          "group_code": 275,
+          "encoded_value": 3
+        },
+        "Dimazin": {
+          "sdk_property": "Dimazin",
+          "path": "variables.dimazin",
+          "source_attribute": "dimazin",
+          "source_value": 3,
+          "group_code": 79,
+          "encoded_value": 3
+        },
+        "Dimblk": {
+          "sdk_property": "Dimblk",
+          "path": "references.arrow",
+          "source_attribute": "dimblk",
+          "source_value": "P4D_Arrow_1",
+          "group_code": 342,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "30",
+          "target_owner": "9"
+        },
+        "Dimblk1": {
+          "sdk_property": "Dimblk1",
+          "path": "references.first_arrow",
+          "source_attribute": "dimblk1",
+          "source_value": "P4D_Arrow_2",
+          "group_code": 343,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "35",
+          "target_owner": "9"
+        },
+        "Dimblk2": {
+          "sdk_property": "Dimblk2",
+          "path": "references.second_arrow",
+          "source_attribute": "dimblk2",
+          "source_value": "P4D_Arrow_3",
+          "group_code": 344,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "3A",
+          "target_owner": "9"
+        },
+        "Dimcen": {
+          "sdk_property": "Dimcen",
+          "path": "variables.dimcen",
+          "source_attribute": "dimcen",
+          "source_value": -2.0,
+          "group_code": 141,
+          "encoded_value": -2.0
+        },
+        "Dimclrd": {
+          "sdk_property": "Dimclrd",
+          "path": "colors.dimension",
+          "source_attribute": "dimclrd",
+          "source_value": 1,
+          "group_code": 176,
+          "encoded_value": 1
+        },
+        "Dimclre": {
+          "sdk_property": "Dimclre",
+          "path": "colors.extension",
+          "source_attribute": "dimclre",
+          "source_value": 3,
+          "group_code": 177,
+          "encoded_value": 3
+        },
+        "Dimclrt": {
+          "sdk_property": "Dimclrt",
+          "path": "colors.text",
+          "source_attribute": "dimclrt",
+          "source_value": 5,
+          "group_code": 178,
+          "encoded_value": 5
+        },
+        "Dimdec": {
+          "sdk_property": "Dimdec",
+          "path": "variables.dimdec",
+          "source_attribute": "dimdec",
+          "source_value": 3,
+          "group_code": 271,
+          "encoded_value": 3
+        },
+        "Dimdle": {
+          "sdk_property": "Dimdle",
+          "path": "variables.dimdle",
+          "source_attribute": "dimdle",
+          "source_value": 0.5,
+          "group_code": 46,
+          "encoded_value": 0.5
+        },
+        "Dimdli": {
+          "sdk_property": "Dimdli",
+          "path": "variables.dimdli",
+          "source_attribute": "dimdli",
+          "source_value": 4.1,
+          "group_code": 43,
+          "encoded_value": 4.1
+        },
+        "Dimdsep": {
+          "sdk_property": "Dimdsep",
+          "path": "variables.dimdsep",
+          "source_attribute": "dimdsep",
+          "source_value": 59,
+          "group_code": 278,
+          "encoded_value": 59
+        },
+        "Dimexe": {
+          "sdk_property": "Dimexe",
+          "path": "variables.dimexe",
+          "source_attribute": "dimexe",
+          "source_value": 1.4,
+          "group_code": 44,
+          "encoded_value": 1.4
+        },
+        "Dimexo": {
+          "sdk_property": "Dimexo",
+          "path": "variables.dimexo",
+          "source_attribute": "dimexo",
+          "source_value": 0.7,
+          "group_code": 42,
+          "encoded_value": 0.7
+        },
+        "Dimfrac": {
+          "sdk_property": "Dimfrac",
+          "path": "variables.dimfrac",
+          "source_attribute": "dimfrac",
+          "source_value": 2,
+          "group_code": 276,
+          "encoded_value": 2
+        },
+        "Dimfxlen": {
+          "sdk_property": "Dimfxlen",
+          "path": "variables.dimfxlen",
+          "source_attribute": "dimfxl",
+          "source_value": 8.5,
+          "group_code": 49,
+          "encoded_value": 8.5
+        },
+        "DimfxlenOn": {
+          "sdk_property": "DimfxlenOn",
+          "path": "variables.dimfxlenon",
+          "source_attribute": "dimfxlon",
+          "source_value": 1,
+          "group_code": 290,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimgap": {
+          "sdk_property": "Dimgap",
+          "path": "variables.dimgap",
+          "source_attribute": "dimgap",
+          "source_value": -0.75,
+          "group_code": 147,
+          "encoded_value": -0.75
+        },
+        "Dimjogang": {
+          "sdk_property": "Dimjogang",
+          "path": "variables.dimjogang",
+          "source_attribute": "dimjogang",
+          "source_value": 37.5,
+          "group_code": 50,
+          "encoded_value": 37.5,
+          "encoded_unit": "degrees",
+          "native_unit": "unresolved"
+        },
+        "Dimjust": {
+          "sdk_property": "Dimjust",
+          "path": "variables.dimjust",
+          "source_attribute": "dimjust",
+          "source_value": 3,
+          "group_code": 280,
+          "encoded_value": 3
+        },
+        "Dimldrblk": {
+          "sdk_property": "Dimldrblk",
+          "path": "references.leader_arrow",
+          "source_attribute": "dimldrblk",
+          "source_value": "P4D_Arrow_4",
+          "group_code": 341,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "3F",
+          "target_owner": "9"
+        },
+        "Dimlfac": {
+          "sdk_property": "Dimlfac",
+          "path": "variables.dimlfac",
+          "source_attribute": "dimlfac",
+          "source_value": -2.0,
+          "group_code": 144,
+          "encoded_value": -2.0
+        },
+        "Dimlim": {
+          "sdk_property": "Dimlim",
+          "path": "variables.dimlim",
+          "source_attribute": "dimlim",
+          "source_value": 0,
+          "group_code": 72,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimltex1": {
+          "sdk_property": "Dimltex1",
+          "path": "references.extension1_linetype",
+          "source_attribute": "dimltex1",
+          "source_value": "P4D_Line_2",
+          "group_code": 346,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "45",
+          "target_owner": "2"
+        },
+        "Dimltex2": {
+          "sdk_property": "Dimltex2",
+          "path": "references.extension2_linetype",
+          "source_attribute": "dimltex2",
+          "source_value": "P4D_Line_3",
+          "group_code": 347,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "46",
+          "target_owner": "2"
+        },
+        "Dimltype": {
+          "sdk_property": "Dimltype",
+          "path": "references.dimension_linetype",
+          "source_attribute": "dimltype",
+          "source_value": "P4D_Line_1",
+          "group_code": 345,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "44",
+          "target_owner": "2"
+        },
+        "Dimlunit": {
+          "sdk_property": "Dimlunit",
+          "path": "variables.dimlunit",
+          "source_attribute": "dimlunit",
+          "source_value": 2,
+          "group_code": 277,
+          "encoded_value": 2
+        },
+        "Dimlwd": {
+          "sdk_property": "Dimlwd",
+          "path": "lineweights.dimension",
+          "source_attribute": "dimlwd",
+          "source_value": 25,
+          "group_code": 371,
+          "encoded_value": 25
+        },
+        "Dimlwe": {
+          "sdk_property": "Dimlwe",
+          "path": "lineweights.extension",
+          "source_attribute": "dimlwe",
+          "source_value": -1,
+          "group_code": 372,
+          "encoded_value": -1
+        },
+        "Dimrnd": {
+          "sdk_property": "Dimrnd",
+          "path": "variables.dimrnd",
+          "source_attribute": "dimrnd",
+          "source_value": 0.25,
+          "group_code": 45,
+          "encoded_value": 0.25
+        },
+        "Dimsah": {
+          "sdk_property": "Dimsah",
+          "path": "variables.dimsah",
+          "source_attribute": "dimsah",
+          "source_value": 1,
+          "group_code": 173,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimscale": {
+          "sdk_property": "Dimscale",
+          "path": "dimension_scale",
+          "source_attribute": "dimscale",
+          "source_value": 2.0,
+          "group_code": 40,
+          "encoded_value": 2.0
+        },
+        "Dimsd1": {
+          "sdk_property": "Dimsd1",
+          "path": "variables.dimsd1",
+          "source_attribute": "dimsd1",
+          "source_value": 1,
+          "group_code": 281,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimsd2": {
+          "sdk_property": "Dimsd2",
+          "path": "variables.dimsd2",
+          "source_attribute": "dimsd2",
+          "source_value": 0,
+          "group_code": 282,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimse1": {
+          "sdk_property": "Dimse1",
+          "path": "variables.dimse1",
+          "source_attribute": "dimse1",
+          "source_value": 1,
+          "group_code": 75,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimse2": {
+          "sdk_property": "Dimse2",
+          "path": "variables.dimse2",
+          "source_attribute": "dimse2",
+          "source_value": 0,
+          "group_code": 76,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimsoxd": {
+          "sdk_property": "Dimsoxd",
+          "path": "variables.dimsoxd",
+          "source_attribute": "dimsoxd",
+          "source_value": 1,
+          "group_code": 175,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtad": {
+          "sdk_property": "Dimtad",
+          "path": "variables.dimtad",
+          "source_attribute": "dimtad",
+          "source_value": 0,
+          "group_code": 77,
+          "encoded_value": 0
+        },
+        "Dimtdec": {
+          "sdk_property": "Dimtdec",
+          "path": "variables.dimtdec",
+          "source_attribute": "dimtdec",
+          "source_value": 4,
+          "group_code": 272,
+          "encoded_value": 4
+        },
+        "Dimtfac": {
+          "sdk_property": "Dimtfac",
+          "path": "variables.dimtfac",
+          "source_attribute": "dimtfac",
+          "source_value": 0.65,
+          "group_code": 146,
+          "encoded_value": 0.65
+        },
+        "Dimtfill": {
+          "sdk_property": "Dimtfill",
+          "path": "variables.dimtfill",
+          "source_attribute": "dimtfill",
+          "source_value": 2,
+          "group_code": 69,
+          "encoded_value": 2
+        },
+        "Dimtfillclr": {
+          "sdk_property": "Dimtfillclr",
+          "path": "colors.text_fill",
+          "source_attribute": "dimtfillclr",
+          "source_value": 2,
+          "group_code": 70,
+          "encoded_value": 2
+        },
+        "Dimtih": {
+          "sdk_property": "Dimtih",
+          "path": "variables.dimtih",
+          "source_attribute": "dimtih",
+          "source_value": 1,
+          "group_code": 73,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtix": {
+          "sdk_property": "Dimtix",
+          "path": "variables.dimtix",
+          "source_attribute": "dimtix",
+          "source_value": 1,
+          "group_code": 174,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtm": {
+          "sdk_property": "Dimtm",
+          "path": "variables.dimtm",
+          "source_attribute": "dimtm",
+          "source_value": 0.07,
+          "group_code": 48,
+          "encoded_value": 0.07
+        },
+        "Dimtmove": {
+          "sdk_property": "Dimtmove",
+          "path": "variables.dimtmove",
+          "source_attribute": "dimtmove",
+          "source_value": 2,
+          "group_code": 279,
+          "encoded_value": 2
+        },
+        "Dimtofl": {
+          "sdk_property": "Dimtofl",
+          "path": "variables.dimtofl",
+          "source_attribute": "dimtofl",
+          "source_value": 1,
+          "group_code": 172,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtoh": {
+          "sdk_property": "Dimtoh",
+          "path": "variables.dimtoh",
+          "source_attribute": "dimtoh",
+          "source_value": 0,
+          "group_code": 74,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimtol": {
+          "sdk_property": "Dimtol",
+          "path": "variables.dimtol",
+          "source_attribute": "dimtol",
+          "source_value": 1,
+          "group_code": 71,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtolj": {
+          "sdk_property": "Dimtolj",
+          "path": "variables.dimtolj",
+          "source_attribute": "dimtolj",
+          "source_value": 2,
+          "group_code": 283,
+          "encoded_value": 2
+        },
+        "Dimtp": {
+          "sdk_property": "Dimtp",
+          "path": "variables.dimtp",
+          "source_attribute": "dimtp",
+          "source_value": 0.12,
+          "group_code": 47,
+          "encoded_value": 0.12
+        },
+        "Dimtsz": {
+          "sdk_property": "Dimtsz",
+          "path": "variables.dimtsz",
+          "source_attribute": "dimtsz",
+          "source_value": 0.8,
+          "group_code": 142,
+          "encoded_value": 0.8
+        },
+        "Dimtvp": {
+          "sdk_property": "Dimtvp",
+          "path": "variables.dimtvp",
+          "source_attribute": "dimtvp",
+          "source_value": 0.3,
+          "group_code": 145,
+          "encoded_value": 0.3
+        },
+        "Dimtxsty": {
+          "sdk_property": "Dimtxsty",
+          "path": "references.text_style",
+          "source_attribute": "dimtxsty",
+          "source_value": "P4D_Text",
+          "group_code": 340,
+          "encoded_state": "pointer",
+          "target_kind": "text_style",
+          "target_handle": "2F",
+          "target_owner": "5"
+        },
+        "Dimtxt": {
+          "sdk_property": "Dimtxt",
+          "path": "text_height",
+          "source_attribute": "dimtxt",
+          "source_value": 2.75,
+          "group_code": 140,
+          "encoded_value": 2.75
+        },
+        "Dimtzin": {
+          "sdk_property": "Dimtzin",
+          "path": "variables.dimtzin",
+          "source_attribute": "dimtzin",
+          "source_value": 8,
+          "group_code": 284,
+          "encoded_value": 8
+        },
+        "Dimupt": {
+          "sdk_property": "Dimupt",
+          "path": "variables.dimupt",
+          "source_attribute": "dimupt",
+          "source_value": 1,
+          "group_code": 288,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimzin": {
+          "sdk_property": "Dimzin",
+          "path": "variables.dimzin",
+          "source_attribute": "dimzin",
+          "source_value": 8,
+          "group_code": 78,
+          "encoded_value": 8
+        }
+      },
+      "xdata": [],
+      "family_name_candidate": false
+    },
+    "P4D_Base$0": {
+      "handle": "49",
+      "owner": "4",
+      "fields": {
+        "Dimadec": {
+          "sdk_property": "Dimadec",
+          "path": "variables.dimadec",
+          "source_attribute": "dimadec",
+          "source_value": 1,
+          "group_code": 179,
+          "encoded_value": 1
+        },
+        "Dimalt": {
+          "sdk_property": "Dimalt",
+          "path": "variables.dimalt",
+          "source_attribute": "dimalt",
+          "source_value": 1,
+          "group_code": 170,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimaltd": {
+          "sdk_property": "Dimaltd",
+          "path": "variables.dimaltd",
+          "source_attribute": "dimaltd",
+          "source_value": 4,
+          "group_code": 171,
+          "encoded_value": 4
+        },
+        "Dimaltf": {
+          "sdk_property": "Dimaltf",
+          "path": "variables.dimaltf",
+          "source_attribute": "dimaltf",
+          "source_value": 0.03937007874,
+          "group_code": 143,
+          "encoded_value": 0.03937007874
+        },
+        "Dimaltrnd": {
+          "sdk_property": "Dimaltrnd",
+          "path": "variables.dimaltrnd",
+          "source_attribute": "dimaltrnd",
+          "source_value": 0.01,
+          "group_code": 148,
+          "encoded_value": 0.01
+        },
+        "Dimalttd": {
+          "sdk_property": "Dimalttd",
+          "path": "variables.dimalttd",
+          "source_attribute": "dimalttd",
+          "source_value": 2,
+          "group_code": 274,
+          "encoded_value": 2
+        },
+        "Dimalttz": {
+          "sdk_property": "Dimalttz",
+          "path": "variables.dimalttz",
+          "source_attribute": "dimalttz",
+          "source_value": 3,
+          "group_code": 286,
+          "encoded_value": 3
+        },
+        "Dimaltu": {
+          "sdk_property": "Dimaltu",
+          "path": "variables.dimaltu",
+          "source_attribute": "dimaltu",
+          "source_value": 2,
+          "group_code": 273,
+          "encoded_value": 2
+        },
+        "Dimaltz": {
+          "sdk_property": "Dimaltz",
+          "path": "variables.dimaltz",
+          "source_attribute": "dimaltz",
+          "source_value": 8,
+          "group_code": 285,
+          "encoded_value": 8
+        },
+        "Dimarcsym": {
+          "sdk_property": "Dimarcsym",
+          "path": "variables.dimarcsym",
+          "source_attribute": "dimarcsym",
+          "source_value": 2,
+          "group_code": 90,
+          "encoded_value": 2
+        },
+        "Dimasz": {
+          "sdk_property": "Dimasz",
+          "path": "arrow_size",
+          "source_attribute": "dimasz",
+          "source_value": 3.0,
+          "group_code": 41,
+          "encoded_value": 3.0
+        },
+        "Dimatfit": {
+          "sdk_property": "Dimatfit",
+          "path": "variables.dimatfit",
+          "source_attribute": "dimatfit",
+          "source_value": 2,
+          "group_code": 289,
+          "encoded_value": 2
+        },
+        "Dimaunit": {
+          "sdk_property": "Dimaunit",
+          "path": "variables.dimaunit",
+          "source_attribute": "dimaunit",
+          "source_value": 3,
+          "group_code": 275,
+          "encoded_value": 3
+        },
+        "Dimazin": {
+          "sdk_property": "Dimazin",
+          "path": "variables.dimazin",
+          "source_attribute": "dimazin",
+          "source_value": 3,
+          "group_code": 79,
+          "encoded_value": 3
+        },
+        "Dimblk": {
+          "sdk_property": "Dimblk",
+          "path": "references.arrow",
+          "source_attribute": "dimblk",
+          "source_value": "P4D_Arrow_1",
+          "group_code": 342,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "30",
+          "target_owner": "9"
+        },
+        "Dimblk1": {
+          "sdk_property": "Dimblk1",
+          "path": "references.first_arrow",
+          "source_attribute": "dimblk1",
+          "source_value": "P4D_Arrow_2",
+          "group_code": 343,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "35",
+          "target_owner": "9"
+        },
+        "Dimblk2": {
+          "sdk_property": "Dimblk2",
+          "path": "references.second_arrow",
+          "source_attribute": "dimblk2",
+          "source_value": "P4D_Arrow_3",
+          "group_code": 344,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "3A",
+          "target_owner": "9"
+        },
+        "Dimcen": {
+          "sdk_property": "Dimcen",
+          "path": "variables.dimcen",
+          "source_attribute": "dimcen",
+          "source_value": -2.0,
+          "group_code": 141,
+          "encoded_value": -2.0
+        },
+        "Dimclrd": {
+          "sdk_property": "Dimclrd",
+          "path": "colors.dimension",
+          "source_attribute": "dimclrd",
+          "source_value": 1,
+          "group_code": 176,
+          "encoded_value": 1
+        },
+        "Dimclre": {
+          "sdk_property": "Dimclre",
+          "path": "colors.extension",
+          "source_attribute": "dimclre",
+          "source_value": 3,
+          "group_code": 177,
+          "encoded_value": 3
+        },
+        "Dimclrt": {
+          "sdk_property": "Dimclrt",
+          "path": "colors.text",
+          "source_attribute": "dimclrt",
+          "source_value": 5,
+          "group_code": 178,
+          "encoded_value": 5
+        },
+        "Dimdec": {
+          "sdk_property": "Dimdec",
+          "path": "variables.dimdec",
+          "source_attribute": "dimdec",
+          "source_value": 3,
+          "group_code": 271,
+          "encoded_value": 3
+        },
+        "Dimdle": {
+          "sdk_property": "Dimdle",
+          "path": "variables.dimdle",
+          "source_attribute": "dimdle",
+          "source_value": 0.5,
+          "group_code": 46,
+          "encoded_value": 0.5
+        },
+        "Dimdli": {
+          "sdk_property": "Dimdli",
+          "path": "variables.dimdli",
+          "source_attribute": "dimdli",
+          "source_value": 4.1,
+          "group_code": 43,
+          "encoded_value": 4.1
+        },
+        "Dimdsep": {
+          "sdk_property": "Dimdsep",
+          "path": "variables.dimdsep",
+          "source_attribute": "dimdsep",
+          "source_value": 59,
+          "group_code": 278,
+          "encoded_value": 59
+        },
+        "Dimexe": {
+          "sdk_property": "Dimexe",
+          "path": "variables.dimexe",
+          "source_attribute": "dimexe",
+          "source_value": 1.4,
+          "group_code": 44,
+          "encoded_value": 1.4
+        },
+        "Dimexo": {
+          "sdk_property": "Dimexo",
+          "path": "variables.dimexo",
+          "source_attribute": "dimexo",
+          "source_value": 0.7,
+          "group_code": 42,
+          "encoded_value": 0.7
+        },
+        "Dimfrac": {
+          "sdk_property": "Dimfrac",
+          "path": "variables.dimfrac",
+          "source_attribute": "dimfrac",
+          "source_value": 2,
+          "group_code": 276,
+          "encoded_value": 2
+        },
+        "Dimfxlen": {
+          "sdk_property": "Dimfxlen",
+          "path": "variables.dimfxlen",
+          "source_attribute": "dimfxl",
+          "source_value": 8.5,
+          "group_code": 49,
+          "encoded_value": 8.5
+        },
+        "DimfxlenOn": {
+          "sdk_property": "DimfxlenOn",
+          "path": "variables.dimfxlenon",
+          "source_attribute": "dimfxlon",
+          "source_value": 1,
+          "group_code": 290,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimgap": {
+          "sdk_property": "Dimgap",
+          "path": "variables.dimgap",
+          "source_attribute": "dimgap",
+          "source_value": -0.75,
+          "group_code": 147,
+          "encoded_value": -0.75
+        },
+        "Dimjogang": {
+          "sdk_property": "Dimjogang",
+          "path": "variables.dimjogang",
+          "source_attribute": "dimjogang",
+          "source_value": 37.5,
+          "group_code": 50,
+          "encoded_value": 37.5,
+          "encoded_unit": "degrees",
+          "native_unit": "unresolved"
+        },
+        "Dimjust": {
+          "sdk_property": "Dimjust",
+          "path": "variables.dimjust",
+          "source_attribute": "dimjust",
+          "source_value": 3,
+          "group_code": 280,
+          "encoded_value": 3
+        },
+        "Dimldrblk": {
+          "sdk_property": "Dimldrblk",
+          "path": "references.leader_arrow",
+          "source_attribute": "dimldrblk",
+          "source_value": "P4D_Arrow_4",
+          "group_code": 341,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "3F",
+          "target_owner": "9"
+        },
+        "Dimlfac": {
+          "sdk_property": "Dimlfac",
+          "path": "variables.dimlfac",
+          "source_attribute": "dimlfac",
+          "source_value": -2.0,
+          "group_code": 144,
+          "encoded_value": -2.0
+        },
+        "Dimlim": {
+          "sdk_property": "Dimlim",
+          "path": "variables.dimlim",
+          "source_attribute": "dimlim",
+          "source_value": 0,
+          "group_code": 72,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimltex1": {
+          "sdk_property": "Dimltex1",
+          "path": "references.extension1_linetype",
+          "source_attribute": "dimltex1",
+          "source_value": "P4D_Line_2",
+          "group_code": 346,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "45",
+          "target_owner": "2"
+        },
+        "Dimltex2": {
+          "sdk_property": "Dimltex2",
+          "path": "references.extension2_linetype",
+          "source_attribute": "dimltex2",
+          "source_value": "P4D_Line_3",
+          "group_code": 347,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "46",
+          "target_owner": "2"
+        },
+        "Dimltype": {
+          "sdk_property": "Dimltype",
+          "path": "references.dimension_linetype",
+          "source_attribute": "dimltype",
+          "source_value": "P4D_Line_1",
+          "group_code": 345,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "44",
+          "target_owner": "2"
+        },
+        "Dimlunit": {
+          "sdk_property": "Dimlunit",
+          "path": "variables.dimlunit",
+          "source_attribute": "dimlunit",
+          "source_value": 2,
+          "group_code": 277,
+          "encoded_value": 2
+        },
+        "Dimlwd": {
+          "sdk_property": "Dimlwd",
+          "path": "lineweights.dimension",
+          "source_attribute": "dimlwd",
+          "source_value": 25,
+          "group_code": 371,
+          "encoded_value": 25
+        },
+        "Dimlwe": {
+          "sdk_property": "Dimlwe",
+          "path": "lineweights.extension",
+          "source_attribute": "dimlwe",
+          "source_value": -1,
+          "group_code": 372,
+          "encoded_value": -1
+        },
+        "Dimrnd": {
+          "sdk_property": "Dimrnd",
+          "path": "variables.dimrnd",
+          "source_attribute": "dimrnd",
+          "source_value": 0.25,
+          "group_code": 45,
+          "encoded_value": 0.25
+        },
+        "Dimsah": {
+          "sdk_property": "Dimsah",
+          "path": "variables.dimsah",
+          "source_attribute": "dimsah",
+          "source_value": 1,
+          "group_code": 173,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimscale": {
+          "sdk_property": "Dimscale",
+          "path": "dimension_scale",
+          "source_attribute": "dimscale",
+          "source_value": 2.0,
+          "group_code": 40,
+          "encoded_value": 2.0
+        },
+        "Dimsd1": {
+          "sdk_property": "Dimsd1",
+          "path": "variables.dimsd1",
+          "source_attribute": "dimsd1",
+          "source_value": 1,
+          "group_code": 281,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimsd2": {
+          "sdk_property": "Dimsd2",
+          "path": "variables.dimsd2",
+          "source_attribute": "dimsd2",
+          "source_value": 0,
+          "group_code": 282,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimse1": {
+          "sdk_property": "Dimse1",
+          "path": "variables.dimse1",
+          "source_attribute": "dimse1",
+          "source_value": 1,
+          "group_code": 75,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimse2": {
+          "sdk_property": "Dimse2",
+          "path": "variables.dimse2",
+          "source_attribute": "dimse2",
+          "source_value": 0,
+          "group_code": 76,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimsoxd": {
+          "sdk_property": "Dimsoxd",
+          "path": "variables.dimsoxd",
+          "source_attribute": "dimsoxd",
+          "source_value": 1,
+          "group_code": 175,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtad": {
+          "sdk_property": "Dimtad",
+          "path": "variables.dimtad",
+          "source_attribute": "dimtad",
+          "source_value": 0,
+          "group_code": 77,
+          "encoded_value": 0
+        },
+        "Dimtdec": {
+          "sdk_property": "Dimtdec",
+          "path": "variables.dimtdec",
+          "source_attribute": "dimtdec",
+          "source_value": 4,
+          "group_code": 272,
+          "encoded_value": 4
+        },
+        "Dimtfac": {
+          "sdk_property": "Dimtfac",
+          "path": "variables.dimtfac",
+          "source_attribute": "dimtfac",
+          "source_value": 0.65,
+          "group_code": 146,
+          "encoded_value": 0.65
+        },
+        "Dimtfill": {
+          "sdk_property": "Dimtfill",
+          "path": "variables.dimtfill",
+          "source_attribute": "dimtfill",
+          "source_value": 2,
+          "group_code": 69,
+          "encoded_value": 2
+        },
+        "Dimtfillclr": {
+          "sdk_property": "Dimtfillclr",
+          "path": "colors.text_fill",
+          "source_attribute": "dimtfillclr",
+          "source_value": 2,
+          "group_code": 70,
+          "encoded_value": 2
+        },
+        "Dimtih": {
+          "sdk_property": "Dimtih",
+          "path": "variables.dimtih",
+          "source_attribute": "dimtih",
+          "source_value": 1,
+          "group_code": 73,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtix": {
+          "sdk_property": "Dimtix",
+          "path": "variables.dimtix",
+          "source_attribute": "dimtix",
+          "source_value": 1,
+          "group_code": 174,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtm": {
+          "sdk_property": "Dimtm",
+          "path": "variables.dimtm",
+          "source_attribute": "dimtm",
+          "source_value": 0.07,
+          "group_code": 48,
+          "encoded_value": 0.07
+        },
+        "Dimtmove": {
+          "sdk_property": "Dimtmove",
+          "path": "variables.dimtmove",
+          "source_attribute": "dimtmove",
+          "source_value": 2,
+          "group_code": 279,
+          "encoded_value": 2
+        },
+        "Dimtofl": {
+          "sdk_property": "Dimtofl",
+          "path": "variables.dimtofl",
+          "source_attribute": "dimtofl",
+          "source_value": 1,
+          "group_code": 172,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtoh": {
+          "sdk_property": "Dimtoh",
+          "path": "variables.dimtoh",
+          "source_attribute": "dimtoh",
+          "source_value": 0,
+          "group_code": 74,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimtol": {
+          "sdk_property": "Dimtol",
+          "path": "variables.dimtol",
+          "source_attribute": "dimtol",
+          "source_value": 1,
+          "group_code": 71,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtolj": {
+          "sdk_property": "Dimtolj",
+          "path": "variables.dimtolj",
+          "source_attribute": "dimtolj",
+          "source_value": 2,
+          "group_code": 283,
+          "encoded_value": 2
+        },
+        "Dimtp": {
+          "sdk_property": "Dimtp",
+          "path": "variables.dimtp",
+          "source_attribute": "dimtp",
+          "source_value": 0.12,
+          "group_code": 47,
+          "encoded_value": 0.12
+        },
+        "Dimtsz": {
+          "sdk_property": "Dimtsz",
+          "path": "variables.dimtsz",
+          "source_attribute": "dimtsz",
+          "source_value": 0.8,
+          "group_code": 142,
+          "encoded_value": 0.8
+        },
+        "Dimtvp": {
+          "sdk_property": "Dimtvp",
+          "path": "variables.dimtvp",
+          "source_attribute": "dimtvp",
+          "source_value": 0.3,
+          "group_code": 145,
+          "encoded_value": 0.3
+        },
+        "Dimtxsty": {
+          "sdk_property": "Dimtxsty",
+          "path": "references.text_style",
+          "source_attribute": "dimtxsty",
+          "source_value": "P4D_Text",
+          "group_code": 340,
+          "encoded_state": "pointer",
+          "target_kind": "text_style",
+          "target_handle": "2F",
+          "target_owner": "5"
+        },
+        "Dimtxt": {
+          "sdk_property": "Dimtxt",
+          "path": "text_height",
+          "source_attribute": "dimtxt",
+          "source_value": 3.25,
+          "group_code": 140,
+          "encoded_value": 3.25
+        },
+        "Dimtzin": {
+          "sdk_property": "Dimtzin",
+          "path": "variables.dimtzin",
+          "source_attribute": "dimtzin",
+          "source_value": 8,
+          "group_code": 284,
+          "encoded_value": 8
+        },
+        "Dimupt": {
+          "sdk_property": "Dimupt",
+          "path": "variables.dimupt",
+          "source_attribute": "dimupt",
+          "source_value": 1,
+          "group_code": 288,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimzin": {
+          "sdk_property": "Dimzin",
+          "path": "variables.dimzin",
+          "source_attribute": "dimzin",
+          "source_value": 8,
+          "group_code": 78,
+          "encoded_value": 8
+        }
+      },
+      "xdata": [],
+      "family_name_candidate": true
+    },
+    "P4D_Metadata": {
+      "handle": "4A",
+      "owner": "4",
+      "fields": {
+        "Dimadec": {
+          "sdk_property": "Dimadec",
+          "path": "variables.dimadec",
+          "source_attribute": "dimadec",
+          "source_value": 1,
+          "group_code": 179,
+          "encoded_value": 1
+        },
+        "Dimalt": {
+          "sdk_property": "Dimalt",
+          "path": "variables.dimalt",
+          "source_attribute": "dimalt",
+          "source_value": 1,
+          "group_code": 170,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimaltd": {
+          "sdk_property": "Dimaltd",
+          "path": "variables.dimaltd",
+          "source_attribute": "dimaltd",
+          "source_value": 4,
+          "group_code": 171,
+          "encoded_value": 4
+        },
+        "Dimaltf": {
+          "sdk_property": "Dimaltf",
+          "path": "variables.dimaltf",
+          "source_attribute": "dimaltf",
+          "source_value": 0.03937007874,
+          "group_code": 143,
+          "encoded_value": 0.03937007874
+        },
+        "Dimaltrnd": {
+          "sdk_property": "Dimaltrnd",
+          "path": "variables.dimaltrnd",
+          "source_attribute": "dimaltrnd",
+          "source_value": 0.01,
+          "group_code": 148,
+          "encoded_value": 0.01
+        },
+        "Dimalttd": {
+          "sdk_property": "Dimalttd",
+          "path": "variables.dimalttd",
+          "source_attribute": "dimalttd",
+          "source_value": 2,
+          "group_code": 274,
+          "encoded_value": 2
+        },
+        "Dimalttz": {
+          "sdk_property": "Dimalttz",
+          "path": "variables.dimalttz",
+          "source_attribute": "dimalttz",
+          "source_value": 3,
+          "group_code": 286,
+          "encoded_value": 3
+        },
+        "Dimaltu": {
+          "sdk_property": "Dimaltu",
+          "path": "variables.dimaltu",
+          "source_attribute": "dimaltu",
+          "source_value": 2,
+          "group_code": 273,
+          "encoded_value": 2
+        },
+        "Dimaltz": {
+          "sdk_property": "Dimaltz",
+          "path": "variables.dimaltz",
+          "source_attribute": "dimaltz",
+          "source_value": 8,
+          "group_code": 285,
+          "encoded_value": 8
+        },
+        "Dimarcsym": {
+          "sdk_property": "Dimarcsym",
+          "path": "variables.dimarcsym",
+          "source_attribute": "dimarcsym",
+          "source_value": 2,
+          "group_code": 90,
+          "encoded_value": 2
+        },
+        "Dimasz": {
+          "sdk_property": "Dimasz",
+          "path": "arrow_size",
+          "source_attribute": "dimasz",
+          "source_value": 3.0,
+          "group_code": 41,
+          "encoded_value": 3.0
+        },
+        "Dimatfit": {
+          "sdk_property": "Dimatfit",
+          "path": "variables.dimatfit",
+          "source_attribute": "dimatfit",
+          "source_value": 2,
+          "group_code": 289,
+          "encoded_value": 2
+        },
+        "Dimaunit": {
+          "sdk_property": "Dimaunit",
+          "path": "variables.dimaunit",
+          "source_attribute": "dimaunit",
+          "source_value": 3,
+          "group_code": 275,
+          "encoded_value": 3
+        },
+        "Dimazin": {
+          "sdk_property": "Dimazin",
+          "path": "variables.dimazin",
+          "source_attribute": "dimazin",
+          "source_value": 3,
+          "group_code": 79,
+          "encoded_value": 3
+        },
+        "Dimblk": {
+          "sdk_property": "Dimblk",
+          "path": "references.arrow",
+          "source_attribute": "dimblk",
+          "source_value": "P4D_Arrow_1",
+          "group_code": 342,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "30",
+          "target_owner": "9"
+        },
+        "Dimblk1": {
+          "sdk_property": "Dimblk1",
+          "path": "references.first_arrow",
+          "source_attribute": "dimblk1",
+          "source_value": "P4D_Arrow_2",
+          "group_code": 343,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "35",
+          "target_owner": "9"
+        },
+        "Dimblk2": {
+          "sdk_property": "Dimblk2",
+          "path": "references.second_arrow",
+          "source_attribute": "dimblk2",
+          "source_value": "P4D_Arrow_3",
+          "group_code": 344,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "3A",
+          "target_owner": "9"
+        },
+        "Dimcen": {
+          "sdk_property": "Dimcen",
+          "path": "variables.dimcen",
+          "source_attribute": "dimcen",
+          "source_value": -2.0,
+          "group_code": 141,
+          "encoded_value": -2.0
+        },
+        "Dimclrd": {
+          "sdk_property": "Dimclrd",
+          "path": "colors.dimension",
+          "source_attribute": "dimclrd",
+          "source_value": 1,
+          "group_code": 176,
+          "encoded_value": 1
+        },
+        "Dimclre": {
+          "sdk_property": "Dimclre",
+          "path": "colors.extension",
+          "source_attribute": "dimclre",
+          "source_value": 3,
+          "group_code": 177,
+          "encoded_value": 3
+        },
+        "Dimclrt": {
+          "sdk_property": "Dimclrt",
+          "path": "colors.text",
+          "source_attribute": "dimclrt",
+          "source_value": 5,
+          "group_code": 178,
+          "encoded_value": 5
+        },
+        "Dimdec": {
+          "sdk_property": "Dimdec",
+          "path": "variables.dimdec",
+          "source_attribute": "dimdec",
+          "source_value": 3,
+          "group_code": 271,
+          "encoded_value": 3
+        },
+        "Dimdle": {
+          "sdk_property": "Dimdle",
+          "path": "variables.dimdle",
+          "source_attribute": "dimdle",
+          "source_value": 0.5,
+          "group_code": 46,
+          "encoded_value": 0.5
+        },
+        "Dimdli": {
+          "sdk_property": "Dimdli",
+          "path": "variables.dimdli",
+          "source_attribute": "dimdli",
+          "source_value": 4.1,
+          "group_code": 43,
+          "encoded_value": 4.1
+        },
+        "Dimdsep": {
+          "sdk_property": "Dimdsep",
+          "path": "variables.dimdsep",
+          "source_attribute": "dimdsep",
+          "source_value": 59,
+          "group_code": 278,
+          "encoded_value": 59
+        },
+        "Dimexe": {
+          "sdk_property": "Dimexe",
+          "path": "variables.dimexe",
+          "source_attribute": "dimexe",
+          "source_value": 1.4,
+          "group_code": 44,
+          "encoded_value": 1.4
+        },
+        "Dimexo": {
+          "sdk_property": "Dimexo",
+          "path": "variables.dimexo",
+          "source_attribute": "dimexo",
+          "source_value": 0.7,
+          "group_code": 42,
+          "encoded_value": 0.7
+        },
+        "Dimfrac": {
+          "sdk_property": "Dimfrac",
+          "path": "variables.dimfrac",
+          "source_attribute": "dimfrac",
+          "source_value": 2,
+          "group_code": 276,
+          "encoded_value": 2
+        },
+        "Dimfxlen": {
+          "sdk_property": "Dimfxlen",
+          "path": "variables.dimfxlen",
+          "source_attribute": "dimfxl",
+          "source_value": 8.5,
+          "group_code": 49,
+          "encoded_value": 8.5
+        },
+        "DimfxlenOn": {
+          "sdk_property": "DimfxlenOn",
+          "path": "variables.dimfxlenon",
+          "source_attribute": "dimfxlon",
+          "source_value": 1,
+          "group_code": 290,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimgap": {
+          "sdk_property": "Dimgap",
+          "path": "variables.dimgap",
+          "source_attribute": "dimgap",
+          "source_value": -0.75,
+          "group_code": 147,
+          "encoded_value": -0.75
+        },
+        "Dimjogang": {
+          "sdk_property": "Dimjogang",
+          "path": "variables.dimjogang",
+          "source_attribute": "dimjogang",
+          "source_value": 37.5,
+          "group_code": 50,
+          "encoded_value": 37.5,
+          "encoded_unit": "degrees",
+          "native_unit": "unresolved"
+        },
+        "Dimjust": {
+          "sdk_property": "Dimjust",
+          "path": "variables.dimjust",
+          "source_attribute": "dimjust",
+          "source_value": 3,
+          "group_code": 280,
+          "encoded_value": 3
+        },
+        "Dimldrblk": {
+          "sdk_property": "Dimldrblk",
+          "path": "references.leader_arrow",
+          "source_attribute": "dimldrblk",
+          "source_value": "P4D_Arrow_4",
+          "group_code": 341,
+          "encoded_state": "pointer",
+          "target_kind": "block",
+          "target_handle": "3F",
+          "target_owner": "9"
+        },
+        "Dimlfac": {
+          "sdk_property": "Dimlfac",
+          "path": "variables.dimlfac",
+          "source_attribute": "dimlfac",
+          "source_value": -2.0,
+          "group_code": 144,
+          "encoded_value": -2.0
+        },
+        "Dimlim": {
+          "sdk_property": "Dimlim",
+          "path": "variables.dimlim",
+          "source_attribute": "dimlim",
+          "source_value": 0,
+          "group_code": 72,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimltex1": {
+          "sdk_property": "Dimltex1",
+          "path": "references.extension1_linetype",
+          "source_attribute": "dimltex1",
+          "source_value": "P4D_Line_2",
+          "group_code": 346,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "45",
+          "target_owner": "2"
+        },
+        "Dimltex2": {
+          "sdk_property": "Dimltex2",
+          "path": "references.extension2_linetype",
+          "source_attribute": "dimltex2",
+          "source_value": "P4D_Line_3",
+          "group_code": 347,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "46",
+          "target_owner": "2"
+        },
+        "Dimltype": {
+          "sdk_property": "Dimltype",
+          "path": "references.dimension_linetype",
+          "source_attribute": "dimltype",
+          "source_value": "P4D_Line_1",
+          "group_code": 345,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "44",
+          "target_owner": "2"
+        },
+        "Dimlunit": {
+          "sdk_property": "Dimlunit",
+          "path": "variables.dimlunit",
+          "source_attribute": "dimlunit",
+          "source_value": 2,
+          "group_code": 277,
+          "encoded_value": 2
+        },
+        "Dimlwd": {
+          "sdk_property": "Dimlwd",
+          "path": "lineweights.dimension",
+          "source_attribute": "dimlwd",
+          "source_value": 25,
+          "group_code": 371,
+          "encoded_value": 25
+        },
+        "Dimlwe": {
+          "sdk_property": "Dimlwe",
+          "path": "lineweights.extension",
+          "source_attribute": "dimlwe",
+          "source_value": -1,
+          "group_code": 372,
+          "encoded_value": -1
+        },
+        "Dimrnd": {
+          "sdk_property": "Dimrnd",
+          "path": "variables.dimrnd",
+          "source_attribute": "dimrnd",
+          "source_value": 0.25,
+          "group_code": 45,
+          "encoded_value": 0.25
+        },
+        "Dimsah": {
+          "sdk_property": "Dimsah",
+          "path": "variables.dimsah",
+          "source_attribute": "dimsah",
+          "source_value": 1,
+          "group_code": 173,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimscale": {
+          "sdk_property": "Dimscale",
+          "path": "dimension_scale",
+          "source_attribute": "dimscale",
+          "source_value": 2.0,
+          "group_code": 40,
+          "encoded_value": 2.0
+        },
+        "Dimsd1": {
+          "sdk_property": "Dimsd1",
+          "path": "variables.dimsd1",
+          "source_attribute": "dimsd1",
+          "source_value": 1,
+          "group_code": 281,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimsd2": {
+          "sdk_property": "Dimsd2",
+          "path": "variables.dimsd2",
+          "source_attribute": "dimsd2",
+          "source_value": 0,
+          "group_code": 282,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimse1": {
+          "sdk_property": "Dimse1",
+          "path": "variables.dimse1",
+          "source_attribute": "dimse1",
+          "source_value": 1,
+          "group_code": 75,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimse2": {
+          "sdk_property": "Dimse2",
+          "path": "variables.dimse2",
+          "source_attribute": "dimse2",
+          "source_value": 0,
+          "group_code": 76,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimsoxd": {
+          "sdk_property": "Dimsoxd",
+          "path": "variables.dimsoxd",
+          "source_attribute": "dimsoxd",
+          "source_value": 1,
+          "group_code": 175,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtad": {
+          "sdk_property": "Dimtad",
+          "path": "variables.dimtad",
+          "source_attribute": "dimtad",
+          "source_value": 0,
+          "group_code": 77,
+          "encoded_value": 0
+        },
+        "Dimtdec": {
+          "sdk_property": "Dimtdec",
+          "path": "variables.dimtdec",
+          "source_attribute": "dimtdec",
+          "source_value": 4,
+          "group_code": 272,
+          "encoded_value": 4
+        },
+        "Dimtfac": {
+          "sdk_property": "Dimtfac",
+          "path": "variables.dimtfac",
+          "source_attribute": "dimtfac",
+          "source_value": 0.65,
+          "group_code": 146,
+          "encoded_value": 0.65
+        },
+        "Dimtfill": {
+          "sdk_property": "Dimtfill",
+          "path": "variables.dimtfill",
+          "source_attribute": "dimtfill",
+          "source_value": 2,
+          "group_code": 69,
+          "encoded_value": 2
+        },
+        "Dimtfillclr": {
+          "sdk_property": "Dimtfillclr",
+          "path": "colors.text_fill",
+          "source_attribute": "dimtfillclr",
+          "source_value": 2,
+          "group_code": 70,
+          "encoded_value": 2
+        },
+        "Dimtih": {
+          "sdk_property": "Dimtih",
+          "path": "variables.dimtih",
+          "source_attribute": "dimtih",
+          "source_value": 1,
+          "group_code": 73,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtix": {
+          "sdk_property": "Dimtix",
+          "path": "variables.dimtix",
+          "source_attribute": "dimtix",
+          "source_value": 1,
+          "group_code": 174,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtm": {
+          "sdk_property": "Dimtm",
+          "path": "variables.dimtm",
+          "source_attribute": "dimtm",
+          "source_value": 0.07,
+          "group_code": 48,
+          "encoded_value": 0.07
+        },
+        "Dimtmove": {
+          "sdk_property": "Dimtmove",
+          "path": "variables.dimtmove",
+          "source_attribute": "dimtmove",
+          "source_value": 2,
+          "group_code": 279,
+          "encoded_value": 2
+        },
+        "Dimtofl": {
+          "sdk_property": "Dimtofl",
+          "path": "variables.dimtofl",
+          "source_attribute": "dimtofl",
+          "source_value": 1,
+          "group_code": 172,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtoh": {
+          "sdk_property": "Dimtoh",
+          "path": "variables.dimtoh",
+          "source_attribute": "dimtoh",
+          "source_value": 0,
+          "group_code": 74,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimtol": {
+          "sdk_property": "Dimtol",
+          "path": "variables.dimtol",
+          "source_attribute": "dimtol",
+          "source_value": 1,
+          "group_code": 71,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtolj": {
+          "sdk_property": "Dimtolj",
+          "path": "variables.dimtolj",
+          "source_attribute": "dimtolj",
+          "source_value": 2,
+          "group_code": 283,
+          "encoded_value": 2
+        },
+        "Dimtp": {
+          "sdk_property": "Dimtp",
+          "path": "variables.dimtp",
+          "source_attribute": "dimtp",
+          "source_value": 0.12,
+          "group_code": 47,
+          "encoded_value": 0.12
+        },
+        "Dimtsz": {
+          "sdk_property": "Dimtsz",
+          "path": "variables.dimtsz",
+          "source_attribute": "dimtsz",
+          "source_value": 0.8,
+          "group_code": 142,
+          "encoded_value": 0.8
+        },
+        "Dimtvp": {
+          "sdk_property": "Dimtvp",
+          "path": "variables.dimtvp",
+          "source_attribute": "dimtvp",
+          "source_value": 0.3,
+          "group_code": 145,
+          "encoded_value": 0.3
+        },
+        "Dimtxsty": {
+          "sdk_property": "Dimtxsty",
+          "path": "references.text_style",
+          "source_attribute": "dimtxsty",
+          "source_value": "P4D_Text",
+          "group_code": 340,
+          "encoded_state": "pointer",
+          "target_kind": "text_style",
+          "target_handle": "2F",
+          "target_owner": "5"
+        },
+        "Dimtxt": {
+          "sdk_property": "Dimtxt",
+          "path": "text_height",
+          "source_attribute": "dimtxt",
+          "source_value": 2.75,
+          "group_code": 140,
+          "encoded_value": 2.75
+        },
+        "Dimtzin": {
+          "sdk_property": "Dimtzin",
+          "path": "variables.dimtzin",
+          "source_attribute": "dimtzin",
+          "source_value": 8,
+          "group_code": 284,
+          "encoded_value": 8
+        },
+        "Dimupt": {
+          "sdk_property": "Dimupt",
+          "path": "variables.dimupt",
+          "source_attribute": "dimupt",
+          "source_value": 1,
+          "group_code": 288,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimzin": {
+          "sdk_property": "Dimzin",
+          "path": "variables.dimzin",
+          "source_attribute": "dimzin",
+          "source_value": 8,
+          "group_code": 78,
+          "encoded_value": 8
+        }
+      },
+      "xdata": [
+        [
+          1000,
+          "preserve metadata"
+        ],
+        [
+          1070,
+          7
+        ]
+      ],
+      "family_name_candidate": false
+    },
+    "P4D_EmptyArrows": {
+      "handle": "4B",
+      "owner": "4",
+      "fields": {
+        "Dimadec": {
+          "sdk_property": "Dimadec",
+          "path": "variables.dimadec",
+          "source_attribute": "dimadec",
+          "source_value": 1,
+          "group_code": 179,
+          "encoded_value": 1
+        },
+        "Dimalt": {
+          "sdk_property": "Dimalt",
+          "path": "variables.dimalt",
+          "source_attribute": "dimalt",
+          "source_value": 1,
+          "group_code": 170,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimaltd": {
+          "sdk_property": "Dimaltd",
+          "path": "variables.dimaltd",
+          "source_attribute": "dimaltd",
+          "source_value": 4,
+          "group_code": 171,
+          "encoded_value": 4
+        },
+        "Dimaltf": {
+          "sdk_property": "Dimaltf",
+          "path": "variables.dimaltf",
+          "source_attribute": "dimaltf",
+          "source_value": 0.03937007874,
+          "group_code": 143,
+          "encoded_value": 0.03937007874
+        },
+        "Dimaltrnd": {
+          "sdk_property": "Dimaltrnd",
+          "path": "variables.dimaltrnd",
+          "source_attribute": "dimaltrnd",
+          "source_value": 0.01,
+          "group_code": 148,
+          "encoded_value": 0.01
+        },
+        "Dimalttd": {
+          "sdk_property": "Dimalttd",
+          "path": "variables.dimalttd",
+          "source_attribute": "dimalttd",
+          "source_value": 2,
+          "group_code": 274,
+          "encoded_value": 2
+        },
+        "Dimalttz": {
+          "sdk_property": "Dimalttz",
+          "path": "variables.dimalttz",
+          "source_attribute": "dimalttz",
+          "source_value": 3,
+          "group_code": 286,
+          "encoded_value": 3
+        },
+        "Dimaltu": {
+          "sdk_property": "Dimaltu",
+          "path": "variables.dimaltu",
+          "source_attribute": "dimaltu",
+          "source_value": 2,
+          "group_code": 273,
+          "encoded_value": 2
+        },
+        "Dimaltz": {
+          "sdk_property": "Dimaltz",
+          "path": "variables.dimaltz",
+          "source_attribute": "dimaltz",
+          "source_value": 8,
+          "group_code": 285,
+          "encoded_value": 8
+        },
+        "Dimarcsym": {
+          "sdk_property": "Dimarcsym",
+          "path": "variables.dimarcsym",
+          "source_attribute": "dimarcsym",
+          "source_value": 2,
+          "group_code": 90,
+          "encoded_value": 2
+        },
+        "Dimasz": {
+          "sdk_property": "Dimasz",
+          "path": "arrow_size",
+          "source_attribute": "dimasz",
+          "source_value": 3.0,
+          "group_code": 41,
+          "encoded_value": 3.0
+        },
+        "Dimatfit": {
+          "sdk_property": "Dimatfit",
+          "path": "variables.dimatfit",
+          "source_attribute": "dimatfit",
+          "source_value": 2,
+          "group_code": 289,
+          "encoded_value": 2
+        },
+        "Dimaunit": {
+          "sdk_property": "Dimaunit",
+          "path": "variables.dimaunit",
+          "source_attribute": "dimaunit",
+          "source_value": 3,
+          "group_code": 275,
+          "encoded_value": 3
+        },
+        "Dimazin": {
+          "sdk_property": "Dimazin",
+          "path": "variables.dimazin",
+          "source_attribute": "dimazin",
+          "source_value": 3,
+          "group_code": 79,
+          "encoded_value": 3
+        },
+        "Dimblk": {
+          "sdk_property": "Dimblk",
+          "path": "references.arrow",
+          "source_attribute": "dimblk",
+          "source_value": "",
+          "group_code": 342,
+          "encoded_state": "absent",
+          "expected_native_state": "unverified"
+        },
+        "Dimblk1": {
+          "sdk_property": "Dimblk1",
+          "path": "references.first_arrow",
+          "source_attribute": "dimblk1",
+          "source_value": "",
+          "group_code": 343,
+          "encoded_state": "absent",
+          "expected_native_state": "unverified"
+        },
+        "Dimblk2": {
+          "sdk_property": "Dimblk2",
+          "path": "references.second_arrow",
+          "source_attribute": "dimblk2",
+          "source_value": "",
+          "group_code": 344,
+          "encoded_state": "absent",
+          "expected_native_state": "unverified"
+        },
+        "Dimcen": {
+          "sdk_property": "Dimcen",
+          "path": "variables.dimcen",
+          "source_attribute": "dimcen",
+          "source_value": -2.0,
+          "group_code": 141,
+          "encoded_value": -2.0
+        },
+        "Dimclrd": {
+          "sdk_property": "Dimclrd",
+          "path": "colors.dimension",
+          "source_attribute": "dimclrd",
+          "source_value": 1,
+          "group_code": 176,
+          "encoded_value": 1
+        },
+        "Dimclre": {
+          "sdk_property": "Dimclre",
+          "path": "colors.extension",
+          "source_attribute": "dimclre",
+          "source_value": 3,
+          "group_code": 177,
+          "encoded_value": 3
+        },
+        "Dimclrt": {
+          "sdk_property": "Dimclrt",
+          "path": "colors.text",
+          "source_attribute": "dimclrt",
+          "source_value": 5,
+          "group_code": 178,
+          "encoded_value": 5
+        },
+        "Dimdec": {
+          "sdk_property": "Dimdec",
+          "path": "variables.dimdec",
+          "source_attribute": "dimdec",
+          "source_value": 3,
+          "group_code": 271,
+          "encoded_value": 3
+        },
+        "Dimdle": {
+          "sdk_property": "Dimdle",
+          "path": "variables.dimdle",
+          "source_attribute": "dimdle",
+          "source_value": 0.5,
+          "group_code": 46,
+          "encoded_value": 0.5
+        },
+        "Dimdli": {
+          "sdk_property": "Dimdli",
+          "path": "variables.dimdli",
+          "source_attribute": "dimdli",
+          "source_value": 4.1,
+          "group_code": 43,
+          "encoded_value": 4.1
+        },
+        "Dimdsep": {
+          "sdk_property": "Dimdsep",
+          "path": "variables.dimdsep",
+          "source_attribute": "dimdsep",
+          "source_value": 59,
+          "group_code": 278,
+          "encoded_value": 59
+        },
+        "Dimexe": {
+          "sdk_property": "Dimexe",
+          "path": "variables.dimexe",
+          "source_attribute": "dimexe",
+          "source_value": 1.4,
+          "group_code": 44,
+          "encoded_value": 1.4
+        },
+        "Dimexo": {
+          "sdk_property": "Dimexo",
+          "path": "variables.dimexo",
+          "source_attribute": "dimexo",
+          "source_value": 0.7,
+          "group_code": 42,
+          "encoded_value": 0.7
+        },
+        "Dimfrac": {
+          "sdk_property": "Dimfrac",
+          "path": "variables.dimfrac",
+          "source_attribute": "dimfrac",
+          "source_value": 2,
+          "group_code": 276,
+          "encoded_value": 2
+        },
+        "Dimfxlen": {
+          "sdk_property": "Dimfxlen",
+          "path": "variables.dimfxlen",
+          "source_attribute": "dimfxl",
+          "source_value": 8.5,
+          "group_code": 49,
+          "encoded_value": 8.5
+        },
+        "DimfxlenOn": {
+          "sdk_property": "DimfxlenOn",
+          "path": "variables.dimfxlenon",
+          "source_attribute": "dimfxlon",
+          "source_value": 1,
+          "group_code": 290,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimgap": {
+          "sdk_property": "Dimgap",
+          "path": "variables.dimgap",
+          "source_attribute": "dimgap",
+          "source_value": -0.75,
+          "group_code": 147,
+          "encoded_value": -0.75
+        },
+        "Dimjogang": {
+          "sdk_property": "Dimjogang",
+          "path": "variables.dimjogang",
+          "source_attribute": "dimjogang",
+          "source_value": 37.5,
+          "group_code": 50,
+          "encoded_value": 37.5,
+          "encoded_unit": "degrees",
+          "native_unit": "unresolved"
+        },
+        "Dimjust": {
+          "sdk_property": "Dimjust",
+          "path": "variables.dimjust",
+          "source_attribute": "dimjust",
+          "source_value": 3,
+          "group_code": 280,
+          "encoded_value": 3
+        },
+        "Dimldrblk": {
+          "sdk_property": "Dimldrblk",
+          "path": "references.leader_arrow",
+          "source_attribute": "dimldrblk",
+          "source_value": "",
+          "group_code": 341,
+          "encoded_state": "absent",
+          "expected_native_state": "unverified"
+        },
+        "Dimlfac": {
+          "sdk_property": "Dimlfac",
+          "path": "variables.dimlfac",
+          "source_attribute": "dimlfac",
+          "source_value": -2.0,
+          "group_code": 144,
+          "encoded_value": -2.0
+        },
+        "Dimlim": {
+          "sdk_property": "Dimlim",
+          "path": "variables.dimlim",
+          "source_attribute": "dimlim",
+          "source_value": 0,
+          "group_code": 72,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimltex1": {
+          "sdk_property": "Dimltex1",
+          "path": "references.extension1_linetype",
+          "source_attribute": "dimltex1",
+          "source_value": "P4D_Line_2",
+          "group_code": 346,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "45",
+          "target_owner": "2"
+        },
+        "Dimltex2": {
+          "sdk_property": "Dimltex2",
+          "path": "references.extension2_linetype",
+          "source_attribute": "dimltex2",
+          "source_value": "P4D_Line_3",
+          "group_code": 347,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "46",
+          "target_owner": "2"
+        },
+        "Dimltype": {
+          "sdk_property": "Dimltype",
+          "path": "references.dimension_linetype",
+          "source_attribute": "dimltype",
+          "source_value": "P4D_Line_1",
+          "group_code": 345,
+          "encoded_state": "pointer",
+          "target_kind": "linetype",
+          "target_handle": "44",
+          "target_owner": "2"
+        },
+        "Dimlunit": {
+          "sdk_property": "Dimlunit",
+          "path": "variables.dimlunit",
+          "source_attribute": "dimlunit",
+          "source_value": 2,
+          "group_code": 277,
+          "encoded_value": 2
+        },
+        "Dimlwd": {
+          "sdk_property": "Dimlwd",
+          "path": "lineweights.dimension",
+          "source_attribute": "dimlwd",
+          "source_value": 25,
+          "group_code": 371,
+          "encoded_value": 25
+        },
+        "Dimlwe": {
+          "sdk_property": "Dimlwe",
+          "path": "lineweights.extension",
+          "source_attribute": "dimlwe",
+          "source_value": -1,
+          "group_code": 372,
+          "encoded_value": -1
+        },
+        "Dimrnd": {
+          "sdk_property": "Dimrnd",
+          "path": "variables.dimrnd",
+          "source_attribute": "dimrnd",
+          "source_value": 0.25,
+          "group_code": 45,
+          "encoded_value": 0.25
+        },
+        "Dimsah": {
+          "sdk_property": "Dimsah",
+          "path": "variables.dimsah",
+          "source_attribute": "dimsah",
+          "source_value": 1,
+          "group_code": 173,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimscale": {
+          "sdk_property": "Dimscale",
+          "path": "dimension_scale",
+          "source_attribute": "dimscale",
+          "source_value": 2.0,
+          "group_code": 40,
+          "encoded_value": 2.0
+        },
+        "Dimsd1": {
+          "sdk_property": "Dimsd1",
+          "path": "variables.dimsd1",
+          "source_attribute": "dimsd1",
+          "source_value": 1,
+          "group_code": 281,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimsd2": {
+          "sdk_property": "Dimsd2",
+          "path": "variables.dimsd2",
+          "source_attribute": "dimsd2",
+          "source_value": 0,
+          "group_code": 282,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimse1": {
+          "sdk_property": "Dimse1",
+          "path": "variables.dimse1",
+          "source_attribute": "dimse1",
+          "source_value": 1,
+          "group_code": 75,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimse2": {
+          "sdk_property": "Dimse2",
+          "path": "variables.dimse2",
+          "source_attribute": "dimse2",
+          "source_value": 0,
+          "group_code": 76,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimsoxd": {
+          "sdk_property": "Dimsoxd",
+          "path": "variables.dimsoxd",
+          "source_attribute": "dimsoxd",
+          "source_value": 1,
+          "group_code": 175,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtad": {
+          "sdk_property": "Dimtad",
+          "path": "variables.dimtad",
+          "source_attribute": "dimtad",
+          "source_value": 0,
+          "group_code": 77,
+          "encoded_value": 0
+        },
+        "Dimtdec": {
+          "sdk_property": "Dimtdec",
+          "path": "variables.dimtdec",
+          "source_attribute": "dimtdec",
+          "source_value": 4,
+          "group_code": 272,
+          "encoded_value": 4
+        },
+        "Dimtfac": {
+          "sdk_property": "Dimtfac",
+          "path": "variables.dimtfac",
+          "source_attribute": "dimtfac",
+          "source_value": 0.65,
+          "group_code": 146,
+          "encoded_value": 0.65
+        },
+        "Dimtfill": {
+          "sdk_property": "Dimtfill",
+          "path": "variables.dimtfill",
+          "source_attribute": "dimtfill",
+          "source_value": 2,
+          "group_code": 69,
+          "encoded_value": 2
+        },
+        "Dimtfillclr": {
+          "sdk_property": "Dimtfillclr",
+          "path": "colors.text_fill",
+          "source_attribute": "dimtfillclr",
+          "source_value": 2,
+          "group_code": 70,
+          "encoded_value": 2
+        },
+        "Dimtih": {
+          "sdk_property": "Dimtih",
+          "path": "variables.dimtih",
+          "source_attribute": "dimtih",
+          "source_value": 1,
+          "group_code": 73,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtix": {
+          "sdk_property": "Dimtix",
+          "path": "variables.dimtix",
+          "source_attribute": "dimtix",
+          "source_value": 1,
+          "group_code": 174,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtm": {
+          "sdk_property": "Dimtm",
+          "path": "variables.dimtm",
+          "source_attribute": "dimtm",
+          "source_value": 0.07,
+          "group_code": 48,
+          "encoded_value": 0.07
+        },
+        "Dimtmove": {
+          "sdk_property": "Dimtmove",
+          "path": "variables.dimtmove",
+          "source_attribute": "dimtmove",
+          "source_value": 2,
+          "group_code": 279,
+          "encoded_value": 2
+        },
+        "Dimtofl": {
+          "sdk_property": "Dimtofl",
+          "path": "variables.dimtofl",
+          "source_attribute": "dimtofl",
+          "source_value": 1,
+          "group_code": 172,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtoh": {
+          "sdk_property": "Dimtoh",
+          "path": "variables.dimtoh",
+          "source_attribute": "dimtoh",
+          "source_value": 0,
+          "group_code": 74,
+          "encoded_value": 0,
+          "expected_boolean": false
+        },
+        "Dimtol": {
+          "sdk_property": "Dimtol",
+          "path": "variables.dimtol",
+          "source_attribute": "dimtol",
+          "source_value": 1,
+          "group_code": 71,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimtolj": {
+          "sdk_property": "Dimtolj",
+          "path": "variables.dimtolj",
+          "source_attribute": "dimtolj",
+          "source_value": 2,
+          "group_code": 283,
+          "encoded_value": 2
+        },
+        "Dimtp": {
+          "sdk_property": "Dimtp",
+          "path": "variables.dimtp",
+          "source_attribute": "dimtp",
+          "source_value": 0.12,
+          "group_code": 47,
+          "encoded_value": 0.12
+        },
+        "Dimtsz": {
+          "sdk_property": "Dimtsz",
+          "path": "variables.dimtsz",
+          "source_attribute": "dimtsz",
+          "source_value": 0.8,
+          "group_code": 142,
+          "encoded_value": 0.8
+        },
+        "Dimtvp": {
+          "sdk_property": "Dimtvp",
+          "path": "variables.dimtvp",
+          "source_attribute": "dimtvp",
+          "source_value": 0.3,
+          "group_code": 145,
+          "encoded_value": 0.3
+        },
+        "Dimtxsty": {
+          "sdk_property": "Dimtxsty",
+          "path": "references.text_style",
+          "source_attribute": "dimtxsty",
+          "source_value": "P4D_Text",
+          "group_code": 340,
+          "encoded_state": "pointer",
+          "target_kind": "text_style",
+          "target_handle": "2F",
+          "target_owner": "5"
+        },
+        "Dimtxt": {
+          "sdk_property": "Dimtxt",
+          "path": "text_height",
+          "source_attribute": "dimtxt",
+          "source_value": 2.75,
+          "group_code": 140,
+          "encoded_value": 2.75
+        },
+        "Dimtzin": {
+          "sdk_property": "Dimtzin",
+          "path": "variables.dimtzin",
+          "source_attribute": "dimtzin",
+          "source_value": 8,
+          "group_code": 284,
+          "encoded_value": 8
+        },
+        "Dimupt": {
+          "sdk_property": "Dimupt",
+          "path": "variables.dimupt",
+          "source_attribute": "dimupt",
+          "source_value": 1,
+          "group_code": 288,
+          "encoded_value": 1,
+          "expected_boolean": true
+        },
+        "Dimzin": {
+          "sdk_property": "Dimzin",
+          "path": "variables.dimzin",
+          "source_attribute": "dimzin",
+          "source_value": 8,
+          "group_code": 78,
+          "encoded_value": 8
+        }
+      },
+      "xdata": [],
+      "family_name_candidate": false
+    }
+  },
+  "checks": [
+    {
+      "style": "P4D_Base",
+      "field": "Dimadec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimalt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimaltd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimaltf",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimaltrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimalttd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimalttz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimaltu",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimaltz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimarcsym",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimasz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimatfit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimaunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimazin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimblk1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimblk2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimcen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimclrd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimclre",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimclrt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimdle",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimdli",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimdsep",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimexe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimexo",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimfrac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimfxlen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "DimfxlenOn",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimgap",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimjogang",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimjust",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimldrblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimlfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimlim",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimltex1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimltex2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimltype",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimlunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimlwd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimlwe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimsah",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimscale",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimsd1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimsd2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimse1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimse2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimsoxd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtad",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtfill",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtfillclr",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtih",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtix",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtm",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtmove",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtofl",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtoh",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtol",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtolj",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtsz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtvp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtxsty",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtxt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimtzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimupt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base",
+      "field": "Dimzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimadec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimalt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimaltd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimaltf",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimaltrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimalttd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimalttz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimaltu",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimaltz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimarcsym",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimasz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimatfit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimaunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimazin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimblk1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimblk2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimcen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimclrd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimclre",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimclrt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimdle",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimdli",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimdsep",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimexe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimexo",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimfrac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimfxlen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "DimfxlenOn",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimgap",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimjogang",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimjust",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimldrblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimlfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimlim",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimltex1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimltex2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimltype",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimlunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimlwd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimlwe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimsah",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimscale",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimsd1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimsd2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimse1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimse2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimsoxd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtad",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtfill",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtfillclr",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtih",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtix",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtm",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtmove",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtofl",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtoh",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtol",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtolj",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtsz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtvp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtxsty",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtxt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimtzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimupt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Base$0",
+      "field": "Dimzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimadec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimalt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimaltd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimaltf",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimaltrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimalttd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimalttz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimaltu",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimaltz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimarcsym",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimasz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimatfit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimaunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimazin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimblk1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimblk2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimcen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimclrd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimclre",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimclrt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimdle",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimdli",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimdsep",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimexe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimexo",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimfrac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimfxlen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "DimfxlenOn",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimgap",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimjogang",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimjust",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimldrblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimlfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimlim",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimltex1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimltex2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimltype",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimlunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimlwd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimlwe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimsah",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimscale",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimsd1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimsd2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimse1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimse2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimsoxd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtad",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtfill",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtfillclr",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtih",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtix",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtm",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtmove",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtofl",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtoh",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtol",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtolj",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtsz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtvp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtxsty",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtxt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimtzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimupt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_Metadata",
+      "field": "Dimzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimadec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimalt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimaltd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimaltf",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimaltrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimalttd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimalttz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimaltu",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimaltz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimarcsym",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimasz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimatfit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimaunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimazin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimblk1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimblk2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimcen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimclrd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimclre",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimclrt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimdle",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimdli",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimdsep",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimexe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimexo",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimfrac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimfxlen",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "DimfxlenOn",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimgap",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimjogang",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimjust",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimldrblk",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimlfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimlim",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimltex1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimltex2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimltype",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimlunit",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimlwd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimlwe",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimrnd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimsah",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimscale",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimsd1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimsd2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimse1",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimse2",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimsoxd",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtad",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtdec",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtfac",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtfill",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtfillclr",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtih",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtix",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtm",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtmove",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtofl",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtoh",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtol",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtolj",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtsz",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtvp",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtxsty",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtxt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimtzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimupt",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    },
+    {
+      "style": "P4D_EmptyArrows",
+      "field": "Dimzin",
+      "ezdxf_readback": true,
+      "physical_tag": true
+    }
+  ],
+  "omissions": [
+    "Modern DIMPOST/DIMAPOST intentionally absent due to known installed export map; legacy file verifies nonempty strings."
+  ],
+  "limits": [
+    "No Dimension entities, native rendering, current DIMSTYLE observation or style creation/cloning.",
+    "DIMJOGANG physical tag is degrees; native getter unit mapping remains unresolved.",
+    "ACI color fields only; native descriptor/RGB/color books are not validated by these fixtures.",
+    "Absent arrow handles do not prove native null/default-arrow semantics.",
+    "Family-like suffix is only naming evidence, not a proven native relationship.",
+    "No native annotative/xref/shape, malformed IDs or fields/extension-dictionary fixtures."
+  ],
+  "audit": {
+    "errors": 0,
+    "fixes": 0
+  }
+}

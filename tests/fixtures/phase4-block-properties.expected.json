@@ -1,0 +1,462 @@
+{
+  "roots": [
+    "43",
+    "47"
+  ],
+  "entities": {
+    "43": {
+      "type": "INSERT",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "true_color",
+          "aci": null,
+          "rgb": [
+            10,
+            120,
+            230
+          ]
+        },
+        "linetype": "DASH067",
+        "lineweight": {
+          "mode": "explicit",
+          "value_hundredth_mm": 35,
+          "native_value": 35
+        }
+      },
+      "layer": "MCP_LAYER067",
+      "layer_handle": "33",
+      "position": [
+        100.0,
+        50.0,
+        0.0
+      ],
+      "rotation": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "base": [
+        10.0,
+        20.0,
+        0.0
+      ],
+      "attributes": [
+        "45",
+        "46"
+      ]
+    },
+    "45": {
+      "type": "ATTRIB",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "aci",
+          "aci": 1,
+          "rgb": null
+        },
+        "linetype": "ByBlock",
+        "lineweight": {
+          "mode": "by_block",
+          "value_hundredth_mm": null,
+          "native_value": -2
+        }
+      },
+      "layer": "MCP_LAYER067",
+      "layer_handle": "33",
+      "tag": "ID",
+      "text": "ID0",
+      "position": [
+        102.0,
+        52.0,
+        0.0
+      ],
+      "height": 2.0,
+      "rotation": 0.2617993877991494,
+      "invisible": false,
+      "constant": false,
+      "style": "MCP_STYLE067",
+      "style_handle": "34",
+      "width": 1.2,
+      "oblique": 0.20943951023931956,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        102.0,
+        52.0,
+        0.0
+      ]
+    },
+    "46": {
+      "type": "ATTRIB",
+      "properties": {
+        "visible": false,
+        "color": {
+          "method": "by_block",
+          "aci": null,
+          "rgb": null
+        },
+        "linetype": "BYLAYER",
+        "lineweight": {
+          "mode": "default",
+          "value_hundredth_mm": null,
+          "native_value": -3
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "tag": "LABEL",
+      "text": "Label 0",
+      "position": [
+        102.0,
+        47.0,
+        0.0
+      ],
+      "height": 3.0,
+      "rotation": 0.0,
+      "invisible": true,
+      "constant": false,
+      "style": "Standard",
+      "style_handle": "29",
+      "width": 1,
+      "oblique": 0.0,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        102.0,
+        47.0,
+        0.0
+      ]
+    },
+    "47": {
+      "type": "INSERT",
+      "properties": {
+        "visible": false,
+        "color": {
+          "method": "aci",
+          "aci": 2,
+          "rgb": null
+        },
+        "linetype": "ByLayer",
+        "lineweight": {
+          "mode": "by_layer",
+          "value_hundredth_mm": null,
+          "native_value": -1
+        }
+      },
+      "layer": "MCP_LAYER067",
+      "layer_handle": "33",
+      "position": [
+        200.0,
+        100.0,
+        0.0
+      ],
+      "rotation": 1.5707963267948966,
+      "scale": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "base": [
+        10.0,
+        20.0,
+        0.0
+      ],
+      "attributes": [
+        "49",
+        "4A"
+      ]
+    },
+    "49": {
+      "type": "ATTRIB",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "aci",
+          "aci": 1,
+          "rgb": null
+        },
+        "linetype": "ByBlock",
+        "lineweight": {
+          "mode": "by_block",
+          "value_hundredth_mm": null,
+          "native_value": -2
+        }
+      },
+      "layer": "MCP_LAYER067",
+      "layer_handle": "33",
+      "tag": "ID",
+      "text": "ID1",
+      "position": [
+        200.0,
+        130.0,
+        0.0
+      ],
+      "height": 4.0,
+      "rotation": 1.8325957145940461,
+      "invisible": false,
+      "constant": false,
+      "style": "MCP_STYLE067",
+      "style_handle": "34",
+      "width": 1.2,
+      "oblique": 0.20943951023931956,
+      "halign": 1,
+      "valign": 2,
+      "alignment_point": [
+        200.0,
+        130.0,
+        0.0
+      ]
+    },
+    "4A": {
+      "type": "ATTRIB",
+      "properties": {
+        "visible": false,
+        "color": {
+          "method": "by_block",
+          "aci": null,
+          "rgb": null
+        },
+        "linetype": "BYLAYER",
+        "lineweight": {
+          "mode": "default",
+          "value_hundredth_mm": null,
+          "native_value": -3
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "tag": "LABEL",
+      "text": "Label 1",
+      "position": [
+        206.0,
+        104.0,
+        0.0
+      ],
+      "height": 6.0,
+      "rotation": 1.5707963267948966,
+      "invisible": true,
+      "constant": false,
+      "style": "Standard",
+      "style_handle": "29",
+      "width": 1,
+      "oblique": 0.0,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        206.0,
+        104.0,
+        0.0
+      ]
+    },
+    "39": {
+      "type": "ATTDEF",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "by_block",
+          "aci": null,
+          "rgb": null
+        },
+        "linetype": "BYLAYER",
+        "lineweight": {
+          "mode": "by_block",
+          "value_hundredth_mm": null,
+          "native_value": -2
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "tag": "NESTED",
+      "text": "Inner",
+      "position": [
+        1.0,
+        1.0,
+        0.0
+      ],
+      "height": 2.0,
+      "rotation": 0.0,
+      "invisible": false,
+      "constant": false,
+      "style": "MCP_STYLE067",
+      "style_handle": "34",
+      "width": 1,
+      "oblique": 0.0,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        0,
+        0,
+        0
+      ]
+    },
+    "3E": {
+      "type": "ATTDEF",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "aci",
+          "aci": 1,
+          "rgb": null
+        },
+        "linetype": "BYLAYER",
+        "lineweight": {
+          "mode": "by_layer",
+          "value_hundredth_mm": null,
+          "native_value": -1
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "tag": "ID",
+      "text": "A",
+      "position": [
+        12.0,
+        22.0,
+        0.0
+      ],
+      "height": 2.0,
+      "rotation": 0.2617993877991494,
+      "invisible": false,
+      "constant": false,
+      "style": "MCP_STYLE067",
+      "style_handle": "34",
+      "width": 1.2,
+      "oblique": 0.20943951023931956,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        0,
+        0,
+        0
+      ]
+    },
+    "3F": {
+      "type": "ATTDEF",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "by_layer",
+          "aci": null,
+          "rgb": null
+        },
+        "linetype": "BYLAYER",
+        "lineweight": {
+          "mode": "default",
+          "value_hundredth_mm": null,
+          "native_value": -3
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "tag": "LABEL",
+      "text": "Definition",
+      "position": [
+        12.0,
+        17.0,
+        0.0
+      ],
+      "height": 3.0,
+      "rotation": 0.0,
+      "invisible": true,
+      "constant": false,
+      "style": "Standard",
+      "style_handle": "29",
+      "width": 1,
+      "oblique": 0.0,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        0,
+        0,
+        0
+      ]
+    },
+    "40": {
+      "type": "INSERT",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "by_block",
+          "aci": null,
+          "rgb": null
+        },
+        "linetype": "ByBlock",
+        "lineweight": {
+          "mode": "by_block",
+          "value_hundredth_mm": null,
+          "native_value": -2
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "position": [
+        8.0,
+        9.0,
+        0.0
+      ],
+      "rotation": 0.0,
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "base": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "attributes": [
+        "42"
+      ]
+    },
+    "42": {
+      "type": "ATTRIB",
+      "properties": {
+        "visible": true,
+        "color": {
+          "method": "true_color",
+          "aci": null,
+          "rgb": [
+            72,
+            90,
+            110
+          ]
+        },
+        "linetype": "BYLAYER",
+        "lineweight": {
+          "mode": "by_block",
+          "value_hundredth_mm": null,
+          "native_value": -2
+        }
+      },
+      "layer": "0",
+      "layer_handle": "27",
+      "tag": "NESTED",
+      "text": "Nested",
+      "position": [
+        9.0,
+        10.0,
+        0.0
+      ],
+      "height": 2.0,
+      "rotation": 0.0,
+      "invisible": false,
+      "constant": false,
+      "style": "MCP_STYLE067",
+      "style_handle": "34",
+      "width": 1,
+      "oblique": 0.0,
+      "halign": 0,
+      "valign": 0,
+      "alignment_point": [
+        9.0,
+        10.0,
+        0.0
+      ]
+    }
+  },
+  "sha256": "64F2490995C5FA1E0FCF5D121C697F69D6B1AE97EAF5A12E50A4A6AF46623E99",
+  "scope": "Stored appearance/formatting fixture, two outer occurrences plus one shared nested insertion; centered text anchor is checked, glyph-derived baseline point is native-dependent."
+}

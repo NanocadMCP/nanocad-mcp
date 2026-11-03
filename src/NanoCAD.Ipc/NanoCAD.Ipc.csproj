@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFrameworks>net6.0-windows;net10.0-windows</TargetFrameworks><CheckEolTargetFramework>false</CheckEolTargetFramework></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../NanoCAD.Contracts/NanoCAD.Contracts.csproj" /></ItemGroup>
+</Project>

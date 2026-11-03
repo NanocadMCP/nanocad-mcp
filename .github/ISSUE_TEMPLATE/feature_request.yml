@@ -1,0 +1,22 @@
+name: Feature request
+description: Describe the engineering task you need to solve
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Engineering result
+      description: What do you need to achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Current workflow and difficulty
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example and constraints
+      description: Include dimensions or a sanitized example if useful

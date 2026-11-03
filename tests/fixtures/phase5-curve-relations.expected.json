@@ -1,0 +1,222 @@
+{
+  "handles": {
+    "line": "2F",
+    "partial": "30",
+    "reversed": "31",
+    "cross": "32",
+    "touch": "33",
+    "parallel": "34",
+    "circle": "35",
+    "same_circle": "36",
+    "tangent_circle": "37",
+    "cross_circle": "38",
+    "far_circle": "39",
+    "tangent_line": "3A",
+    "arc_a": "3B",
+    "arc_b": "3C",
+    "rectangle_a": "3D",
+    "rectangle_b": "3E",
+    "bulge": "3F",
+    "bulge_arc": "40",
+    "off_plane": "41",
+    "tiny_off_plane": "42",
+    "inclined_circle": "43",
+    "large_polyline": "44"
+  },
+  "cases": [
+    {
+      "name": "partial line",
+      "first": "line",
+      "second": "partial",
+      "length": 4,
+      "points": null,
+      "ends": [
+        [
+          3,
+          0,
+          0
+        ],
+        [
+          7,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "identical reversed line",
+      "first": "line",
+      "second": "reversed",
+      "length": 10,
+      "points": null,
+      "ends": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          10,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "line crossing",
+      "first": "line",
+      "second": "cross",
+      "length": 0,
+      "points": [
+        [
+          5,
+          0,
+          0
+        ]
+      ],
+      "ends": null
+    },
+    {
+      "name": "collinear endpoint touch",
+      "first": "line",
+      "second": "touch",
+      "length": 0,
+      "points": [
+        [
+          10,
+          0,
+          0
+        ]
+      ],
+      "ends": null
+    },
+    {
+      "name": "parallel disjoint",
+      "first": "line",
+      "second": "parallel",
+      "length": 0,
+      "points": [],
+      "ends": null
+    },
+    {
+      "name": "coincident circles",
+      "first": "circle",
+      "second": "same_circle",
+      "length": 31.41592653589793,
+      "points": null,
+      "ends": null
+    },
+    {
+      "name": "tangent circles",
+      "first": "circle",
+      "second": "tangent_circle",
+      "length": 0,
+      "points": [
+        [
+          35,
+          0,
+          0
+        ]
+      ],
+      "ends": null
+    },
+    {
+      "name": "two circle crossings",
+      "first": "circle",
+      "second": "cross_circle",
+      "length": 0,
+      "points": [
+        [
+          33,
+          4,
+          0
+        ],
+        [
+          33,
+          -4,
+          0
+        ]
+      ],
+      "ends": null
+    },
+    {
+      "name": "disjoint circles",
+      "first": "circle",
+      "second": "far_circle",
+      "length": 0,
+      "points": [],
+      "ends": null
+    },
+    {
+      "name": "tangent line",
+      "first": "circle",
+      "second": "tangent_line",
+      "length": 0,
+      "points": [
+        [
+          30,
+          5,
+          0
+        ]
+      ],
+      "ends": null
+    },
+    {
+      "name": "partial arcs",
+      "first": "arc_a",
+      "second": "arc_b",
+      "length": 7.853981633974483,
+      "points": null,
+      "ends": [
+        [
+          60,
+          5,
+          0
+        ],
+        [
+          55,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "shared polyline edge",
+      "first": "rectangle_a",
+      "second": "rectangle_b",
+      "length": 10,
+      "points": null,
+      "ends": [
+        [
+          90,
+          0,
+          0
+        ],
+        [
+          90,
+          10,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "bulge and circular arc",
+      "first": "bulge",
+      "second": "bulge_arc",
+      "length": 15.707963267948966,
+      "points": null,
+      "ends": [
+        [
+          110,
+          0,
+          0
+        ],
+        [
+          120,
+          0,
+          0
+        ]
+      ]
+    }
+  ]
+}

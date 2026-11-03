@@ -1,0 +1,586 @@
+{
+  "units": "Millimeters",
+  "initial_count": 13,
+  "after_count": 14,
+  "initial": {
+    "line": {
+      "layer": {
+        "name": "P3_LINE"
+      },
+      "geometry": {
+        "start": [
+          1,
+          2,
+          0
+        ],
+        "end": [
+          11,
+          2,
+          0
+        ]
+      },
+      "type": "Line"
+    },
+    "circle": {
+      "layer": {
+        "name": "P3_CIRCLE"
+      },
+      "geometry": {
+        "center": [
+          30,
+          20,
+          0
+        ],
+        "radius": 5
+      },
+      "type": "Circle"
+    },
+    "arc": {
+      "layer": {
+        "name": "P3_ARC"
+      },
+      "geometry": {
+        "center": [
+          50,
+          20,
+          0
+        ],
+        "radius": 4,
+        "start_point": [
+          54,
+          20,
+          0
+        ],
+        "end_point": [
+          50,
+          24,
+          0
+        ],
+        "sweep_angle": 1.5707963267948966
+      },
+      "type": "Arc"
+    },
+    "polyline": {
+      "layer": {
+        "name": "P3_POLYLINE"
+      },
+      "geometry": {
+        "closed": true,
+        "vertex_count": 3,
+        "vertices": [
+          {
+            "point_wcs": [
+              0,
+              40,
+              0
+            ],
+            "bulge": 0.5,
+            "start_width": 1,
+            "end_width": 2
+          },
+          {
+            "point_wcs": [
+              10,
+              40,
+              0
+            ],
+            "bulge": 0,
+            "start_width": 2,
+            "end_width": 1
+          },
+          {
+            "point_wcs": [
+              10,
+              50,
+              0
+            ],
+            "bulge": 0,
+            "start_width": 0,
+            "end_width": 0
+          }
+        ]
+      },
+      "type": "Polyline"
+    },
+    "text": {
+      "layer": {
+        "name": "P3_TEXT"
+      },
+      "geometry": {
+        "text": "Editing 26",
+        "position": [
+          30,
+          40,
+          0
+        ],
+        "height": 3,
+        "rotation": 0,
+        "width_factor": 1
+      },
+      "type": "Text"
+    },
+    "mtext": {
+      "layer": {
+        "name": "P3_MTEXT"
+      },
+      "geometry": {
+        "plain_text": "First line\nSecond line",
+        "location": [
+          70,
+          40,
+          0
+        ],
+        "text_height": 3,
+        "width": 20
+      },
+      "type": "MText"
+    },
+    "erase": {
+      "layer": {
+        "name": "P3_ERASE"
+      },
+      "geometry": {
+        "start": [
+          0,
+          70,
+          0
+        ],
+        "end": [
+          10,
+          70,
+          0
+        ]
+      },
+      "type": "Line"
+    },
+    "reference": {
+      "layer": {
+        "name": "P3_REFERENCE"
+      },
+      "geometry": {
+        "start": [
+          -20,
+          -20,
+          0
+        ],
+        "end": [
+          -10,
+          -20,
+          0
+        ]
+      },
+      "type": "Line"
+    },
+    "locked": {
+      "layer": {
+        "name": "P3_LOCKED"
+      },
+      "geometry": {
+        "start": [
+          0,
+          80,
+          0
+        ],
+        "end": [
+          10,
+          80,
+          0
+        ]
+      },
+      "type": "Line"
+    },
+    "off": {
+      "layer": {
+        "name": "P3_OFF"
+      },
+      "geometry": {
+        "start": [
+          0,
+          90,
+          0
+        ],
+        "end": [
+          10,
+          90,
+          0
+        ]
+      },
+      "type": "Line"
+    },
+    "frozen": {
+      "layer": {
+        "name": "P3_FROZEN"
+      },
+      "geometry": {
+        "start": [
+          0,
+          100,
+          0
+        ],
+        "end": [
+          10,
+          100,
+          0
+        ]
+      },
+      "type": "Line"
+    },
+    "3d": {
+      "layer": {
+        "name": "P3_3D"
+      },
+      "geometry": {
+        "start": [
+          20,
+          80,
+          2
+        ],
+        "end": [
+          30,
+          80,
+          2
+        ]
+      },
+      "type": "Line"
+    },
+    "block": {
+      "layer": {
+        "name": "P3_BLOCK"
+      },
+      "geometry": {},
+      "type": "Unknown"
+    }
+  },
+  "operations": [
+    {
+      "operation": "move",
+      "roles": [
+        "line",
+        "circle"
+      ],
+      "displacement": [
+        10,
+        5
+      ]
+    },
+    {
+      "operation": "rotate",
+      "roles": [
+        "line"
+      ],
+      "center": [
+        0,
+        0
+      ],
+      "angle": 1.5707963267948966
+    },
+    {
+      "operation": "scale",
+      "roles": [
+        "circle"
+      ],
+      "center": [
+        30,
+        20
+      ],
+      "factor": 2
+    },
+    {
+      "operation": "set_properties",
+      "roles": [
+        "line",
+        "arc"
+      ],
+      "properties": {
+        "layer": "P3_TARGET",
+        "color_aci": 1,
+        "linetype": "Continuous",
+        "lineweight_hundredth_mm": 35
+      }
+    },
+    {
+      "operation": "copy",
+      "roles": [
+        "line",
+        "circle"
+      ],
+      "displacement": [
+        100,
+        0
+      ]
+    },
+    {
+      "operation": "move",
+      "roles": [
+        "arc"
+      ],
+      "displacement": [
+        2,
+        -3
+      ]
+    },
+    {
+      "operation": "rotate",
+      "roles": [
+        "arc"
+      ],
+      "center": [
+        52,
+        17
+      ],
+      "angle": 1.5707963267948966
+    },
+    {
+      "operation": "scale",
+      "roles": [
+        "polyline"
+      ],
+      "center": [
+        0,
+        0
+      ],
+      "factor": 2
+    },
+    {
+      "operation": "move",
+      "roles": [
+        "text"
+      ],
+      "displacement": [
+        5,
+        -5
+      ]
+    },
+    {
+      "operation": "rotate",
+      "roles": [
+        "text"
+      ],
+      "center": [
+        35,
+        35
+      ],
+      "angle": 1.5707963267948966
+    },
+    {
+      "operation": "scale",
+      "roles": [
+        "mtext"
+      ],
+      "center": [
+        70,
+        40
+      ],
+      "factor": 2
+    },
+    {
+      "operation": "move",
+      "roles": [
+        "mtext"
+      ],
+      "displacement": [
+        10,
+        5
+      ]
+    },
+    {
+      "operation": "move",
+      "roles": [
+        "erase"
+      ],
+      "displacement": [
+        5,
+        5
+      ]
+    },
+    {
+      "operation": "erase",
+      "roles": [
+        "erase"
+      ]
+    }
+  ],
+  "after": {
+    "line": {
+      "layer": {
+        "name": "P3_TARGET"
+      },
+      "geometry": {
+        "start": [
+          -7,
+          11,
+          0
+        ],
+        "end": [
+          -7,
+          21,
+          0
+        ]
+      },
+      "properties": {
+        "color": {
+          "method": "aci",
+          "aci": 1
+        },
+        "linetype": "Continuous",
+        "lineweight": {
+          "mode": "explicit",
+          "native_value": 35,
+          "value_hundredth_mm": 35
+        }
+      }
+    },
+    "circle": {
+      "geometry": {
+        "center": [
+          50,
+          30,
+          0
+        ],
+        "radius": 10
+      }
+    },
+    "arc": {
+      "layer": {
+        "name": "P3_TARGET"
+      },
+      "geometry": {
+        "center": [
+          52,
+          17,
+          0
+        ],
+        "radius": 4,
+        "start_point": [
+          52,
+          21,
+          0
+        ],
+        "end_point": [
+          48,
+          17,
+          0
+        ],
+        "sweep_angle": 1.5707963267948966
+      },
+      "properties": {
+        "color": {
+          "method": "aci",
+          "aci": 1
+        },
+        "linetype": "Continuous",
+        "lineweight": {
+          "mode": "explicit",
+          "native_value": 35,
+          "value_hundredth_mm": 35
+        }
+      }
+    },
+    "polyline": {
+      "geometry": {
+        "closed": true,
+        "vertex_count": 3,
+        "vertices": [
+          {
+            "point_wcs": [
+              0,
+              80,
+              0
+            ],
+            "bulge": 0.5,
+            "start_width": 2,
+            "end_width": 4
+          },
+          {
+            "point_wcs": [
+              20,
+              80,
+              0
+            ],
+            "bulge": 0,
+            "start_width": 4,
+            "end_width": 2
+          },
+          {
+            "point_wcs": [
+              20,
+              100,
+              0
+            ],
+            "bulge": 0,
+            "start_width": 0,
+            "end_width": 0
+          }
+        ]
+      }
+    },
+    "text": {
+      "geometry": {
+        "text": "Editing 26",
+        "position": [
+          35,
+          35,
+          0
+        ],
+        "height": 3,
+        "rotation": 1.5707963267948966,
+        "width_factor": 1
+      }
+    },
+    "mtext": {
+      "geometry": {
+        "plain_text": "First line\nSecond line",
+        "location": [
+          80,
+          45,
+          0
+        ],
+        "text_height": 6,
+        "width": 40
+      }
+    },
+    "copy_line": {
+      "layer": {
+        "name": "P3_TARGET"
+      },
+      "geometry": {
+        "start": [
+          93,
+          11,
+          0
+        ],
+        "end": [
+          93,
+          21,
+          0
+        ]
+      },
+      "properties": {
+        "color": {
+          "method": "aci",
+          "aci": 1
+        },
+        "linetype": "Continuous",
+        "lineweight": {
+          "mode": "explicit",
+          "native_value": 35,
+          "value_hundredth_mm": 35
+        }
+      }
+    },
+    "copy_circle": {
+      "layer": {
+        "name": "P3_CIRCLE"
+      },
+      "geometry": {
+        "center": [
+          150,
+          30,
+          0
+        ],
+        "radius": 10
+      }
+    }
+  },
+  "note": "Resolve handles by unique role layers in the initial native query, never assume imported DXF handles."
+}

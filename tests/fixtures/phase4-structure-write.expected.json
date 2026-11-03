@@ -1,0 +1,236 @@
+{
+  "initial_model_count": 7,
+  "roles": {
+    "a": {
+      "layer": "P4W_A",
+      "handle": "40",
+      "attributes": {
+        "NAME": {
+          "handle": "42",
+          "text": "Pump A-01",
+          "flags": 0,
+          "position": [
+            0.0,
+            3.0,
+            0.0
+          ]
+        },
+        "CONST": {
+          "handle": "43",
+          "text": "Constant",
+          "flags": 2,
+          "position": [
+            0.0,
+            6.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "b": {
+      "layer": "P4W_B",
+      "handle": "44",
+      "attributes": {
+        "NAME": {
+          "handle": "46",
+          "text": "Pump B-01",
+          "flags": 0,
+          "position": [
+            30.0,
+            3.0,
+            0.0
+          ]
+        },
+        "CONST": {
+          "handle": "47",
+          "text": "Constant",
+          "flags": 2,
+          "position": [
+            30.0,
+            6.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "locked": {
+      "layer": "P4W_LOCKED",
+      "handle": "48",
+      "attributes": {
+        "NAME": {
+          "handle": "4A",
+          "text": "Locked",
+          "flags": 0,
+          "position": [
+            0.0,
+            33.0,
+            0.0
+          ]
+        },
+        "CONST": {
+          "handle": "4B",
+          "text": "Constant",
+          "flags": 2,
+          "position": [
+            0.0,
+            36.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "off": {
+      "layer": "P4W_OFF",
+      "handle": "4C",
+      "attributes": {
+        "NAME": {
+          "handle": "4E",
+          "text": "Off",
+          "flags": 0,
+          "position": [
+            30.0,
+            33.0,
+            0.0
+          ]
+        },
+        "CONST": {
+          "handle": "4F",
+          "text": "Constant",
+          "flags": 2,
+          "position": [
+            30.0,
+            36.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "frozen": {
+      "layer": "P4W_FROZEN",
+      "handle": "50",
+      "attributes": {
+        "NAME": {
+          "handle": "52",
+          "text": "Frozen",
+          "flags": 0,
+          "position": [
+            0.0,
+            63.0,
+            0.0
+          ]
+        },
+        "CONST": {
+          "handle": "53",
+          "text": "Constant",
+          "flags": 2,
+          "position": [
+            0.0,
+            66.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "aligned": {
+      "layer": "P4W_ALIGNED",
+      "handle": "54",
+      "attributes": {
+        "NAME": {
+          "handle": "56",
+          "text": "Alignment",
+          "flags": 0,
+          "position": [
+            30.0,
+            63.0,
+            0.0
+          ]
+        },
+        "CONST": {
+          "handle": "57",
+          "text": "Constant",
+          "flags": 2,
+          "position": [
+            30.0,
+            66.0,
+            0.0
+          ]
+        }
+      }
+    }
+  },
+  "reference_handle": "58",
+  "layers": {
+    "0": {
+      "handle": "27",
+      "flags": 0,
+      "color": 7
+    },
+    "Defpoints": {
+      "handle": "28",
+      "flags": 0,
+      "color": 7
+    },
+    "P4W_A": {
+      "handle": "2F",
+      "flags": 0,
+      "color": 2
+    },
+    "P4W_B": {
+      "handle": "30",
+      "flags": 0,
+      "color": 3
+    },
+    "P4W_LOCKED": {
+      "handle": "31",
+      "flags": 4,
+      "color": 4
+    },
+    "P4W_OFF": {
+      "handle": "32",
+      "flags": 0,
+      "color": -5
+    },
+    "P4W_FROZEN": {
+      "handle": "33",
+      "flags": 1,
+      "color": 6
+    },
+    "P4W_ALIGNED": {
+      "handle": "34",
+      "flags": 0,
+      "color": 7
+    },
+    "P4W_REF": {
+      "handle": "35",
+      "flags": 0,
+      "color": 8
+    },
+    "P4W_EDIT": {
+      "handle": "36",
+      "flags": 0,
+      "color": 9
+    },
+    "external|P4W_DEP": {
+      "handle": "37",
+      "flags": 16,
+      "color": 7
+    }
+  },
+  "definition_name": "P4W_UNIT",
+  "definition_attribute_text": "Default name",
+  "new_layer": {
+    "name": "MCP_Test",
+    "color_aci": 2,
+    "linetype": "P4W_DASH",
+    "lineweight_hundredth_mm": 25,
+    "is_plottable": false
+  },
+  "changed_attribute": {
+    "role": "a",
+    "tag": "NAME",
+    "before": "Pump A-01",
+    "after": "Pump A-02"
+  },
+  "scope": "Offline DXF audited. Native flags/handles must be checked after opening. No xref file exists or is loaded; dependent-style layer has a synthetic flag/name for refusal testing.",
+  "current_layer": "P4W_EDIT"
+}

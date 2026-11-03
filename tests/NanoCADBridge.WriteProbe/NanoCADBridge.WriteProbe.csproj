@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'LockOnly'">
+    <AssemblyName>NanoCADBridge.WriteProbe.LockOnly</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'LockOnly2'">
+    <AssemblyName>NanoCADBridge.WriteProbe.LockOnly2</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY;WRITE_PROBE_DISTINCT_COMMAND</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'CommandContext'">
+    <AssemblyName>NanoCADBridge.WriteProbe.CommandContext</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY;WRITE_PROBE_COMMAND_CONTEXT</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'CommandNoLock'">
+    <AssemblyName>NanoCADBridge.WriteProbe.CommandNoLock</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY;WRITE_PROBE_COMMAND_CONTEXT;WRITE_PROBE_COMMAND_NO_LOCK</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'FailureNoMarker'">
+    <AssemblyName>NanoCADBridge.WriteProbe.FailureNoMarker</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY;WRITE_PROBE_COMMAND_CONTEXT;WRITE_PROBE_COMMAND_NO_LOCK;WRITE_PROBE_FAILURE_NO_MARKER</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'TransactionMarker'">
+    <AssemblyName>NanoCADBridge.WriteProbe.TransactionMarker</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY;WRITE_PROBE_COMMAND_CONTEXT;WRITE_PROBE_COMMAND_NO_LOCK;WRITE_PROBE_TRANSACTION_MARKER</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ProbeUndoPolicy)' == 'CancelFailure'">
+    <AssemblyName>NanoCADBridge.WriteProbe.CancelFailure</AssemblyName>
+    <DefineConstants>$(DefineConstants);WRITE_PROBE_LOCK_ONLY;WRITE_PROBE_COMMAND_CONTEXT;WRITE_PROBE_COMMAND_NO_LOCK;WRITE_PROBE_CANCEL_FAILURE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+    <Reference Include="hostmgd" HintPath="$(NanoCadManagedDir)\hostmgd.dll" Private="false" />
+    <Reference Include="hostdbmgd" HintPath="$(NanoCadManagedDir)\hostdbmgd.dll" Private="false" />
+    <Compile Include="../../src/NanoCADBridge/HostWindowState.cs" Link="HostWindowState.cs" />
+  </ItemGroup>
+</Project>

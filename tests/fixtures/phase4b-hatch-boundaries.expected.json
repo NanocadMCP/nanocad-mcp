@@ -1,0 +1,105 @@
+{
+  "cases": [
+    {
+      "handle": "2F",
+      "complete": true,
+      "loops": [
+        {
+          "boundary": "30",
+          "points": [
+            [
+              0,
+              0
+            ],
+            [
+              40,
+              0
+            ],
+            [
+              40,
+              30
+            ],
+            [
+              0,
+              30
+            ]
+          ]
+        },
+        {
+          "boundary": "31",
+          "points": [
+            [
+              10,
+              10
+            ],
+            [
+              10,
+              20
+            ],
+            [
+              20,
+              20
+            ],
+            [
+              20,
+              10
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "handle": "33",
+      "complete": true,
+      "loops": [
+        {
+          "boundary": "32",
+          "points": [
+            [
+              60,
+              0
+            ],
+            [
+              90,
+              0
+            ],
+            [
+              90,
+              30
+            ],
+            [
+              75,
+              30
+            ],
+            [
+              75,
+              15
+            ],
+            [
+              60,
+              15
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "handle": "35",
+      "complete": false,
+      "loops": [
+        {
+          "boundary": "34",
+          "points": null
+        }
+      ]
+    }
+  ],
+  "sources": [
+    "30",
+    "31",
+    "32",
+    "34",
+    "36"
+  ],
+  "scope": "Explicit matching DXF source/reactor pairs, polyline hole, concave line chain, unsupported curved circle; no native bridge creation used."
+}

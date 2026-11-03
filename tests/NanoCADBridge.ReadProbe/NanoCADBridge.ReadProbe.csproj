@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App" />
+    <Reference Include="hostmgd" HintPath="$(NanoCadManagedDir)\hostmgd.dll" Private="false" />
+    <Reference Include="hostdbmgd" HintPath="$(NanoCadManagedDir)\hostdbmgd.dll" Private="false" />
+  </ItemGroup>
+</Project>

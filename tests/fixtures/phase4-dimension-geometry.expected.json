@@ -1,0 +1,184 @@
+{
+  "sha256": "9FB28B75826D45FFE19EC5BF3853AED87A2949F43D64AD6195AD62A3565E3EF9",
+  "scope": "DXF roundtrip tags plus independent analytical measurements; native acceptance pending",
+  "objects": [
+    {
+      "handle": "8A",
+      "kind": "AlignedDimension",
+      "measurement": 50,
+      "definition": {
+        "xline1_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "xline2_point": [
+          30.0,
+          40.0,
+          0.0
+        ],
+        "dimline_point": [
+          -8.0,
+          6.0,
+          0.0
+        ]
+      },
+      "style_handle": "73",
+      "text": "Dimension <>"
+    },
+    {
+      "handle": "99",
+      "kind": "RotatedDimension",
+      "measurement": 51.96152422706632,
+      "definition": {
+        "xline1_point": [
+          100.0,
+          0.0,
+          0.0
+        ],
+        "xline2_point": [
+          160.0,
+          0.0,
+          0.0
+        ],
+        "dimline_point": [
+          87.00961894323342,
+          22.5,
+          0.0
+        ],
+        "rotation": 0.5235987755982988
+      },
+      "style_handle": "73",
+      "text": "<>"
+    },
+    {
+      "handle": "A8",
+      "kind": "RadialDimension",
+      "measurement": 15,
+      "definition": {
+        "center": [
+          200.0,
+          0.0,
+          0.0
+        ],
+        "chord_point": [
+          215.0,
+          0.0,
+          0.0
+        ],
+        "leader_length": 0
+      },
+      "style_handle": "83",
+      "text": "<>"
+    },
+    {
+      "handle": "B2",
+      "kind": "DiametricDimension",
+      "measurement": 40,
+      "definition": {
+        "chord_point": [
+          320.0,
+          0.0,
+          0.0
+        ],
+        "far_chord_point": [
+          280.0,
+          0.0,
+          0.0
+        ],
+        "leader_length": 0
+      },
+      "style_handle": "83",
+      "text": "<>"
+    },
+    {
+      "handle": "BC",
+      "kind": "LineAngularDimension2",
+      "measurement": 1.5707963267948966,
+      "definition": {
+        "xline1_start": [
+          0.0,
+          100.0,
+          0.0
+        ],
+        "xline1_end": [
+          40.0,
+          100.0,
+          0.0
+        ],
+        "xline2_start": [
+          0.0,
+          100.0,
+          0.0
+        ],
+        "xline2_end": [
+          0.0,
+          140.0,
+          0.0
+        ],
+        "arc_point": [
+          10.0,
+          110.0,
+          0.0
+        ]
+      },
+      "style_handle": "89",
+      "text": "<>"
+    },
+    {
+      "handle": "CD",
+      "kind": "Point3AngularDimension",
+      "measurement": 1.0471975511965976,
+      "definition": {
+        "center_point": [
+          100.0,
+          100.0,
+          0.0
+        ],
+        "xline1_point": [
+          120.0,
+          100.0,
+          0.0
+        ],
+        "xline2_point": [
+          110.0,
+          117.32050807568876,
+          0.0
+        ],
+        "arc_point": [
+          113.0,
+          107.0,
+          0.0
+        ]
+      },
+      "style_handle": "89",
+      "text": "<>"
+    },
+    {
+      "handle": "DD",
+      "kind": "OrdinateDimension",
+      "measurement": 40,
+      "definition": {
+        "origin": [
+          200.0,
+          100.0,
+          0.0
+        ],
+        "defining_point": [
+          240.0,
+          135.0,
+          0.0
+        ],
+        "leader_end_point": [
+          255.0,
+          145.0,
+          0.0
+        ],
+        "using_x_axis": true
+      },
+      "style_handle": "73",
+      "text": "<>"
+    }
+  ],
+  "control_handle": "E8"
+}

@@ -1,0 +1,34 @@
+# Local research and tool caches.
+/.research/
+/.tools/
+/.nuget/
+/.dotnet-home/
+/.vs/
+
+# Build output.
+/artifacts/
+**/bin/
+**/obj/
+
+# Local tools, settings, diagnostics and user data.
+/output/
+/outputs/
+/tmp/
+/.idea/
+/.vscode/
+/config/local/
+*.user
+*.suo
+*.log
+*.tmp
+*.dwg
+*.dxf
+*.bak
+*.dwl
+*.dwl2
+
+# Obtain vendor SDKs separately; generated slices retain vendor terms.
+/NCadSDK_*/
+/nanoCAD DWG Samples*/
+/nanoCAD DWG Samples*.zip
+/src/NanoCAD.NativeParameters/sdk-compat/generated/

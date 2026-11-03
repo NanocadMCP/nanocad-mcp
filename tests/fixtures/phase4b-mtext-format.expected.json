@@ -1,0 +1,218 @@
+{
+  "scope": "Raw DXF oracle only; native flags/read/audit pending",
+  "source": "tests\\fixtures\\phase4b-mtext-edit.dxf",
+  "source_sha256": "F58CA894F64683E88363DB76F49FCCDA284A0AA39E233E61BF3415F1771E9058",
+  "sha256": "E1123F22C7B94D97EEFA86230FC1DBF4D3531EF141E543388A5AAC54C36AFFC0",
+  "entities": {
+    "2F": {
+      "owner": "17",
+      "contents": "Old A\\PSecond",
+      "plain_text": "Old A\nSecond",
+      "location": [
+        10.0,
+        20.0,
+        0.0
+      ],
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "text_height": 3.0,
+      "width": 100.0,
+      "attachment": "TopLeft",
+      "text_style": "Standard",
+      "style_handle": "29",
+      "line_spacing_style": "Exactly",
+      "line_spacing_factor": 1.5,
+      "flow_direction": "LeftToRight",
+      "column_type": "NoColumns",
+      "background": {
+        "enabled": true,
+        "use_drawing_background": false,
+        "scale_factor": 1.25,
+        "color": {
+          "method": "aci",
+          "aci": 3,
+          "rgb": null
+        }
+      },
+      "added_groups": {
+        "7": "Standard",
+        "11": "1.0",
+        "21": "0.0",
+        "31": "0.0",
+        "72": "1",
+        "73": "2",
+        "44": "1.5",
+        "90": "1",
+        "45": "1.25",
+        "63": "3"
+      }
+    },
+    "30": {
+      "owner": "17",
+      "contents": "Control",
+      "plain_text": "Control",
+      "location": [
+        150.0,
+        20.0,
+        0.0
+      ],
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "text_height": 3.0,
+      "width": 25.0,
+      "attachment": "TopLeft",
+      "text_style": "Standard",
+      "style_handle": "29",
+      "line_spacing_style": "AtLeast",
+      "line_spacing_factor": 0.75,
+      "flow_direction": "LeftToRight",
+      "column_type": "NoColumns",
+      "background": {
+        "enabled": false,
+        "use_drawing_background": false,
+        "scale_factor": 1.5,
+        "color": {
+          "method": "aci",
+          "aci": 7,
+          "rgb": null
+        }
+      },
+      "added_groups": {
+        "7": "Standard",
+        "11": "1.0",
+        "21": "0.0",
+        "31": "0.0",
+        "72": "1",
+        "73": "1",
+        "44": "0.75",
+        "90": "0",
+        "45": "1.5",
+        "63": "7"
+      }
+    },
+    "31": {
+      "owner": "17",
+      "contents": "\\LUnderlined\\l",
+      "plain_text": "Underlined",
+      "location": [
+        10.0,
+        -20.0,
+        0.0
+      ],
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "text_height": 3.0,
+      "width": 100.0,
+      "attachment": "TopLeft",
+      "text_style": "Standard",
+      "style_handle": "29",
+      "line_spacing_style": "Exactly",
+      "line_spacing_factor": 2.0,
+      "flow_direction": "ByStyle",
+      "column_type": "NoColumns",
+      "background": {
+        "enabled": true,
+        "use_drawing_background": false,
+        "scale_factor": 1.75,
+        "color": {
+          "method": "true_color",
+          "aci": null,
+          "rgb": [
+            10,
+            120,
+            230
+          ]
+        }
+      },
+      "added_groups": {
+        "7": "Standard",
+        "11": "1.0",
+        "21": "0.0",
+        "31": "0.0",
+        "72": "5",
+        "73": "2",
+        "44": "2.0",
+        "90": "1",
+        "45": "1.75",
+        "63": "7",
+        "421": "686310"
+      }
+    },
+    "32": {
+      "owner": "17",
+      "contents": "Centered",
+      "plain_text": "Centered",
+      "location": [
+        150.0,
+        -20.0,
+        0.0
+      ],
+      "direction": [
+        1,
+        0,
+        0
+      ],
+      "normal": [
+        0,
+        0,
+        1
+      ],
+      "text_height": 3.0,
+      "width": 100.0,
+      "attachment": "MiddleCenter",
+      "text_style": "Standard",
+      "style_handle": "29",
+      "line_spacing_style": "AtLeast",
+      "line_spacing_factor": 1.25,
+      "flow_direction": "LeftToRight",
+      "column_type": "NoColumns",
+      "background": {
+        "enabled": true,
+        "use_drawing_background": true,
+        "scale_factor": 1.1,
+        "color": {
+          "method": "aci",
+          "aci": 2,
+          "rgb": null
+        }
+      },
+      "added_groups": {
+        "7": "Standard",
+        "11": "1.0",
+        "21": "0.0",
+        "31": "0.0",
+        "72": "1",
+        "73": "1",
+        "44": "1.25",
+        "90": "3",
+        "45": "1.1",
+        "63": "2"
+      }
+    }
+  },
+  "control_handle": "33"
+}

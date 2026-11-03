@@ -1,0 +1,245 @@
+{
+  "handles": {
+    "base": "2F",
+    "far": "30",
+    "cross": "31",
+    "same": "32",
+    "tangent": "33",
+    "upper": "34",
+    "left": "35",
+    "wrapped": "36",
+    "outside": "37",
+    "inclined": "38",
+    "skew": "39",
+    "pierce": "3A",
+    "thin": "3B",
+    "above": "3C"
+  },
+  "intersections": [
+    {
+      "name": "separated",
+      "a": "base",
+      "b": "far",
+      "points": []
+    },
+    {
+      "name": "crossing",
+      "a": "base",
+      "b": "cross",
+      "points": [
+        [
+          7.5,
+          3.307189138830738,
+          0
+        ],
+        [
+          7.5,
+          -3.307189138830738,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "tangent",
+      "a": "base",
+      "b": "tangent",
+      "points": [
+        [
+          10,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "inclined pierce",
+      "a": "inclined",
+      "b": "pierce",
+      "points": [
+        [
+          0,
+          0,
+          35
+        ]
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "name": "separated",
+      "a": "base",
+      "b": "far",
+      "points": [],
+      "length": 0
+    },
+    {
+      "name": "crossing",
+      "a": "base",
+      "b": "cross",
+      "points": [
+        [
+          7.5,
+          3.307189138830738,
+          0
+        ],
+        [
+          7.5,
+          -3.307189138830738,
+          0
+        ]
+      ],
+      "length": 0
+    },
+    {
+      "name": "tangent",
+      "a": "base",
+      "b": "tangent",
+      "points": [
+        [
+          10,
+          0,
+          0
+        ]
+      ],
+      "length": 0
+    },
+    {
+      "name": "coincident",
+      "a": "base",
+      "b": "same",
+      "points": null,
+      "length": 48.44224110273838
+    },
+    {
+      "name": "quarter overlap",
+      "a": "upper",
+      "b": "left",
+      "points": null,
+      "length": 12.110560275684595,
+      "ends": [
+        [
+          60,
+          5,
+          0
+        ],
+        [
+          50,
+          0,
+          0
+        ]
+      ]
+    }
+  ],
+  "distance": [
+    {
+      "name": "separated",
+      "a": "base",
+      "b": "far",
+      "distance": 10,
+      "points": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          20,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "crossing",
+      "a": "base",
+      "b": "cross",
+      "distance": 0
+    },
+    {
+      "name": "tangent",
+      "a": "base",
+      "b": "tangent",
+      "distance": 0,
+      "points": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          10,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "coincident",
+      "a": "base",
+      "b": "same",
+      "distance": 0
+    },
+    {
+      "name": "quarter overlap",
+      "a": "upper",
+      "b": "left",
+      "distance": 0
+    },
+    {
+      "name": "wrapped finite",
+      "a": "wrapped",
+      "b": "outside",
+      "distance": 4,
+      "points": [
+        [
+          100,
+          0,
+          0
+        ],
+        [
+          104,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "inclined skew",
+      "a": "inclined",
+      "b": "skew",
+      "distance": 4,
+      "points": [
+        [
+          10,
+          0,
+          30
+        ],
+        [
+          14,
+          0,
+          30
+        ]
+      ]
+    },
+    {
+      "name": "thin ellipse",
+      "a": "thin",
+      "b": "above",
+      "distance": 0.9,
+      "points": [
+        [
+          0,
+          40.1,
+          0
+        ],
+        [
+          0,
+          41,
+          0
+        ]
+      ]
+    }
+  ],
+  "overlap_length_absolute_tolerance": 1e-06,
+  "coordinates_absolute_tolerance": 1e-07
+}

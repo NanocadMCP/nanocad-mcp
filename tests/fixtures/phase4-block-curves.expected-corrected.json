@@ -1,0 +1,258 @@
+{
+  "root": "3C",
+  "root_matrix": [
+    1.2246467991473532e-16,
+    -2.0,
+    0,
+    96.0,
+    2.0,
+    1.2246467991473532e-16,
+    0,
+    198.0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    1
+  ],
+  "nested": [
+    {
+      "handle": "38",
+      "local_matrix": [
+        1.7320508075688774,
+        -0.24999999999999997,
+        0,
+        7.285898384862245,
+        0.9999999999999999,
+        0.43301270189221935,
+        0,
+        16.700961894323342,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "world_matrix": [
+        -1.9999999999999996,
+        -0.8660254037844387,
+        0.0,
+        62.598076211353316,
+        3.464101615137755,
+        -0.4999999999999999,
+        0.0,
+        212.5717967697245,
+        0.0,
+        0.0,
+        1,
+        0.0,
+        0.0,
+        0.0,
+        0,
+        1.0
+      ]
+    },
+    {
+      "handle": "3A",
+      "local_matrix": [
+        -6.123233995736766e-17,
+        1.5,
+        0,
+        -14.5,
+        1.0,
+        9.184850993605148e-17,
+        0,
+        -2.0000000000000004,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "world_matrix": [
+        -2.0,
+        0.0,
+        0.0,
+        100.0,
+        0.0,
+        3.0,
+        0.0,
+        169.0,
+        0.0,
+        0.0,
+        1,
+        0.0,
+        0.0,
+        0.0,
+        0,
+        1.0
+      ]
+    }
+  ],
+  "leaves": [
+    {
+      "handle": "35",
+      "type": "Ellipse",
+      "geometry": {
+        "center": [
+          5,
+          6,
+          0
+        ],
+        "major_axis": [
+          6,
+          8,
+          0
+        ],
+        "minor_axis": [
+          -4,
+          3,
+          0
+        ],
+        "major_radius": 10,
+        "minor_radius": 5,
+        "radius_ratio": 0.5,
+        "normal": [
+          0,
+          0,
+          1
+        ],
+        "start_point": [
+          10.085722143867205,
+          14.436540615115117,
+          0.0
+        ],
+        "end_point": [
+          2.7507602300787526,
+          11.030665185248278,
+          0.0
+        ],
+        "start_parameter": 0.2,
+        "end_parameter": 1.3,
+        "closed": false
+      }
+    },
+    {
+      "handle": "36",
+      "type": "Spline",
+      "geometry": {
+        "degree": 3,
+        "rational": false,
+        "periodic": false,
+        "closed": false,
+        "planar": false,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            20,
+            0,
+            0
+          ],
+          [
+            22,
+            5,
+            0
+          ],
+          [
+            26,
+            -2,
+            0
+          ],
+          [
+            30,
+            0,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          20,
+          0,
+          0
+        ],
+        "end_point": [
+          30,
+          0,
+          0
+        ]
+      },
+      "weights": []
+    },
+    {
+      "handle": "37",
+      "type": "Spline",
+      "geometry": {
+        "degree": 2,
+        "rational": true,
+        "periodic": false,
+        "closed": false,
+        "planar": false,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            70,
+            0,
+            0
+          ],
+          [
+            70,
+            10,
+            0
+          ],
+          [
+            60,
+            10,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          70,
+          0,
+          0
+        ],
+        "end_point": [
+          60,
+          10,
+          0
+        ]
+      },
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ]
+    }
+  ],
+  "node_count": 9,
+  "oracle": "Independent row-major T(position)*Rz*S*T(-definitionBase), explicit multiplication; two occurrences of the same three local native curves, nonuniform scale and reflection."
+}

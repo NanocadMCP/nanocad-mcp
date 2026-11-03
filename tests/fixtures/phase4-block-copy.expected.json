@@ -1,0 +1,24 @@
+{
+  "roots": [
+    "3C",
+    "40",
+    "44"
+  ],
+  "opaque": "48",
+  "definition": "35",
+  "sha256": "E23E9762C2A4E0AE99D9053FFC79345B4367223FDF913637DEB5F5221DFF144E",
+  "manual_attribute": {
+    "handle": "3E",
+    "position": [
+      107,
+      219,
+      0
+    ],
+    "color": [
+      43,
+      94,
+      129
+    ],
+    "style": "COPY_STYLE068"
+  }
+}

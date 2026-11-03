@@ -1,0 +1,22 @@
+{
+  "sha256": "B484E40D0625B7296782AD08D9414FA6987D1FBC582AB2BD29D689CBC1B39BE1",
+  "cases": [
+    {
+      "handle": "8A",
+      "geometric_measurement": 50,
+      "dimension_text": "999",
+      "effective_dimlfac": 2
+    },
+    {
+      "handle": "DD",
+      "geometric_measurement": 40,
+      "effective_dimlfac": -2
+    },
+    {
+      "handle": "A8",
+      "measurement": null,
+      "reason": "unsupported_dimension_plane"
+    }
+  ],
+  "method": "Owned derived DXF with positive/negative per-entity measurement factors, literal override and unsupported plane. Source fixture preserved; no native write or dimension regeneration."
+}

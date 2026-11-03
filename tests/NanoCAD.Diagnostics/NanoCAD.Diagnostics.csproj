@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/NanoCAD.McpServer/NanoCAD.McpServer.csproj" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/NanoCADBridge/HostWindowState.cs" Link="HostWindowState.cs" /></ItemGroup>
+</Project>

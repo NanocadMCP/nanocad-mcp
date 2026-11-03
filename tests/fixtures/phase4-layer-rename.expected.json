@@ -1,0 +1,20 @@
+{
+  "names": [
+    "MCP_RENAME_A",
+    "MCP_RENAME_B",
+    "MCP_RENAME_CONTROL"
+  ],
+  "layers": [
+    "32",
+    "33",
+    "34"
+  ],
+  "entities": [
+    "35",
+    "36",
+    "37"
+  ],
+  "current_layer": "32",
+  "sha256": "7F974DDD7070840F432E4AD51E89A16F58C091571BC8E5E3BED1B8403AD5B8F3",
+  "scope": "Owned fixture: ordinary current layer and two independent layers; three source/control entities. No product test API."
+}

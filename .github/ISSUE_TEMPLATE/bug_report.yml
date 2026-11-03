@@ -1,0 +1,39 @@
+name: Bug report
+description: Describe a reproducible problem
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Do not post credentials or confidential drawings. For vulnerabilities, follow SECURITY.md."
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: Windows, nanoCAD, AI client, MCP server, bridge and protocol
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Task and steps
+      description: Include units and relevant dimensions
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result and exact error
+      description: Include operation ID and outcome if available. Do not repeat an uncertain write just for this report.
+    validations:
+      required: true
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Safe attachments
+      description: Attach only files you are allowed to share

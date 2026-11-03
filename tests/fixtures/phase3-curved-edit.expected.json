@@ -1,0 +1,32 @@
+{
+  "handles": {
+    "degree1_line": "2F",
+    "cubic_bezier": "30",
+    "nonuniform_straight": "31",
+    "rational_quarter": "32",
+    "rational_circle": "33",
+    "spatial_bezier": "34",
+    "control": "36",
+    "ellipse_full": "3A",
+    "ellipse_trim": "3B"
+  },
+  "targets": [
+    "3A",
+    "3B",
+    "30",
+    "32"
+  ],
+  "all_handles": [
+    "2F",
+    "30",
+    "31",
+    "32",
+    "33",
+    "34",
+    "35",
+    "36",
+    "3A",
+    "3B"
+  ],
+  "oracle": "Move[5,7],rotate pi/2 around origin,scale2: point[-2(y+7),2(x+5),0],vector[-2y,2x,0]. Copy adds[100,0,0]. Knots/weights/parameter domain retained; length*2, closed ellipse area*4."
+}

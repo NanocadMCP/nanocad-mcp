@@ -1,0 +1,449 @@
+{
+  "cases": [
+    {
+      "name": "degree1_line",
+      "handle": "2F",
+      "geometry": {
+        "degree": 1,
+        "rational": false,
+        "periodic": false,
+        "closed": false,
+        "planar": true,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            3,
+            4,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          0,
+          0,
+          0
+        ],
+        "end_point": [
+          3,
+          4,
+          0
+        ]
+      },
+      "weights": null,
+      "length": 5,
+      "area": null,
+      "query": [
+        0,
+        0,
+        0
+      ],
+      "nearest": [
+        0,
+        0,
+        0
+      ],
+      "distance": 0.0
+    },
+    {
+      "name": "cubic_bezier",
+      "handle": "30",
+      "geometry": {
+        "degree": 3,
+        "rational": false,
+        "periodic": false,
+        "closed": false,
+        "planar": true,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            20,
+            0,
+            0
+          ],
+          [
+            22,
+            5,
+            0
+          ],
+          [
+            26,
+            -2,
+            0
+          ],
+          [
+            30,
+            0,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          20,
+          0,
+          0
+        ],
+        "end_point": [
+          30,
+          0,
+          0
+        ]
+      },
+      "weights": null,
+      "length": 11.386266382589898,
+      "area": null,
+      "query": [
+        20,
+        0,
+        0
+      ],
+      "nearest": [
+        20,
+        0,
+        0
+      ],
+      "distance": 0.0
+    },
+    {
+      "name": "nonuniform_straight",
+      "handle": "31",
+      "geometry": {
+        "degree": 2,
+        "rational": false,
+        "periodic": false,
+        "closed": false,
+        "planar": true,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            40,
+            0,
+            0
+          ],
+          [
+            42,
+            0,
+            0
+          ],
+          [
+            47,
+            0,
+            0
+          ],
+          [
+            50,
+            0,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          0.2,
+          1,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          40,
+          0,
+          0
+        ],
+        "end_point": [
+          50,
+          0,
+          0
+        ]
+      },
+      "weights": null,
+      "length": 10,
+      "area": null,
+      "query": [
+        40,
+        0,
+        0
+      ],
+      "nearest": [
+        40,
+        0,
+        0
+      ],
+      "distance": 0.0
+    },
+    {
+      "name": "rational_quarter",
+      "handle": "32",
+      "geometry": {
+        "degree": 2,
+        "rational": true,
+        "periodic": false,
+        "closed": false,
+        "planar": true,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            70,
+            0,
+            0
+          ],
+          [
+            70,
+            10,
+            0
+          ],
+          [
+            60,
+            10,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          70,
+          0,
+          0
+        ],
+        "end_point": [
+          60,
+          10,
+          0
+        ]
+      },
+      "weights": [
+        1,
+        0.7071067811865476,
+        1
+      ],
+      "length": 15.707963267948966,
+      "area": null,
+      "query": [
+        75,
+        0,
+        0
+      ],
+      "nearest": [
+        70,
+        0,
+        0
+      ],
+      "distance": 5.0
+    },
+    {
+      "name": "rational_circle",
+      "handle": "33",
+      "geometry": {
+        "degree": 2,
+        "rational": true,
+        "periodic": false,
+        "closed": true,
+        "planar": true,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            10,
+            30,
+            0
+          ],
+          [
+            10,
+            40,
+            0
+          ],
+          [
+            0,
+            40,
+            0
+          ],
+          [
+            -10,
+            40,
+            0
+          ],
+          [
+            -10,
+            30,
+            0
+          ],
+          [
+            -10,
+            20,
+            0
+          ],
+          [
+            0,
+            20,
+            0
+          ],
+          [
+            10,
+            20,
+            0
+          ],
+          [
+            10,
+            30,
+            0
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          1,
+          1,
+          2,
+          2,
+          3,
+          3,
+          4,
+          4,
+          4
+        ],
+        "start_parameter": 0,
+        "end_parameter": 4,
+        "start_point": [
+          10,
+          30,
+          0
+        ],
+        "end_point": [
+          10,
+          30,
+          0
+        ]
+      },
+      "weights": [
+        1,
+        0.7071067811865476,
+        1,
+        0.7071067811865476,
+        1,
+        0.7071067811865476,
+        1,
+        0.7071067811865476,
+        1
+      ],
+      "length": 62.83185307179586,
+      "area": 314.1592653589793,
+      "query": [
+        15,
+        30,
+        0
+      ],
+      "nearest": [
+        10,
+        30,
+        0
+      ],
+      "distance": 5.0
+    },
+    {
+      "name": "spatial_bezier",
+      "handle": "34",
+      "geometry": {
+        "degree": 3,
+        "rational": false,
+        "periodic": false,
+        "closed": false,
+        "planar": false,
+        "has_fit_data": false,
+        "control_points": [
+          [
+            30,
+            30,
+            0
+          ],
+          [
+            32,
+            35,
+            1
+          ],
+          [
+            36,
+            28,
+            4
+          ],
+          [
+            40,
+            30,
+            8
+          ]
+        ],
+        "knots": [
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        "start_parameter": 0,
+        "end_parameter": 1,
+        "start_point": [
+          30,
+          30,
+          0
+        ],
+        "end_point": [
+          40,
+          30,
+          8
+        ]
+      },
+      "weights": null,
+      "length": 14.05653955488614,
+      "area": null,
+      "query": [
+        30,
+        30,
+        0
+      ],
+      "nearest": [
+        30,
+        30,
+        0
+      ],
+      "distance": 0.0
+    }
+  ],
+  "oversized": "35",
+  "control": "36",
+  "oracle": "Analytic line/circle lengths and area; cubic Bernstein derivative adaptive Simpson1e-11 crosschecked composite16384, all test-only",
+  "length_tolerance": 1e-06
+}

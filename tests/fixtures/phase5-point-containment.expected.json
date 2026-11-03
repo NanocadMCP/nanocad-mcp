@@ -1,0 +1,208 @@
+{
+  "handles": {
+    "circle": "2F",
+    "reverse_circle": "30",
+    "ccw": "31",
+    "cw": "32",
+    "concave": "33",
+    "crossing": "34",
+    "open": "35",
+    "bulge": "36",
+    "off_plane": "37",
+    "large": "38",
+    "line": "39",
+    "arc": "3A"
+  },
+  "cases": [
+    {
+      "boundary": "circle",
+      "point": [
+        0,
+        0,
+        0
+      ],
+      "classification": "inside",
+      "label": "circle center"
+    },
+    {
+      "boundary": "circle",
+      "point": [
+        3,
+        0,
+        0
+      ],
+      "classification": "inside",
+      "label": "circle interior"
+    },
+    {
+      "boundary": "circle",
+      "point": [
+        6,
+        0,
+        0
+      ],
+      "classification": "outside",
+      "label": "circle exterior"
+    },
+    {
+      "boundary": "circle",
+      "point": [
+        5,
+        0,
+        0
+      ],
+      "classification": "boundary",
+      "label": "circle boundary"
+    },
+    {
+      "boundary": "reverse_circle",
+      "point": [
+        0,
+        30,
+        0
+      ],
+      "classification": "inside",
+      "label": "negative-normal circle"
+    },
+    {
+      "boundary": "reverse_circle",
+      "point": [
+        5,
+        30,
+        0
+      ],
+      "classification": "boundary",
+      "label": "negative-normal boundary"
+    },
+    {
+      "boundary": "ccw",
+      "point": [
+        25,
+        5,
+        0
+      ],
+      "classification": "inside",
+      "label": "CCW rectangle"
+    },
+    {
+      "boundary": "ccw",
+      "point": [
+        19,
+        5,
+        0
+      ],
+      "classification": "outside",
+      "label": "rectangle exterior"
+    },
+    {
+      "boundary": "ccw",
+      "point": [
+        20,
+        5,
+        0
+      ],
+      "classification": "boundary",
+      "label": "edge boundary"
+    },
+    {
+      "boundary": "ccw",
+      "point": [
+        20,
+        0,
+        0
+      ],
+      "classification": "boundary",
+      "label": "vertex boundary"
+    },
+    {
+      "boundary": "ccw",
+      "point": [
+        20.00000005,
+        5,
+        0
+      ],
+      "classification": "boundary",
+      "label": "near edge inside tolerance"
+    },
+    {
+      "boundary": "ccw",
+      "point": [
+        19.99999995,
+        5,
+        0
+      ],
+      "classification": "boundary",
+      "label": "near edge outside tolerance"
+    },
+    {
+      "boundary": "cw",
+      "point": [
+        45,
+        5,
+        0
+      ],
+      "classification": "inside",
+      "label": "CW rectangle"
+    },
+    {
+      "boundary": "cw",
+      "point": [
+        51,
+        5,
+        0
+      ],
+      "classification": "outside",
+      "label": "CW exterior"
+    },
+    {
+      "boundary": "concave",
+      "point": [
+        62,
+        8,
+        0
+      ],
+      "classification": "inside",
+      "label": "concave side"
+    },
+    {
+      "boundary": "concave",
+      "point": [
+        65,
+        8,
+        0
+      ],
+      "classification": "outside",
+      "label": "notch inside bounding box"
+    },
+    {
+      "boundary": "concave",
+      "point": [
+        65,
+        2,
+        0
+      ],
+      "classification": "inside",
+      "label": "concave bottom"
+    },
+    {
+      "boundary": "concave",
+      "point": [
+        64,
+        7,
+        0
+      ],
+      "classification": "boundary",
+      "label": "inner edge boundary"
+    },
+    {
+      "boundary": "concave",
+      "point": [
+        64,
+        4,
+        0
+      ],
+      "classification": "boundary",
+      "label": "reentrant corner"
+    }
+  ]
+}

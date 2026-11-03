@@ -1,0 +1,6 @@
+{
+  "source": "C:\\NanoCAD MCP\\nanoCAD DWG Samples\\nanoCAD DWG Samples\\Samples\\Model-layout (design).dwg",
+  "target": "C:\\NanoCAD MCP\\tests\\fixtures\\phase9-drawing-views.dwg",
+  "sha256": "ACA97347931E8B1A13D48A072BA3BE98B60F78F0DA1E94D94BDCAFC4044AF512",
+  "purpose": "Readonly discovery of existing drawing views; original supplied sample retained"
+}

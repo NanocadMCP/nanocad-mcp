@@ -1,0 +1,207 @@
+{
+  "handles": {
+    "line": "2F",
+    "cross": "30",
+    "skew": "31",
+    "end": "32",
+    "parallel": "33",
+    "overlap": "34",
+    "circle": "35",
+    "outer_circle": "36",
+    "inner_circle": "37",
+    "circle_line": "38",
+    "arc": "39",
+    "arc_line": "3A",
+    "arc_below": "3B",
+    "rectangle": "3C",
+    "rectangle_line": "3D",
+    "bulge": "3E",
+    "bulge_line": "3F",
+    "inclined_circle": "40",
+    "inclined_line": "41",
+    "large_polyline": "42",
+    "degenerate": "43",
+    "text": "44"
+  },
+  "cases": [
+    {
+      "name": "interior crossing",
+      "first": "line",
+      "second": "cross",
+      "distance": 0,
+      "points": [
+        [
+          5,
+          0,
+          0
+        ],
+        [
+          5,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "skew interior",
+      "first": "line",
+      "second": "skew",
+      "distance": 4,
+      "points": [
+        [
+          5,
+          0,
+          0
+        ],
+        [
+          5,
+          0,
+          4
+        ]
+      ]
+    },
+    {
+      "name": "finite endpoints",
+      "first": "line",
+      "second": "end",
+      "distance": 7.0710678118654755,
+      "points": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          15,
+          5,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "parallel nonunique",
+      "first": "line",
+      "second": "parallel",
+      "distance": 3,
+      "points": null
+    },
+    {
+      "name": "overlapping nonunique",
+      "first": "line",
+      "second": "overlap",
+      "distance": 0,
+      "points": null
+    },
+    {
+      "name": "external circles",
+      "first": "circle",
+      "second": "outer_circle",
+      "distance": 7,
+      "points": [
+        [
+          35,
+          0,
+          0
+        ],
+        [
+          42,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "concentric circles",
+      "first": "circle",
+      "second": "inner_circle",
+      "distance": 3,
+      "points": null
+    },
+    {
+      "name": "circle and line",
+      "first": "circle",
+      "second": "circle_line",
+      "distance": 3,
+      "points": [
+        [
+          30,
+          5,
+          0
+        ],
+        [
+          30,
+          8,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "arc endpoint",
+      "first": "arc",
+      "second": "arc_line",
+      "distance": 3,
+      "points": [
+        [
+          65,
+          0,
+          0
+        ],
+        [
+          68,
+          0,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "arc finite sweep",
+      "first": "arc",
+      "second": "arc_below",
+      "distance": 5.830951894845301,
+      "points": [
+        [
+          65,
+          0,
+          0
+        ],
+        [
+          60,
+          -3,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "closed polyline",
+      "first": "rectangle",
+      "second": "rectangle_line",
+      "distance": 5,
+      "points": null
+    },
+    {
+      "name": "semicircular bulge",
+      "first": "bulge",
+      "second": "bulge_line",
+      "distance": 3,
+      "points": [
+        [
+          105,
+          -5,
+          0
+        ],
+        [
+          105,
+          -8,
+          0
+        ]
+      ]
+    },
+    {
+      "name": "circle in XZ plane",
+      "first": "inclined_circle",
+      "second": "inclined_line",
+      "distance": 4,
+      "points": null
+    }
+  ]
+}

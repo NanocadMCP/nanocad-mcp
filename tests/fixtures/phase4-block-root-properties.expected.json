@@ -1,0 +1,31 @@
+{
+  "roots": [
+    "3C",
+    "40",
+    "44"
+  ],
+  "opaque": "48",
+  "definition": "35",
+  "manual_attribute": {
+    "handle": "3E",
+    "position": [
+      107,
+      219,
+      0
+    ],
+    "color": [
+      43,
+      94,
+      129
+    ],
+    "style": "COPY_STYLE068"
+  },
+  "layer_handles": {
+    "0": "27",
+    "COPY_LAYER068": "32",
+    "PROPERTIES_LAYER069": "51",
+    "LOCKED_LAYER069": "52"
+  },
+  "sha256": "C287068D8C6B18CF77C2C63A3165B7B5EF6A4C7B28A65B0A4FE9C5DDE974FB60",
+  "status": "Offline fixture for independent root property edits; no native069 test or acceptance yet"
+}

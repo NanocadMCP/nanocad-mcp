@@ -1,0 +1,272 @@
+{
+  "source": "C:\\NanoCAD MCP\\tests\\fixtures\\phase4-layouts.dxf",
+  "source_sha256": "665cf88ad523d271a3720f1517bdcb5061dc6b304a535a5545410e4c6cc6801d",
+  "fixture_sha256": "25a6cef118b0f16d5a85f27a5c66401825219878e9a9c79124c04270e92ae077",
+  "roles": {
+    "model_block_keep": "49",
+    "model_block_erase": "4A",
+    "paper_block_keep": "4B",
+    "paper_block_erase": "4C",
+    "helix_keep": "4D",
+    "helix_erase": "4E"
+  },
+  "definition_handle": "43",
+  "paper_layout": "Sheet A3",
+  "paper_layout_handle": "1E",
+  "layouts": {
+    "Model": {
+      "handle": "1A",
+      "block_record_handle": "17",
+      "dxf": {
+        "handle": "1A",
+        "owner": "D",
+        "page_setup_name": "",
+        "paper_size": "A3",
+        "plot_view_name": "",
+        "left_margin": 7.5,
+        "bottom_margin": 20.0,
+        "right_margin": 7.5,
+        "top_margin": 20.0,
+        "paper_width": 420.0,
+        "paper_height": 297.0,
+        "plot_origin_x_offset": 0.0,
+        "plot_origin_y_offset": 0.0,
+        "plot_window_x1": 0.0,
+        "plot_window_y1": 0.0,
+        "plot_window_x2": 0.0,
+        "plot_window_y2": 0.0,
+        "scale_numerator": 1.0,
+        "scale_denominator": 1.0,
+        "plot_layout_flags": 1024,
+        "plot_paper_units": 1,
+        "plot_rotation": 0,
+        "plot_type": 5,
+        "current_style_sheet": "",
+        "standard_scale_type": 16,
+        "shade_plot_mode": 0,
+        "shade_plot_resolution_level": 2,
+        "shade_plot_custom_dpi": 300,
+        "unit_factor": 1.0,
+        "paper_image_origin_x": 0.0,
+        "paper_image_origin_y": 0.0,
+        "name": "Model",
+        "layout_flags": 1,
+        "taborder": 0,
+        "limmin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "limmax": [
+          420.0,
+          297.0,
+          0.0
+        ],
+        "insert_base": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extmin": [
+          1e+20,
+          1e+20,
+          1e+20
+        ],
+        "extmax": [
+          -1e+20,
+          -1e+20,
+          -1e+20
+        ],
+        "elevation": 0.0,
+        "ucs_origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "ucs_xaxis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "ucs_yaxis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "ucs_type": 1,
+        "block_record_handle": "17"
+      }
+    },
+    "Sheet A3": {
+      "handle": "1E",
+      "block_record_handle": "1B",
+      "dxf": {
+        "handle": "1E",
+        "owner": "D",
+        "page_setup_name": "A3 Setup",
+        "plot_configuration_file": "None",
+        "paper_size": "MCP_A3_(420.00_x_297.00_MM)",
+        "plot_view_name": "",
+        "left_margin": 11.0,
+        "bottom_margin": 9.0,
+        "right_margin": 7.0,
+        "top_margin": 5.0,
+        "paper_width": 420.0,
+        "paper_height": 297.0,
+        "plot_origin_x_offset": 2.0,
+        "plot_origin_y_offset": 3.0,
+        "plot_window_x1": -2.0,
+        "plot_window_y1": -3.0,
+        "plot_window_x2": 101.0,
+        "plot_window_y2": 202.0,
+        "scale_numerator": 1.0,
+        "scale_denominator": 50.0,
+        "plot_layout_flags": 672,
+        "plot_paper_units": 1,
+        "plot_rotation": 1,
+        "plot_type": 5,
+        "current_style_sheet": "MCP_missing_style.ctb",
+        "standard_scale_type": 16,
+        "shade_plot_mode": 0,
+        "shade_plot_resolution_level": 2,
+        "shade_plot_custom_dpi": 300,
+        "unit_factor": 1.0,
+        "paper_image_origin_x": 0.0,
+        "paper_image_origin_y": 0.0,
+        "name": "Sheet A3",
+        "layout_flags": 1,
+        "taborder": 1,
+        "limmin": [
+          -13.0,
+          -12.0,
+          0.0
+        ],
+        "limmax": [
+          407.0,
+          285.0,
+          0.0
+        ],
+        "insert_base": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extmin": [
+          1e+20,
+          1e+20,
+          1e+20
+        ],
+        "extmax": [
+          -1e+20,
+          -1e+20,
+          -1e+20
+        ],
+        "elevation": 0.0,
+        "ucs_origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "ucs_xaxis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "ucs_yaxis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "ucs_type": 1,
+        "block_record_handle": "1B",
+        "viewport_handle": "35"
+      }
+    },
+    "Sheet Letter": {
+      "handle": "3C",
+      "block_record_handle": "39",
+      "dxf": {
+        "handle": "3C",
+        "owner": "D",
+        "page_setup_name": "",
+        "plot_configuration_file": "None",
+        "paper_size": "MCP_Letter_(11.00_x_8.50_Inches)",
+        "plot_view_name": "",
+        "left_margin": 15.875,
+        "bottom_margin": 12.7,
+        "right_margin": 9.524999999999999,
+        "top_margin": 6.35,
+        "paper_width": 279.4,
+        "paper_height": 215.89999999999998,
+        "plot_origin_x_offset": 3.175,
+        "plot_origin_y_offset": 6.35,
+        "plot_window_x1": 0.0,
+        "plot_window_y1": 0.0,
+        "plot_window_x2": 0.0,
+        "plot_window_y2": 0.0,
+        "scale_numerator": 1.0,
+        "scale_denominator": 1.0,
+        "plot_layout_flags": 740,
+        "plot_paper_units": 0,
+        "plot_rotation": 2,
+        "plot_type": 5,
+        "current_style_sheet": "",
+        "standard_scale_type": 16,
+        "shade_plot_mode": 0,
+        "shade_plot_resolution_level": 2,
+        "shade_plot_custom_dpi": 300,
+        "unit_factor": 0.03937007874015748,
+        "paper_image_origin_x": 0.0,
+        "paper_image_origin_y": 0.0,
+        "name": "Sheet Letter",
+        "layout_flags": 1,
+        "taborder": 3,
+        "limmin": [
+          -0.75,
+          -0.75,
+          0.0
+        ],
+        "limmax": [
+          10.25,
+          7.75,
+          0.0
+        ],
+        "insert_base": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "extmin": [
+          1e+20,
+          1e+20,
+          1e+20
+        ],
+        "extmax": [
+          -1e+20,
+          -1e+20,
+          -1e+20
+        ],
+        "elevation": 0.0,
+        "ucs_origin": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "ucs_xaxis": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "ucs_yaxis": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "ucs_type": 1,
+        "block_record_handle": "39",
+        "viewport_handle": "3D"
+      }
+    }
+  },
+  "scope": "Offline tags/identity prepared only. Native HELIX load/type/geometry and Paper ownership must be verified at runtime."
+}

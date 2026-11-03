@@ -1,0 +1,433 @@
+{
+  "scope": "Offline DXF roundtrip only; native style creation/cloning/font rendering unverified.",
+  "dxf_version": "AC1018",
+  "units": "Millimeters",
+  "model_count": 3,
+  "reference_handles": [
+    "37",
+    "38",
+    "39"
+  ],
+  "current_text_style": "P4S_SHX",
+  "text_styles": {
+    "P4S_SHX": {
+      "handle": "2F",
+      "font_file": "txt.shx",
+      "big_font_file": "",
+      "height": 0.0,
+      "width_factor": 1.0,
+      "oblique_radians": 0.0,
+      "table_flags": 0,
+      "generation_flags": 0,
+      "extended_font": [
+        "",
+        false,
+        false
+      ],
+      "acad_xdata": null
+    },
+    "P4S_TTF": {
+      "handle": "30",
+      "font_file": "arial.ttf",
+      "big_font_file": "",
+      "height": 0.0,
+      "width_factor": 1.0,
+      "oblique_radians": 0.0,
+      "table_flags": 0,
+      "generation_flags": 0,
+      "extended_font": [
+        "Arial",
+        false,
+        true
+      ],
+      "acad_xdata": [
+        [
+          1000,
+          "Arial"
+        ],
+        [
+          1071,
+          33554466
+        ]
+      ]
+    },
+    "P4S_FIXED": {
+      "handle": "31",
+      "font_file": "txt.shx",
+      "big_font_file": "",
+      "height": 2.5,
+      "width_factor": 1.0,
+      "oblique_radians": 0.0,
+      "table_flags": 0,
+      "generation_flags": 0,
+      "extended_font": [
+        "",
+        false,
+        false
+      ],
+      "acad_xdata": null
+    },
+    "P4S_VERTICAL": {
+      "handle": "32",
+      "font_file": "txt.shx",
+      "big_font_file": "",
+      "height": 0.0,
+      "width_factor": 1.0,
+      "oblique_radians": 0.0,
+      "table_flags": 4,
+      "generation_flags": 0,
+      "extended_font": [
+        "",
+        false,
+        false
+      ],
+      "acad_xdata": null
+    },
+    "P4S_BACKWARD": {
+      "handle": "33",
+      "font_file": "txt.shx",
+      "big_font_file": "",
+      "height": 0.0,
+      "width_factor": 1.0,
+      "oblique_radians": 0.0,
+      "table_flags": 0,
+      "generation_flags": 2,
+      "extended_font": [
+        "",
+        false,
+        false
+      ],
+      "acad_xdata": null
+    },
+    "P4S_OBLIQUE": {
+      "handle": "34",
+      "font_file": "txt.shx",
+      "big_font_file": "",
+      "height": 0.0,
+      "width_factor": 1.0,
+      "oblique_radians": 0.2617993877991494,
+      "table_flags": 0,
+      "generation_flags": 0,
+      "extended_font": [
+        "",
+        false,
+        false
+      ],
+      "acad_xdata": null
+    }
+  },
+  "dimension_styles": {
+    "P4S_DIM_BASE": {
+      "handle": "35",
+      "dimscale": 1.0,
+      "dimtxt": 2.5,
+      "dimasz": 2.5,
+      "dimtxsty": "P4S_SHX",
+      "dimlfac": 1.0,
+      "dimalt": 0,
+      "dimpost": "",
+      "dimapost": ""
+    },
+    "P4S_DIM_ALTERNATE": {
+      "handle": "36",
+      "dimscale": 2.0,
+      "dimtxt": 3.5,
+      "dimasz": 3.0,
+      "dimtxsty": "P4S_TTF",
+      "dimlfac": 1.0,
+      "dimalt": 1,
+      "dimpost": "<> mm",
+      "dimapost": "[]"
+    }
+  },
+  "proposed_names": [
+    "MCP_Text_Variable",
+    "MCP_Text_Fixed",
+    "MCP_Dim_Derived"
+  ],
+  "checks": [
+    {
+      "style": "P4S_SHX",
+      "field": "font",
+      "expected": "txt.shx",
+      "actual": "txt.shx"
+    },
+    {
+      "style": "P4S_SHX",
+      "field": "height",
+      "expected": 0,
+      "actual": 0.0
+    },
+    {
+      "style": "P4S_SHX",
+      "field": "width",
+      "expected": 1,
+      "actual": 1.0
+    },
+    {
+      "style": "P4S_SHX",
+      "field": "oblique",
+      "expected": 0,
+      "actual": 0.0
+    },
+    {
+      "style": "P4S_SHX",
+      "field": "name",
+      "expected": "P4S_SHX",
+      "actual": "P4S_SHX"
+    },
+    {
+      "style": "P4S_SHX",
+      "field": "owner",
+      "expected": "5",
+      "actual": "5"
+    },
+    {
+      "style": "P4S_TTF",
+      "field": "font",
+      "expected": "arial.ttf",
+      "actual": "arial.ttf"
+    },
+    {
+      "style": "P4S_TTF",
+      "field": "height",
+      "expected": 0,
+      "actual": 0.0
+    },
+    {
+      "style": "P4S_TTF",
+      "field": "width",
+      "expected": 1,
+      "actual": 1.0
+    },
+    {
+      "style": "P4S_TTF",
+      "field": "oblique",
+      "expected": 0,
+      "actual": 0.0
+    },
+    {
+      "style": "P4S_TTF",
+      "field": "name",
+      "expected": "P4S_TTF",
+      "actual": "P4S_TTF"
+    },
+    {
+      "style": "P4S_TTF",
+      "field": "owner",
+      "expected": "5",
+      "actual": "5"
+    },
+    {
+      "style": "P4S_FIXED",
+      "field": "font",
+      "expected": "txt.shx",
+      "actual": "txt.shx"
+    },
+    {
+      "style": "P4S_FIXED",
+      "field": "height",
+      "expected": 2.5,
+      "actual": 2.5
+    },
+    {
+      "style": "P4S_FIXED",
+      "field": "width",
+      "expected": 1,
+      "actual": 1.0
+    },
+    {
+      "style": "P4S_FIXED",
+      "field": "oblique",
+      "expected": 0,
+      "actual": 0.0
+    },
+    {
+      "style": "P4S_FIXED",
+      "field": "name",
+      "expected": "P4S_FIXED",
+      "actual": "P4S_FIXED"
+    },
+    {
+      "style": "P4S_FIXED",
+      "field": "owner",
+      "expected": "5",
+      "actual": "5"
+    },
+    {
+      "style": "P4S_VERTICAL",
+      "field": "font",
+      "expected": "txt.shx",
+      "actual": "txt.shx"
+    },
+    {
+      "style": "P4S_VERTICAL",
+      "field": "flags",
+      "expected": 4,
+      "actual": 4
+    },
+    {
+      "style": "P4S_VERTICAL",
+      "field": "name",
+      "expected": "P4S_VERTICAL",
+      "actual": "P4S_VERTICAL"
+    },
+    {
+      "style": "P4S_VERTICAL",
+      "field": "owner",
+      "expected": "5",
+      "actual": "5"
+    },
+    {
+      "style": "P4S_BACKWARD",
+      "field": "font",
+      "expected": "txt.shx",
+      "actual": "txt.shx"
+    },
+    {
+      "style": "P4S_BACKWARD",
+      "field": "generation_flags",
+      "expected": 2,
+      "actual": 2
+    },
+    {
+      "style": "P4S_BACKWARD",
+      "field": "name",
+      "expected": "P4S_BACKWARD",
+      "actual": "P4S_BACKWARD"
+    },
+    {
+      "style": "P4S_BACKWARD",
+      "field": "owner",
+      "expected": "5",
+      "actual": "5"
+    },
+    {
+      "style": "P4S_OBLIQUE",
+      "field": "font",
+      "expected": "txt.shx",
+      "actual": "txt.shx"
+    },
+    {
+      "style": "P4S_OBLIQUE",
+      "field": "oblique",
+      "expected": 15,
+      "actual": 15.0
+    },
+    {
+      "style": "P4S_OBLIQUE",
+      "field": "name",
+      "expected": "P4S_OBLIQUE",
+      "actual": "P4S_OBLIQUE"
+    },
+    {
+      "style": "P4S_OBLIQUE",
+      "field": "owner",
+      "expected": "5",
+      "actual": "5"
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimscale",
+      "expected": 1.0,
+      "actual": 1.0
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimtxt",
+      "expected": 2.5,
+      "actual": 2.5
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimasz",
+      "expected": 2.5,
+      "actual": 2.5
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimtxsty",
+      "expected": "P4S_SHX",
+      "actual": "P4S_SHX"
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimlfac",
+      "expected": 1.0,
+      "actual": 1.0
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimalt",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimpost",
+      "expected": "",
+      "actual": ""
+    },
+    {
+      "style": "P4S_DIM_BASE",
+      "field": "dimapost",
+      "expected": "",
+      "actual": ""
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimscale",
+      "expected": 2.0,
+      "actual": 2.0
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimtxt",
+      "expected": 3.5,
+      "actual": 3.5
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimasz",
+      "expected": 3.0,
+      "actual": 3.0
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimtxsty",
+      "expected": "P4S_TTF",
+      "actual": "P4S_TTF"
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimlfac",
+      "expected": 1.0,
+      "actual": 1.0
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimalt",
+      "expected": 1,
+      "actual": 1
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimpost",
+      "expected": "<> mm",
+      "actual": "<> mm"
+    },
+    {
+      "style": "P4S_DIM_ALTERNATE",
+      "field": "dimapost",
+      "expected": "[]",
+      "actual": "[]"
+    }
+  ],
+  "extended_font_checks": 2,
+  "coverage_limits": [
+    "No annotative/xref/shape/big-font fixture claims.",
+    "TTF ACAD XData is preserved by ezdxf; native FontDescriptor and Clone need separate verification.",
+    "No font was opened or rendering/glyph bounds checked.",
+    "No Dimension entity exists; style consumption by dimensions belongs to later coverage."
+  ]
+}
