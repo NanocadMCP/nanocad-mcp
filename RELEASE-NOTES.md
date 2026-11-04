@@ -13,6 +13,9 @@ resident view and source history after the nanoCAD command completes.
 The fixed-center native Hole feature applies and verifies through extent.
 This package uses server 0.253.0, bridge 0.208.0 and IPC protocol 0.144.
 
+Tag `450` identifies the packaged source. Download the installer, ZIPs and
+checksums from [GitHub Release 450](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/450).
+
 ## Build 449
 
 Server 0.252.0 publishes top-level input fields for `manage_document` and
