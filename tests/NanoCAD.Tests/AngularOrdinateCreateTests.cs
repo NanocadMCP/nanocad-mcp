@@ -34,9 +34,10 @@ internal static class AngularOrdinateCreateTests
         await test("angular ordinate creation is byte bounded and publishes each supported kind", () =>
         {
             if (CreateValidation.ParseEntities(Wire.Element(Enumerable.Repeat(Angular, 17).ToArray()), allowDimensions: true).Length != 17) throw new Exception("Former dimension count ceiling remains.");
-            var kinds = ToolCatalog.Tools.Single(t => t.Name == "nanocad.create_entities").InputSchema.GetProperty("properties").GetProperty("entities").GetProperty("items").GetProperty("oneOf").EnumerateArray().Where(v => v.GetProperty("properties").GetProperty("type").GetProperty("const").GetString() == "Dimension").Select(v => v.GetProperty("properties").GetProperty("kind").GetProperty("const").GetString()).ToArray();
-            var expected = new[] { "aligned", "rotated", "radial", "diametric", "angular_3point", "angular_2line", "ordinate" };
-            if (!expected.All(kinds.Contains) || kinds.Distinct().Count() != kinds.Length) throw new Exception("Required dimension kinds missing or ambiguous.");
+            var kinds = ToolCatalog.Tools.Single(t => t.Name == "nanocad.create_entities").InputSchema.GetProperty("properties").GetProperty("entities").GetProperty("items").GetProperty("oneOf").EnumerateArray().Where(v => v.GetProperty("properties").GetProperty("type").GetProperty("const").GetString() == "Dimension").Select(v => v.GetProperty("properties").GetProperty("kind").GetProperty("const").GetString()!).ToArray();
+            var expected = new[] { "aligned", "rotated", "radial", "diametric", "angular_3point", "angular_2line", "ordinate", "arc_length", "jogged_radial" };
+            if (kinds.Length != expected.Length || !expected.ToHashSet(StringComparer.Ordinal).SetEquals(kinds))
+                throw new Exception("The published dimension kind set differs from the supported contract.");
             return Task.CompletedTask;
         });
     }

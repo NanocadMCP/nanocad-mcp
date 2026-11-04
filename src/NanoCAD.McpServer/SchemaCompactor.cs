@@ -63,6 +63,33 @@ internal static class SchemaCompactor
         return JsonSerializer.SerializeToElement(root);
     }
 
+    // The default catalog indexes edit operations. Focused help keeps the
+    // complete branches, and request validation still uses the typed contracts.
+    public static JsonElement PublishOperationIndex(JsonElement input)
+    {
+        var root = JsonNode.Parse(input.GetRawText())!.AsObject();
+        var operations = root["properties"]!["operations"]!.AsObject();
+        var names = operations["items"]!["oneOf"]!.AsArray()
+            .Select(branch => branch!["properties"]!["operation"]!["const"]!.GetValue<string>())
+            .Distinct(StringComparer.Ordinal);
+        operations["items"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["operation"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["enum"] = new JsonArray(names.Select(name => (JsonNode?)JsonValue.Create(name)).ToArray())
+                }
+            },
+            ["required"] = new JsonArray("operation"),
+            ["additionalProperties"] = true
+        };
+        operations["description"] = "Ordered operations. Add the fields from each exact variant's focused input contract directly to its item. Follow the branch's batching and recovery rules.";
+        return JsonSerializer.SerializeToElement(root);
+    }
+
     // Factor identical schema objects through local JSON Schema references.
     // Values, descriptions, required fields and validation keywords are unchanged.
     public static JsonElement Compact(JsonElement schema)

@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using ModelContextProtocol.Protocol;
 using NanoCAD.McpServer;
 
 internal static class AuditServerRoutingTests
@@ -56,6 +57,55 @@ internal static class AuditServerRoutingTests
                 }
             }
             return Task.CompletedTask;
+        });
+        await test("server default catalog indexes edit variants while retaining focused and structured contracts", () =>
+        {
+            var listTools = typeof(ToolCatalog).Assembly.GetType("NanoCAD.McpServer.McpPresentation")!
+                .GetMethod("ListTools", BindingFlags.Public | BindingFlags.Static)!;
+            const string responseMode = "NANOCAD_MCP_RESPONSE_MODE";
+            string? previousMode = Environment.GetEnvironmentVariable(responseMode);
+            try
+            {
+                Environment.SetEnvironmentVariable(responseMode, "structured");
+                var full = (IList<Tool>)listTools.Invoke(null, null)!;
+                Environment.SetEnvironmentVariable(responseMode, null);
+                var compact = (IList<Tool>)listTools.Invoke(null, null)!;
+                foreach (var tool in full)
+                {
+                    var published = compact.Single(candidate => candidate.Name == tool.Name);
+                    if (tool.Name is not ("nanocad.modify_entities" or "nanocad.modify_structure"))
+                    {
+                        if (!JsonElement.DeepEquals(tool.InputSchema, published.InputSchema))
+                            throw new Exception("Default projection changed an unrelated tool: " + tool.Name);
+                        continue;
+                    }
+                    string operation = tool.Name["nanocad.".Length..];
+                    var items = published.InputSchema.GetProperty("properties").GetProperty("operations").GetProperty("items");
+                    var publishedNames = items.GetProperty("properties").GetProperty("operation").GetProperty("enum");
+                    var focusedNames = AuditServerContractSupport.Input(operation).GetProperty("variants");
+                    if (!JsonElement.DeepEquals(publishedNames, focusedNames) || !items.GetProperty("additionalProperties").GetBoolean() ||
+                        items.GetProperty("type").GetString() != "object" || items.GetProperty("required")[0].GetString() != "operation" ||
+                        !published.Description!.Contains("operation=" + operation, StringComparison.Ordinal) ||
+                        !JsonNode.DeepEquals(EditEnvelope(tool.InputSchema), EditEnvelope(published.InputSchema)))
+                        throw new Exception("Default edit index changed the request envelope or focused discovery: " + operation);
+                }
+                var move = AuditServerContractSupport.Branch("modify_entities", "move");
+                var copyViewport = AuditServerContractSupport.Branch("modify_structure", "copy_viewport");
+                if (!move.GetProperty("properties").TryGetProperty("displacement", out _) ||
+                    !copyViewport.GetProperty("properties").TryGetProperty("layout_handle", out _))
+                    throw new Exception("Focused edit contracts lost variant-specific fields.");
+            }
+            finally { Environment.SetEnvironmentVariable(responseMode, previousMode); }
+            return Task.CompletedTask;
+
+            static JsonObject EditEnvelope(JsonElement input)
+            {
+                var schema = JsonNode.Parse(input.GetRawText())!.AsObject();
+                var operations = schema["properties"]!["operations"]!.AsObject();
+                operations.Remove("items");
+                operations.Remove("description");
+                return schema;
+            }
         });
         await test("server prose compaction retains properties and literal values named description", () =>
         {
