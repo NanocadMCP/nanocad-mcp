@@ -10,6 +10,9 @@ from those fields can call both tools. The bridge still checks each action or
 mode against its exact input contract. This package uses bridge 0.207.0 and IPC
 protocol 0.144.
 
+Tag `449` identifies the source used to build the package. Download the EXE,
+portable ZIP and checksums from [GitHub Release 449](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/449).
+
 ## Build 448
 
 Server 0.251.0 verifies the named pipe owner's Windows user SID directly, so
