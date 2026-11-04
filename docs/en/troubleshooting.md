@@ -34,6 +34,8 @@ In packages 446 and 447, a connection can fail even when both processes run as t
 
 If your deployment allows it, save your drawings and reopen nanoCAD and the assistant in the same desktop session without administrator privileges. The source server version 0.251.0 checks the pipe owner's individual Windows user SID directly. It still verifies the peer process, session, user and elevation before sending a request.
 
+If exactly one application runs as administrator, the IPC peer checks reject the connection by design. Run nanoCAD and the assistant at the same elevation level.
+
 ## Connected, but the wrong drawing or instance is selected
 
 Ask the assistant to list the available nanoCAD instances and open documents, then identify the drawing by its actual path and content. With several nanoCAD processes, it must select a specific bridge instance. `AMBIGUOUS_INSTANCE` asks for that choice; it does not mean that the installation failed.
