@@ -11,13 +11,14 @@ remain in force. Bridge 0.207.0 and IPC protocol 0.144 are carried forward.
 The default tool catalog uses compact operation indexes for entity and
 structure edits. Exact variants remain available through focused guidance.
 
-Tag `448` identifies the source used to build the package. The installer is
-unsigned. Installation on a clean Windows machine has not been verified.
+Tag `448` identifies the source used to build the package. The EXE, portable ZIP
+and checksums are available from [GitHub Release 448](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/448).
+The installer is unsigned. Installation on a clean Windows machine has not
+been verified.
 
 ## Package 447
 
-Tag `447` identifies the source for a local maintenance package. The published
-Windows downloads are available on the [release 446 page](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/446).
+Tag `447` identifies the source of the preceding maintenance package.
 
 ## Package contents
 
