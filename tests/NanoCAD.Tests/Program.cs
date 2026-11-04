@@ -5,7 +5,6 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
-using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using NanoCAD.Contracts;
 using NanoCAD.Ipc;
@@ -18,7 +17,7 @@ try { runner = new ManagedTestRunner(args); }
 catch (ArgumentException error)
 {
     Console.Error.WriteLine(error.Message);
-    Console.Error.WriteLine("Usage: NanoCAD.Tests [--suite all|managed] [--filter substring] [--rerun-failed results.json] [--junit report.xml]");
+    Console.Error.WriteLine("Usage: NanoCAD.Tests [--suite all|managed] [--filter substring] [--rerun-failed results.json] [--junit report.xml] [--json report.json] [--require-standard-windows-user SID]");
     return 2;
 }
 string testRoot = runner.Root;
@@ -330,20 +329,9 @@ using (var listener = new BridgeListener(descriptor, async (request, token) =>
     foreach (var protocolVersion in new[] { "2025-11-25", "2026-07-28" })
         await Test($"MCP {protocolVersion} discovery and tool calls through stdio/pipe", async () =>
         {
-            string dotnet = TestEnvironment.DotnetHost;
-            string server = TestEnvironment.ServerAssembly;
-            var transport = new StdioClientTransport(new StdioClientTransportOptions
-            {
-                // SDK 2.2.0 wraps Windows commands in cmd.exe. A bare executable in its own cwd
-                // avoids cmd.exe stripping quotes around an executable path containing spaces.
-                Name = "nanocad-test",
-                Command = "dotnet.exe",
-                WorkingDirectory = Path.GetDirectoryName(dotnet),
-                Arguments = [server],
-                EnvironmentVariables = new Dictionary<string, string?> { ["NANOCAD_MCP_HOME"] = testRoot }
-            });
+            await using var server = new TestMcpServer(testRoot);
             using var connectDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-            await using var client = await McpClient.CreateAsync(transport, new McpClientOptions { ProtocolVersion = protocolVersion }, cancellationToken: connectDeadline.Token);
+            await using var client = await server.ConnectAsync(protocolVersion, connectDeadline.Token);
             Check(client.NegotiatedProtocolVersion == protocolVersion, "protocol negotiation");
             var tools = await client.ListToolsAsync();
             Check(tools.Select(tool => tool.Name).Order().SequenceEqual(ToolCatalog.Tools.Select(tool => tool.Name).Order()), "stdio published tool names differ from the catalog");

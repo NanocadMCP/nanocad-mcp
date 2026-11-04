@@ -1,6 +1,9 @@
 using System.Diagnostics;
+using System.Security.Principal;
 using System.Text.Json;
 using System.Xml.Linq;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
 
 internal sealed class ManagedTestRunner
 {
@@ -9,6 +12,7 @@ internal sealed class ManagedTestRunner
     private readonly List<string> filters = [];
     private HashSet<string>? failedNames;
     private readonly string? junit;
+    private readonly string? json;
     private readonly bool managedOnly;
     private int filtered;
 
@@ -26,6 +30,8 @@ internal sealed class ManagedTestRunner
             {
                 case "--filter": filters.Add(value); break;
                 case "--junit": junit = Path.GetFullPath(value); break;
+                case "--json": json = Path.GetFullPath(value); break;
+                case "--require-standard-windows-user": RequireStandardWindowsUser(value); break;
                 case "--suite" when value is "all" or "managed": managedOnly = value == "managed"; break;
                 case "--rerun-failed":
                     using (var previous = JsonDocument.Parse(File.ReadAllText(value)))
@@ -39,6 +45,16 @@ internal sealed class ManagedTestRunner
         }
         Directory.CreateDirectory(Root);
         Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", Root);
+    }
+
+    private static void RequireStandardWindowsUser(string expectedSid)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var administrators = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+        if (identity.User?.Value != expectedSid || !Equals(identity.Owner, identity.User) ||
+            identity.Groups == null || identity.Groups.Contains(administrators))
+            throw new ArgumentException("The CI test process requires the requested standard Windows user with its user SID as token owner.");
+        Console.WriteLine("Verified standard Windows test token and user SID owner.");
     }
 
     public Task Run(string name, Func<Task> test) => Execute(name, test, false);
@@ -79,7 +95,7 @@ internal sealed class ManagedTestRunner
             outcomes.Add(new("test selection", false, "No tests matched the requested selection.", false, 0, null));
         int failures = outcomes.Count(item => !item.passed);
         int skipped = outcomes.Count(item => item.skipped);
-        File.WriteAllText(Path.Combine(Root, "results.json"), JsonSerializer.Serialize(new
+        string results = JsonSerializer.Serialize(new
         {
             utc = DateTime.UtcNow.ToString("O"),
             failures,
@@ -90,7 +106,13 @@ internal sealed class ManagedTestRunner
             skipped,
             scope = "No CAD execution: contracts, queue, Windows IPC, discovery, MCP stdio; optional compiled host metadata",
             outcomes
-        }, new JsonSerializerOptions { WriteIndented = true }));
+        }, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(Path.Combine(Root, "results.json"), results);
+        if (json != null)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(json)!);
+            File.WriteAllText(json, results);
+        }
         if (junit != null)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(junit)!);
@@ -115,6 +137,21 @@ internal static class TestEnvironment
 {
     public static string ServerAssembly => typeof(NanoCAD.McpServer.ToolService).Assembly.Location;
 
+    public static Process StartServer(string home)
+    {
+        var info = new ProcessStartInfo(DotnetHost)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        info.ArgumentList.Add(ServerAssembly);
+        info.Environment["NANOCAD_MCP_HOME"] = home;
+        return Process.Start(info) ?? throw new InvalidOperationException("MCP test server did not start.");
+    }
+
     public static string DotnetHost
     {
         get
@@ -133,6 +170,47 @@ internal static class TestEnvironment
                 if (File.Exists(candidate)) return Path.GetFullPath(candidate);
             }
             throw new FileNotFoundException("Set DOTNET_HOST_PATH to the .NET SDK host used to build the managed tests.");
+        }
+    }
+}
+
+internal sealed class TestMcpServer : IAsyncDisposable
+{
+    private readonly Process process;
+    private readonly Task<string> stderr;
+
+    public TestMcpServer(string home)
+    {
+        process = TestEnvironment.StartServer(home);
+        stderr = process.StandardError.ReadToEndAsync();
+    }
+
+    public async Task<McpClient> ConnectAsync(string protocolVersion, CancellationToken cancellationToken)
+    {
+        // Direct process startup honors the resolved host path, including spaces.
+        var transport = new StreamClientTransport(process.StandardInput.BaseStream, process.StandardOutput.BaseStream);
+        try
+        {
+            return await McpClient.CreateAsync(transport, new McpClientOptions { ProtocolVersion = protocolVersion }, cancellationToken: cancellationToken);
+        }
+        catch (Exception error) when (process.HasExited)
+        {
+            throw new InvalidOperationException($"MCP test server exited (0x{process.ExitCode:X8}): {await stderr}", error);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        using (process)
+        {
+            process.StandardInput.BaseStream.Dispose();
+            try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException)
+            {
+                if (!process.HasExited) process.Kill();
+                await process.WaitForExitAsync();
+            }
+            await stderr;
         }
     }
 }

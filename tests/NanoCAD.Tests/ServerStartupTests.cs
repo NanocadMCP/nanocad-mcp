@@ -1,5 +1,3 @@
-using ModelContextProtocol.Client;
-using System.Diagnostics;
 using System.Text.Json;
 using NanoCAD.McpServer;
 
@@ -8,18 +6,10 @@ internal static class ServerStartupTests
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
         string root = Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!;
-        string dotnet = TestEnvironment.DotnetHost;
-        string server = TestEnvironment.ServerAssembly;
-        Process Start(string home)
-        {
-            var info = new ProcessStartInfo(dotnet) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
-            info.ArgumentList.Add(server); info.Environment["NANOCAD_MCP_HOME"] = home;
-            return Process.Start(info) ?? throw new Exception("Server child not started.");
-        }
         await test("server startup failure exits normally with bounded stderr and clean stdout", async () =>
         {
             string blocked = Path.Combine(root, "blocked-log-home"); File.WriteAllText(blocked, "owned startup failure fixture");
-            using var process = Start(blocked); var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
+            using var process = TestEnvironment.StartServer(blocked); var stdout = process.StandardOutput.ReadToEndAsync(); var stderr = process.StandardError.ReadToEndAsync();
             try
             {
                 await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
@@ -35,17 +25,10 @@ internal static class ServerStartupTests
             await test("server initialize guidance matches actual core capabilities " + protocol, async () =>
             {
                 using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                var transport = new StdioClientTransport(new StdioClientTransportOptions
-                {
-                    Name = "core-startup-test",
-                    Command = "dotnet.exe",
-                    WorkingDirectory = Path.GetDirectoryName(dotnet),
-                    Arguments = [server],
-                    EnvironmentVariables = new Dictionary<string, string?> { ["NANOCAD_MCP_HOME"] = Path.Combine(root, "startup-" + protocol) }
-                });
+                await using var server = new TestMcpServer(Path.Combine(root, "startup-" + protocol));
                 // The SDK negotiates the appropriate handshake. New session protocols
                 // are not sent through the legacy initialize request.
-                await using var client = await McpClient.CreateAsync(transport, new McpClientOptions { ProtocolVersion = protocol }, cancellationToken: deadline.Token);
+                await using var client = await server.ConnectAsync(protocol, deadline.Token);
                 string instructions = client.ServerInstructions ?? throw new Exception("No server instructions.");
                 if (instructions != ServerGuidance.Instructions) throw new Exception("Current guidance was not delivered intact in the real MCP handshake.");
                 if (client.NegotiatedProtocolVersion != protocol ||
