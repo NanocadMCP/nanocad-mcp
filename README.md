@@ -35,10 +35,6 @@ Download the installer or ready-to-run ZIP from [release 449](https://github.com
 
 The release page also provides `SHA256SUMS-449.txt` and archives of the source and documentation from the tagged build.
 
-The downloadable package includes server **0.252.0**, bridge **0.207.0** and protocol **0.144**. Use server and bridge files from the same release.
-
-The installer is unsigned. Installation on a clean computer has not been verified. Follow your organization's installation policy; do not disable security protections.
-
 ## Get started
 
 1. Save your drawings and close nanoCAD.
