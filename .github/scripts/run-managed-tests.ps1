@@ -6,10 +6,12 @@ if (-not $IsWindows -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONME
 $workspace = (Resolve-Path -LiteralPath $env:GITHUB_WORKSPACE).Path
 $assembly = (Resolve-Path -LiteralPath (Join-Path $workspace 'tests/NanoCAD.Tests/bin/Release/net10.0-windows/NanoCAD.Tests.dll')).Path
 $dotnet = (Resolve-Path -LiteralPath (Join-Path $env:DOTNET_ROOT 'dotnet.exe')).Path
-$expectedSdk = (Get-Content -LiteralPath (Join-Path $workspace 'global.json') -Raw | ConvertFrom-Json).sdk.version
-$resolvedSdk = & $dotnet --version
-if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath (Join-Path $env:DOTNET_ROOT "sdk/$expectedSdk"))) {
-    throw "The setup-dotnet host did not resolve the SDK required by global.json ($expectedSdk)."
+Push-Location -LiteralPath $workspace
+try {
+    $resolvedSdk = & $dotnet --version
+    if ($LASTEXITCODE -ne 0) { throw 'The setup-dotnet host could not resolve the SDK required by global.json.' }
+} finally {
+    Pop-Location
 }
 Write-Host "Managed tests use .NET SDK $resolvedSdk from $dotnet."
 $artifacts = (New-Item -ItemType Directory -Path (Join-Path $workspace 'artifacts') -Force).FullName
