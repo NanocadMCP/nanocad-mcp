@@ -53,28 +53,31 @@ internal static class CadTargetedRead407
     {
         unavailable = false;
         if (filter == null) return true;
+        var bounds = ReadBounds(entity, cancel);
+        unavailable = bounds == null;
+        return bounds?.Matches(filter) == true;
+    }
+    internal static QueryEnvelope? ReadBounds(Entity entity, Action cancel)
+    {
         cancel();
         // Ray/Xline do not have finite entity extents. Never interpret a native
         // sentinel extent as an actual finite bounding rectangle.
-        if (entity is Ray or Xline) { unavailable = true; return false; }
+        if (entity is Ray or Xline) return null;
         try
         {
             var bounds = entity.GeometricExtents;
             var min = bounds.MinPoint; var max = bounds.MaxPoint;
-            if (!double.IsFinite(min.X) || !double.IsFinite(min.Y) || !double.IsFinite(max.X) || !double.IsFinite(max.Y) || min.X > max.X || min.Y > max.Y)
-            { unavailable = true; return false; }
-            double minX=min.X,minY=min.Y,maxX=max.X,maxY=max.Y;
+            var envelope = new QueryEnvelope(min.X, min.Y, min.Z, max.X, max.Y, max.Z);
+            if (!envelope.IsFiniteXY) return null;
             if(entity.GetType()==typeof(MInsertBlock)&&entity is MInsertBlock array)
             {
-                if(!CadMInsertBounds407.TryExpand(array,min,max,cancel,out var candidate)) { unavailable=true;return false; }
-                minX=candidate.MinX;minY=candidate.MinY;maxX=candidate.MaxX;maxY=candidate.MaxY;
+                if(!CadMInsertBounds407.TryExpand(array,min,max,cancel,out var candidate)) return null;
+                return new(candidate.MinX, candidate.MinY, candidate.MinZ, candidate.MaxX, candidate.MaxY, candidate.MaxZ);
             }
-            return filter.Mode == "within"
-                ? minX >= filter.Min[0] && minY >= filter.Min[1] && maxX <= filter.Max[0] && maxY <= filter.Max[1]
-                : minX <= filter.Max[0] && minY <= filter.Max[1] && maxX >= filter.Min[0] && maxY >= filter.Min[1];
+            return envelope;
         }
         catch (Teigha.Runtime.Exception error) when (!error.ErrorStatus.ToString().Contains("Lock", StringComparison.OrdinalIgnoreCase))
-        { cancel(); unavailable = true; return false; }
+        { cancel(); return null; }
     }
     internal static object Semantics(Arguments args, int unavailableBounds) => new
     {

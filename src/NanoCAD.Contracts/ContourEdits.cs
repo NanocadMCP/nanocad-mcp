@@ -37,13 +37,13 @@ public static partial class ModifyValidation
         string operation=Text(item,"operation",path,32);
         if(operation=="offset_curve")
         {
-            Shape(item,path,"operation","handles","distance","side");
+            Shape(item,path,"operation","handles","distance","side","mode");
             string side=Text(item,"side",path,16);
             if(side is not "left" and not "right" and not "inward" and not "outward")throw Invalid(path+".side","Use left/right for a directed Line, inward/outward for circles, arcs and closed convex straight polylines.");
             return new OffsetCurveSpec(handles,Number(Required(item,"distance",path),path+".distance",.001,1e6),side);
         }
-        if(operation=="trim_curve")Shape(item,path,"operation","handles","boundary_handles","pick_point");
-        else Shape(item,path,"operation","handles","boundary_handles","end");
+        if(operation=="trim_curve")Shape(item,path,"operation","handles","boundary_handles","pick_point","mode");
+        else Shape(item,path,"operation","handles","boundary_handles","end","mode");
         var input=Required(item,"boundary_handles",path);
         if(input.ValueKind!=JsonValueKind.Array||input.GetArrayLength()<1)throw Invalid(path+".boundary_handles","Use distinct existing boundary handles.");
         var boundaries=new List<string>();var seen=new HashSet<string>(StringComparer.Ordinal);

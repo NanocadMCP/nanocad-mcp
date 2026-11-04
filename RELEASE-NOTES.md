@@ -2,6 +2,22 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 451
+
+Write tools can check a proposed operation with `validate_only` and return
+current object state with `return_state`. Geometry writes default to millimeters.
+A revision qualified with its bridge and document can identify the only active
+drawing without repeating both IDs.
+
+Object queries can summarize type and layer counts and drawing bounds.
+Point and Line creation and native trim accept snaps to existing geometry.
+The MCP catalog exposes tool arguments directly and offers focused variant help.
+WCS bounds can crop a visible orthographic Model view without moving the camera.
+
+This package uses server 0.254.0, bridge 0.209.0 and IPC protocol 0.144.
+The installer is unsigned. See [GitHub Release 451](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/451)
+for the installer, archives and SHA-256 checksums.
+
 ## Build 450
 
 Aligned dimensions can follow a selected line of an ordinary unit-scale

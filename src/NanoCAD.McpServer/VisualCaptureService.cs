@@ -16,7 +16,7 @@ public static class VisualCaptureService
     private static readonly SemaphoreSlim Gate=new(1,1);
     // Only a hint about observation quality. Identical pixels after a camera
     // change cannot prove that the CAD view has rendered the new state.
-    private sealed record CaptureFingerprint(string Bridge,string Document,string Camera,string Sha256,bool ViewportOnly);
+    private sealed record CaptureFingerprint(string Bridge,string Document,string Camera,string Sha256,bool ViewportOnly,CaptureWorldBounds? Bounds);
     private static CaptureFingerprint? _lastCapture;
     public static void RequireContext(VisualCaptureArguments args,JsonElement data)
     {
@@ -34,11 +34,25 @@ public static class VisualCaptureService
     public static void RequireCaptureArea(VisualCaptureArguments args, JsonElement result)
     {
         bool viewportOnly = result.TryGetProperty("viewport_only", out var viewport) && viewport.ValueKind == JsonValueKind.True;
-        if (viewportOnly != args.ViewportOnly)
-            throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The bridge did not confirm the requested capture area.");
+        if (viewportOnly != args.RequiresViewport)
+            throw new DomainException(args.Bounds == null ? "CAPTURE_VIEWPORT_UNAVAILABLE" : "CAPTURE_BOUNDS_UNAVAILABLE",
+                "The bridge did not confirm the requested capture area.");
         if (viewportOnly && (!result.TryGetProperty("capture_document_id", out var document) || document.ValueKind != JsonValueKind.String || document.GetString() != args.DocumentId ||
             !result.TryGetProperty("capture_revision", out var revision) || revision.ValueKind != JsonValueKind.String || revision.GetString() != args.Revision))
             throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The observed viewport belongs to another document or revision.", true);
+        bool hasBounds = result.TryGetProperty("capture_bounds", out var bounds) && bounds.ValueKind != JsonValueKind.Null;
+        if (args.Bounds == null && !hasBounds) return;
+
+        DomainException Invalid() => new("CAPTURE_BOUNDS_UNAVAILABLE", "The bridge did not confirm the requested WCS bounds and crop dimensions.");
+        int Pixels(string name) => result.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number &&
+            value.TryGetInt32(out int pixels) && pixels > 0 ? pixels : throw Invalid();
+        if (!hasBounds || args.Bounds == null) throw Invalid();
+        CaptureWorldBounds reported;
+        try { reported = CaptureWorldBounds.Parse(bounds); }
+        catch (DomainException) { throw Invalid(); }
+        if (reported != args.Bounds || !result.TryGetProperty("crop_pixels", out var pixels) || CapturePixelRect.Read(pixels) is not { } crop ||
+            !crop.Fits(Pixels("viewport_width"), Pixels("viewport_height")) ||
+            crop.right - crop.left != Pixels("source_width") || crop.bottom - crop.top != Pixels("source_height")) throw Invalid();
     }
     public static void RequirePng(byte[] png,int width,int height,int maxEdge)
     {
@@ -109,10 +123,20 @@ public static class VisualCaptureService
                 ["max_edge"] = args.MaxEdge, ["inline_image"] = true
             };
             if (args.ViewportOnly) workerInput["viewport_only"] = true;
+            if (args.Bounds is { } bounds)
+            {
+                if (!beforeData.TryGetProperty("view", out var beforeCamera) || beforeCamera.ValueKind != JsonValueKind.Object ||
+                    !beforeCamera.TryGetProperty("camera_token", out var observedToken) || observedToken.ValueKind != JsonValueKind.String)
+                    throw new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "The current camera could not be verified for WCS bounds capture.");
+                workerInput["bounds"] = JsonSerializer.SerializeToNode(bounds.ToWire(), Wire.Json);
+                workerInput["expected_camera_token"] = observedToken.GetString();
+            }
             var response=await client.CallAsync(descriptor,new Request(Wire.Version,Guid.NewGuid().ToString("D"),"capture_window",9000,
                 Wire.Element(workerInput)),deadline.Token);
-            if (args.ViewportOnly && response.error is { code: "INVALID_ARGUMENT", message: "Unknown capture argument." })
-                throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The loaded bridge does not support viewport-only capture.");
+            if (args.RequiresViewport && response.error is { code: "INVALID_ARGUMENT", message: "Unknown capture argument." })
+                throw args.Bounds != null
+                    ? new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "The loaded bridge does not support WCS bounds capture.")
+                    : new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The loaded bridge does not support viewport-only capture.");
             if(!response.success)throw new DomainException(response.error!.code,response.error.message,response.error.retryable,response.error.details);
             var remote=Wire.Element(response.data!);
             if(remote.GetProperty("capture_id").GetString()!=captureId||remote.GetProperty("process_id").GetInt32()!=descriptor.process_id)
@@ -137,20 +161,29 @@ public static class VisualCaptureService
                 ?token.GetString()??"": "";
             var previous=_lastCapture;
             bool identicalAfterCameraChange=previous!=null&&previous.Bridge==args.BridgeId&&previous.Document==args.DocumentId&&
-                previous.ViewportOnly==args.ViewportOnly&&previous.Camera.Length>0&&cameraToken.Length>0&&previous.Camera!=cameraToken&&previous.Sha256==digest;
-            _lastCapture=new(args.BridgeId,args.DocumentId,cameraToken,digest,args.ViewportOnly);
+                previous.ViewportOnly==args.RequiresViewport&&previous.Bounds==args.Bounds&&previous.Camera.Length>0&&cameraToken.Length>0&&previous.Camera!=cameraToken&&previous.Sha256==digest;
+            _lastCapture=new(args.BridgeId,args.DocumentId,cameraToken,digest,args.RequiresViewport,args.Bounds);
+            string scope = args.Bounds != null ? "native_viewport_wcs_bounds_observation" :
+                args.ViewportOnly ? "native_viewport_observation" : "main_window_observation";
             var data=new {frame_id=id,source="windows_graphics_capture",mime_type="image/png",width,height,
                 source_width=frame.GetProperty("source_width").GetInt32(),source_height=frame.GetProperty("source_height").GetInt32(),
                 png_sha256=digest,process_id=descriptor.process_id,process_start_utc_ticks=descriptor.process_start_utc_ticks.ToString(CultureInfo.InvariantCulture),
                 started_at_utc=started,completed_at_utc=DateTime.UtcNow.ToString("O"),frame_system_relative_ticks=timestamp,capture_started_system_relative_ticks=captureStart,
                 document=afterData,document_metadata_unchanged=true,camera_consistency=cameraVerified?"camera_metadata_unchanged":"unverified",
-                scope=args.ViewportOnly ? "native_viewport_observation; camera metadata comparison is not an atomic model-render synchronization barrier" :
-                    "main_window_observation; camera metadata comparison is not an atomic model-render synchronization barrier"};
+                scope=scope + "; camera metadata comparison is not an atomic model-render synchronization barrier"};
             var warnings=identicalAfterCameraChange
                 ?new[]{"Visual observation only: verify dimensions and write outcomes with exact APIs; separate dialogs/menus may be absent.",
                     "CAPTURE_IDENTICAL_AFTER_CAMERA_CHANGE: Pixels match the previous frame despite a different camera token. Inspect the actual image; rendering may not have updated. This does not imply a CAD write failure."}
                 :new[]{"Visual observation only: verify dimensions and write outcomes with exact APIs; separate dialogs/menus may be absent."};
-            return (Result.Ok(id,data,after.context,warnings),png);
+            object resultData = data;
+            if (args.Bounds != null)
+            {
+                var regionData = JsonSerializer.SerializeToNode(data, Wire.Json)!.AsObject();
+                foreach (string field in new[] { "capture_bounds", "crop_pixels", "viewport_width", "viewport_height" })
+                    regionData[field] = JsonNode.Parse(remote.GetProperty(field).GetRawText());
+                resultData = regionData;
+            }
+            return (Result.Ok(id,resultData,after.context,warnings),png);
         }
         catch(OperationCanceledException) when(!cancellation.IsCancellationRequested){throw new DomainException("CAPTURE_TIMEOUT","Capture deadline expired; only the visual worker was stopped.",true);}
         catch(InvalidOperationException){throw new DomainException("CAPTURE_FAILED","Window capture or its context could not be verified.");}

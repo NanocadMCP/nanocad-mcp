@@ -73,7 +73,7 @@ public static partial class CreateValidation
     private static double Number(JsonElement value, string path, double minimum = -Maximum, double maximum = Maximum)
     {
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) || number < minimum || number > maximum)
-            throw Invalid(path, $"Expected finite number between {minimum} and {maximum}.", "INVALID_GEOMETRY");
+            throw InputError.Create(path, "Expected a finite number in the supported range.", new { minimum, maximum }, "INVALID_GEOMETRY");
         return number == 0 ? 0 : number;
     }
     private static Point2 Point(JsonElement value, string name, string path)
@@ -105,7 +105,7 @@ public static partial class CreateValidation
         if (revision.Any(c => c is < '0' or > '9') || !ulong.TryParse(revision, NumberStyles.None, CultureInfo.InvariantCulture, out var revisionNumber))
             throw Invalid("$.expected_revision", "Expected decimal uint64 string.");
         var units = Text(value, "units", "$", 32);
-        if (units != "Millimeters") throw Invalid("$.units", "Initial creation supports explicit Millimeters only.", "UNSUPPORTED_UNITS");
+        if (units != "Millimeters") throw InputError.Create("$.units", "Expected Millimeters.", new[] { "Millimeters" }, "UNSUPPORTED_UNITS");
         var result = new CreateArguments(bridge, document, revisionNumber.ToString(CultureInfo.InvariantCulture), operation, units,
             ParseEntities(Required(value, "entities", "$"), allowDimensions: true))
         { TargetSpace = WriteSpace.Parse(value) };
@@ -130,6 +130,10 @@ public static partial class CreateValidation
             SketchPlaneSpec? workplane = null;
             if (item.TryGetProperty("workplane", out var wp))
             {
+                if (type == "Point" && item.TryGetProperty("position_snap", out _))
+                    throw Invalid(path + ".workplane", "position_snap resolves directly in WCS; omit workplane.");
+                if (type == "Line" && (item.TryGetProperty("start_snap", out _) || item.TryGetProperty("end_snap", out _)))
+                    throw Invalid(path + ".workplane", "Snapped Line endpoints resolve directly in WCS. Omit workplane.");
                 if (item.TryGetProperty("construction", out var sourceConstruction) && sourceConstruction.ValueKind == JsonValueKind.String && sourceConstruction.GetString() is "native_curve" or "fit_points_3d") throw Invalid(path, "This construction uses actual WCS geometry; workplane is not accepted.");
                 if (!allowDimensions || type is not ("Line" or "Circle" or "Arc" or "Ellipse" or "Spline" or "Polyline" or "Point" or "Wipeout")) throw Invalid(path, "workplane is supported only for top-level Line/Circle/Arc/Ellipse/Spline/Polyline/Point/Wipeout creation.");
                 workplane = DrawingWorkplane.Parse(wp); item = DrawingWorkplane.WithoutFrame(item);
@@ -172,6 +176,8 @@ public static partial class CreateValidation
                     specs.Add(ParseDimension(item, path, layer)); break;
                 case "Region": specs.Add(ParseRegion(item, path, layer)); break;
                 case "Helix": specs.Add(ParseHelix(item, path, layer)); break;
+                case "Line" when allowDimensions && (item.TryGetProperty("start_snap", out _) || item.TryGetProperty("end_snap", out _)):
+                    specs.Add(ParseSnappedLine(item, path, layer)); break;
                 case "Line":
                     Shape(item, path, "type", "layer", "start", "end");
                     var start = Point(item, "start", path); var end = Point(item, "end", path);

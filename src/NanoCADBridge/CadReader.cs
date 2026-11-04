@@ -207,7 +207,7 @@ internal sealed class CadReader
         var selectionRevision = selection ? state.SelectionRevision : null;
         var watch=Stopwatch.StartNew();
         int unavailableBounds=0;
-        EntitySummary? Read(ulong handle)
+        (Entity entity, EntitySummary summary)? ReadMatch(ulong handle)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if(!state.Document.Database.TryGetObjectId(new Handle(unchecked((long)handle)),out var id)||!id.IsValid||id.IsErased||id.IsEffectivelyErased)
@@ -220,9 +220,14 @@ internal sealed class CadReader
             if(args.Layers!=null&&!args.Layers.Contains(summary.layer!.name,StringComparer.OrdinalIgnoreCase))return null;
             if(!CadTargetedRead407.MatchBlock(entity,args.QueryBlock,transaction,cancellationToken.ThrowIfCancellationRequested))return null;
             if(!CadTargetedRead407.MatchText(entity,args.QueryText,cancellationToken.ThrowIfCancellationRequested))return null;
-            if(!CadTargetedRead407.MatchBounds(entity,args.QueryBounds,cancellationToken.ThrowIfCancellationRequested,out var unavailable))
+            return (entity, summary);
+        }
+        EntitySummary? Read(ulong handle)
+        {
+            if (ReadMatch(handle) is not { } match) return null;
+            if(!CadTargetedRead407.MatchBounds(match.entity,args.QueryBounds,cancellationToken.ThrowIfCancellationRequested,out var unavailable))
             {if(unavailable)unavailableBounds++;return null;}
-            return summary;
+            return match.summary;
         }
         object Convert(HandlePages<EntitySummary>.Page page)
         {
@@ -253,6 +258,15 @@ internal sealed class CadReader
                 if(!id.IsErased&&!id.IsEffectivelyErased)yield return unchecked((ulong)id.Handle.Value);
             }
             watch.Restart();
+        }
+        if (args.SummaryOnly)
+        {
+            var summary = new QuerySummary();
+            foreach (var handle in Identities())
+                if (ReadMatch(handle) is { } match)
+                    summary.Add(match.summary.type, match.summary.layer!.name,
+                        CadTargetedRead407.ReadBounds(match.entity, cancellationToken.ThrowIfCancellationRequested), args.QueryBounds);
+            return summary.Result(args.ReadSpace);
         }
         return Convert(_snapshots.First(state.Id,state.Revision,selectionRevision,args.FilterKey(operation),Identities(),args.PageSize,Read,Yield));
     }

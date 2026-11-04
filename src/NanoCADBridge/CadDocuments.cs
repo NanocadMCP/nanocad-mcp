@@ -99,6 +99,54 @@ internal sealed class CadDocuments
         if (args.Action == "save") CheckDwgLinetypes(state.Document.Database, check);
         return state;
     }
+
+    public (ReadContext? Context, object? Plan) Preview(DocumentArguments args, Action check)
+    {
+        check();
+        Ready(args.BridgeId);
+        if (args.Action is "save" or "export_dxf")
+        {
+            var target = PreflightSave(args, check: check);
+            return (Context(target), new { action = args.Action, destination = SavePath(args, target) });
+        }
+        if (args.Action is "activate" or "activate_layout")
+        {
+            var target = Target(args, args.Action == "activate_layout");
+            if (args.Action == "activate") return (Context(target), new { action = args.Action, target_document_id = target.Id });
+            var layout = ResolveLayout(args, target);
+            return (Context(target), new { action = args.Action, layout_handle = args.LayoutHandle, layout_name = layout.Name });
+        }
+        if (args.Action == "open")
+        {
+            var existing = FindOpenSource(args, check);
+            if (existing == null) DocumentFilePolicy.Check(args.Path!, true, false);
+            return (existing == null ? null : Context(existing), new { action = args.Action, reused_open_document = existing != null });
+        }
+        return (null, null);
+    }
+
+    private DocumentState? FindOpenSource(DocumentArguments args, Action check)
+    {
+        var existing = States(check).SingleOrDefault(s => s.Document.IsNamedDrawing && SamePath(s.Document.Name, args.Path));
+        if (existing != null && existing.Document.IsReadOnly != args.ReadOnly)
+            throw new DomainException("DOCUMENT_MODE_MISMATCH", "The file is already open in a different read-only mode; it will not be reopened.");
+        return existing;
+    }
+
+    private static (string Name, ObjectId Block, bool Model) ResolveLayout(DocumentArguments args, DocumentState state)
+    {
+        if (state.Document.IsReadOnly) throw new DomainException("DOCUMENT_READ_ONLY", "Layout activation may initialize native paper-space content; a writable document is required.");
+        var database = state.Document.Database;
+        var layoutId = CadStructureWriter.Find(database, args.LayoutHandle!);
+        using var transaction = database.TransactionManager.StartTransaction();
+        if (transaction.GetObject(layoutId, OpenMode.ForRead) is not Layout layout || layout.GetType() != typeof(Layout) || layout.OwnerId != database.LayoutDictionaryId)
+            throw new DomainException("UNSUPPORTED_LAYOUT", "Expected an existing native layout from the active document.");
+        var blockId = layout.BlockTableRecordId;
+        if (transaction.GetObject(blockId, OpenMode.ForRead) is not BlockTableRecord block || block.GetType() != typeof(BlockTableRecord) ||
+            block.OwnerId != database.BlockTableId || block.LayoutId != layoutId || !block.IsLayout)
+            throw new DomainException("UNSUPPORTED_LAYOUT", "Layout has inconsistent paper/model block ownership.");
+        return (LayoutMetadata.Text(layout.LayoutName), blockId, layout.ModelType);
+    }
     public Result Save(WriteJob job, DocumentState bound)
     {
         ReadContext? context = null;
@@ -172,19 +220,8 @@ internal sealed class CadDocuments
             else if (args.Action == "activate_layout")
             {
                 state = Target(args, true);
-                if (state.Document.IsReadOnly) throw new DomainException("DOCUMENT_READ_ONLY", "Layout activation may initialize native paper-space content; a writable document is required.");
                 var database = state.Document.Database;
-                ObjectId layoutId = CadStructureWriter.Find(database, args.LayoutHandle!); string name; ObjectId blockId; bool model;
-                using (var transaction = database.TransactionManager.StartTransaction())
-                {
-                    var item = transaction.GetObject(layoutId, OpenMode.ForRead);
-                    if (item is not Layout layout || layout.GetType() != typeof(Layout) || layout.OwnerId != database.LayoutDictionaryId)
-                        throw new DomainException("UNSUPPORTED_LAYOUT", "Expected an existing native layout from the active document.");
-                    name = LayoutMetadata.Text(layout.LayoutName); blockId = layout.BlockTableRecordId; model = layout.ModelType;
-                    var block = transaction.GetObject(blockId, OpenMode.ForRead) as BlockTableRecord;
-                    if (block is null || block.GetType() != typeof(BlockTableRecord) || block.OwnerId != database.BlockTableId || block.LayoutId != layoutId || !block.IsLayout)
-                        throw new DomainException("UNSUPPORTED_LAYOUT", "Layout has inconsistent paper/model block ownership.");
-                }
+                var (name, blockId, model) = ResolveLayout(args,state);
                 job.CheckCancellation();
                 job.BeginCommit(); started = true;
                 // Genuine layout navigation on the existing UI dispatcher. Native
@@ -215,11 +252,9 @@ internal sealed class CadDocuments
             }
             else
             {
-                var existing = States().SingleOrDefault(s => s.Document.IsNamedDrawing && SamePath(s.Document.Name, args.Path));
+                var existing = FindOpenSource(args,job.CheckCancellation);
                 if (existing != null)
                 {
-                    if (existing.Document.IsReadOnly != args.ReadOnly)
-                        throw new DomainException("DOCUMENT_MODE_MISMATCH", "The file is already open in a different read-only mode; it will not be reopened.");
                     state = existing; reused = true;
                     job.BeginCommit(); started = true;
                 }

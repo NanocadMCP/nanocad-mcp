@@ -24,7 +24,7 @@ If the family is unclear, get_guidance(topic="commands") and its optional sectio
 | Place or measure a cloud, or derive a contour from its section | topic="point_clouds"; cloud source data stays read-only |
 | Resolve pending, unknown, stale or failed work | topic="recovery" |
 
-Before the first write with a create_entities, modify_entities or modify_structure variant, read get_guidance(topic="operation", operation=tool name without nanocad. prefix, variant=exact kind/type/operation value). It supplies the complete input contract and branch limits. Reuse it while the installed contract is unchanged. Omit variant to discover names; topic="schema" also exposes exact inputs when the client shows unknown fields. Do not fetch every topic at startup or ask the engineer to supply schemas.
+Before the first write with a create_entities, modify_entities or modify_structure variant, read get_guidance(topic="operation", operation=tool name without nanocad. prefix, variant=exact kind/type/operation value). It supplies the item's exact inputs and operating limits. Reuse it while the installed contract is unchanged. Omit variant to discover names and common request fields. Use topic="schema" with a variant for the complete request.
 
 Use each field's declared units and frame; document millimeters do not imply angular degrees or local coordinates. Keep returned handles, native IDs and tokens in their declared roles and bridge/document/revision scope. Refresh affected references after edits and native IDs after reopen/copy. Follow cursors to completion for the required filtered inventory, including empty incomplete pages. Page size and response-byte budgets are not model-size limits; never invent a fixed body-count ceiling.
 

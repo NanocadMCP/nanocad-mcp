@@ -27,6 +27,7 @@ public sealed class ToolService
         byte[]? image = null;
         string? selectedBridge = null;
         ReadPreparationSelection433? preparationSelection = null;
+        WriteStateObservation? state = null;
         try
         {
             var input = Wire.Element(arguments ?? new Dictionary<string, JsonElement>());
@@ -37,6 +38,12 @@ public sealed class ToolService
             }
             else
             {
+                WriteRequestOptions? options = null;
+                if (Wire.WriteOperations.Contains(operation))
+                {
+                    options = await WriteRequestOptions.BindAsync(operation, input, Discovery.Choose, ReadDocuments, cancellationToken);
+                    input = options.Arguments;
+                }
                 var bridgeId = Wire.ValidateBridge(operation, input);
                 selectedBridge = bridgeId;
                 var request = new Request(Wire.Version, id, operation, RequestTimeoutMilliseconds, input);
@@ -48,7 +55,23 @@ public sealed class ToolService
                 {
                     var descriptor = Discovery.Choose(bridgeId);
                     selectedBridge = descriptor.bridge_instance_id;
+                    if (options?.ValidateOnly == true)
+                        request = request with { operation = WritePreviewRequest.Route, arguments = Wire.Element(new WritePreviewRequest(operation, input)) };
                     result = await _client.CallAsync(descriptor, request, cancellationToken);
+                    if (options?.ReturnState == true && result.success)
+                    {
+                        try
+                        {
+                            state = await WriteResultState.ReadAsync(operation, result,
+                                (reader, arguments, cancel) => ReadBridge(descriptor, reader, arguments, cancel), cancellationToken);
+                        }
+                        catch (Exception error) when (error is DomainException or OperationCanceledException or IOException or
+                            UnauthorizedAccessException or JsonException or InvalidOperationException or KeyNotFoundException or System.ComponentModel.Win32Exception)
+                        {
+                            state = new("unavailable", result.context, null,
+                                error is DomainException domain ? domain.Error.code : "OBSERVATION_UNAVAILABLE");
+                        }
+                    }
                 }
             }
         }
@@ -58,11 +81,34 @@ public sealed class ToolService
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         { result = Result.Fail(id, new("BRIDGE_UNAVAILABLE", "Local bridge discovery or transport failed.", true)); }
 
+        if (result.error is { } invalid) result = result with { error = InputError.Complete(invalid) };
         (result, image) = FitResponseBudget(result, operation, image, selectedBridge);
+        if (state is not null && result.success)
+        {
+            var withState = result with { write_state = state };
+            if (JsonSerializer.SerializeToUtf8Bytes(Wrap(withState)).Length <= ResponseBudget) result = withState;
+            else
+            {
+                withState = result with { write_state = new("unavailable", result.context, null, "RESPONSE_LIMIT_EXCEEDED") };
+                if (JsonSerializer.SerializeToUtf8Bytes(Wrap(withState)).Length <= ResponseBudget) result = withState;
+            }
+        }
         var preparation = PrepareRead(operation, preparationSelection, result, image);
         var responseResult = Wrap(result, image, preparation);
         _log.Write(operation, id, result.success ? "ok" : result.error!.code, watch.ElapsedMilliseconds);
         return responseResult;
+    }
+
+    private Task<Result> ReadBridge(Descriptor descriptor, string operation, object arguments, CancellationToken cancellation) =>
+        _client.CallAsync(descriptor, new(Wire.Version, Guid.NewGuid().ToString("D"), operation,
+            RequestTimeoutMilliseconds, Wire.Element(arguments)), cancellation);
+
+    private async Task<DocumentList> ReadDocuments(Descriptor descriptor, CancellationToken cancellation)
+    {
+        var result = await ReadBridge(descriptor, "get_documents", new { descriptor.bridge_instance_id }, cancellation);
+        if (!result.success && result.error is { } error) throw new DomainException(error.code, error.message, error.retryable, error.details);
+        return (result.data is JsonElement json ? json : Wire.Element(result.data!)).Deserialize<DocumentList>(Wire.Json)
+            ?? throw new DomainException("PROTOCOL_MISMATCH", "The bridge did not return an open-document inventory.");
     }
 
     private async Task<Result> GetStatusAsync(Request request, string? bridgeId, CancellationToken cancellationToken)

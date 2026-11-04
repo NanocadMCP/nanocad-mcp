@@ -10,9 +10,10 @@ internal static class CommandTreeCatalog
     private static readonly string[] DirectKinds = ["extrusion", "boolean", "transform_copy", "drilled_copy", "fillet_copy", "chamfer_copy", "shell_copy", "loft", "revolve", "sweep", "box", "sphere", "cylinder", "frustum", "torus", "wedge", "pyramid"];
     private static readonly string[] DirectEdits = ["separate_solid", "slice_solid", "transform_solid", "fillet_solid", "chamfer_solid", "shell_solid", "drill_solid", "offset_faces", "presspull_faces", "extrude_faces", "extrude_faces_along_path", "transform_faces", "taper_faces", "remove_faces", "imprint_solid", "boolean_solid", "offset_solid", "replace_solid"];
     private static readonly string[] CommonEdits = ["move", "copy", "rotate", "scale", "mirror", "erase", "set_properties", "explode_native"];
-    private static readonly string[] AnnotationKinds = ["Text", "MText", "aligned", "rotated", "radial", "diametric", "angular_3point", "angular_2line", "ordinate", "arc_length", "jogged_radial", "Tolerance", "MLeader", "Table"];
-    private static bool Model(string name) => name.Contains("model_", StringComparison.Ordinal);
+    private static readonly string[] AnnotationKinds = ["Text", "MText", "aligned", "rotated", "radial", "diametric", "angular_3point", "angular_2line", "ordinate", "arc_length", "jogged_radial", "projected_aligned", "Tolerance", "MLeader", "Table"];
+    private static bool Model(string name) => name == "rebuild_model" || name.Contains("model_", StringComparison.Ordinal);
     private static bool InternalSketch(string name) => name is "add_sketch_constraints" or "set_sketch_constraint_parameter" or "delete_sketch_constraints" or "set_model_sketch_visibility";
+    private static bool RetainedDrawingModel(string name) => name is "extrude_drawing_circle" or "extrude_drawing_profile" or "revolve_drawing_profile";
     private static bool DrawingDriver(string name) => name.Contains("drawing_", StringComparison.Ordinal);
     private static bool Sheet(string name) => name.Contains("layout", StringComparison.Ordinal) || name.Contains("viewport", StringComparison.Ordinal) || name.Contains("drawing_view", StringComparison.Ordinal) || name.Contains("section_view", StringComparison.Ordinal);
     private static bool Annotation(string name) => name.Contains("text", StringComparison.Ordinal) || name.Contains("dimension", StringComparison.Ordinal) || name.Contains("table", StringComparison.Ordinal) || name.Contains("mleader", StringComparison.Ordinal) || name == "set_tolerance";
@@ -50,7 +51,7 @@ internal static class CommandTreeCatalog
                 title = "2D drawing and structure"; purpose = "Curves, source constraints, dimensions and callouts, masks, native groups, blocks and arrays within their published scope.";
                 foreach (var tool in new[] { "query_objects", "inspect_objects", "analyze_geometry", "inspect_block", "inspect_constraints", "get_structure" }) Add(tool);
                 Branch("create_entities", name => !Model(name) && !DirectKinds.Contains(name));
-                Branch("modify_entities", name => !Model(name) && !InternalSketch(name) && !DirectEdits.Contains(name) && name != "transform_point_cloud");
+                Branch("modify_entities", name => !Model(name) && !InternalSketch(name) && !RetainedDrawingModel(name) && !DirectEdits.Contains(name) && name != "transform_point_cloud");
                 Branch("modify_structure", name => !Sheet(name));
                 break;
             case "direct3d":

@@ -13,10 +13,11 @@ public static class WriteSpace
     public static void Check(CreateArguments args)
     {
         if(args.TargetSpace!="paper")return;
-        if(args.Entities.Any(e=>e.Workplane!=null||e is not (LineSpec or CircleSpec or ArcSpec or PolylineSpec or SmoothPolylineSpec409 or EllipseSpec or SplineSpec or FitSplineSpec408 or PeriodicFitSplineSpec441 or CurveSplineSpec408 or WipeoutSpec431 or PointSpec408 or ConstructionCurve443 or TextSpec or MTextSpec or IDimensionCreation or ProjectedAlignedDimensionSpec or ToleranceSpec356 or MLeaderSpec or MLeaderBlockSpec442 or TableSpec or HatchSpec or AssociativeHatchSpec)))
+        if(args.Entities.Any(e=>e.Workplane!=null||e is not (LineSpec or LineFromNativeSnapSpec or ResolvedNativeSnapLineSpec or CircleSpec or ArcSpec or PolylineSpec or SmoothPolylineSpec409 or EllipseSpec or SplineSpec or FitSplineSpec408 or PeriodicFitSplineSpec441 or CurveSplineSpec408 or WipeoutSpec431 or PointSpec408 or PointFromNativeSnapSpec or ConstructionCurve443 or TextSpec or MTextSpec or IDimensionCreation or ProjectedAlignedDimensionSpec or ToleranceSpec356 or MLeaderSpec or MLeaderBlockSpec442 or TableSpec or HatchSpec or AssociativeHatchSpec)))
             throw new DomainException("OUT_OF_SCOPE","Paper writes support sheet-plane 2D geometry and annotations, including native associative Hatch from source curves in the same active sheet; model features and solids require Model Space.");
         if(args.Entities.OfType<ConstructionCurve443>().Any(curve=>curve.BasePoint.Z!=0||curve.UnitDirection.Z!=0))throw new DomainException("OUT_OF_SCOPE","Paper Ray/Xline creation uses sheet-plane Z0 bases and directions.");
         if(args.Entities.OfType<PointSpec408>().Any(point=>point.Position.Z!=0))throw new DomainException("OUT_OF_SCOPE","Paper Point creation uses sheet-plane Z0 positions.");
+        if(args.Entities.OfType<ResolvedNativeSnapLineSpec>().Any(line=>line.Start.Z!=0||line.End.Z!=0))throw new DomainException("OUT_OF_SCOPE","Paper Line snaps use sheet-plane WCS Z0 endpoints.");
     }
     public static void Check(ModifyArguments args)
     {

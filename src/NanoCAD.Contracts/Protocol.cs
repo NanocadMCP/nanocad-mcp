@@ -16,20 +16,28 @@ public static class Wire
     public static readonly string[] ReadOperations = { "get_status", "get_operation_result", "get_document", "get_selection", "query_objects", "inspect_objects", "get_structure", "inspect_block", "get_documents", "analyze_geometry", "inspect_model_history", "get_model_variables", "inspect_sketch_constraints", "get_drawing_views", "inspect_solid_topology", "inspect_constraints", "inspect_point_cloud", "analyze_point_cloud" };
     public static readonly string[] WriteOperations = { "create_entities", "modify_entities", "manage_document", "modify_structure", "set_model_parameter", "set_view" };
     public static readonly string[] Operations = ReadOperations.Concat(WriteOperations).ToArray();
-    public static string? ValidateBridge(string operation, JsonElement input) => operation == "capture_window"
-        ? VisualCaptureBridgeArguments.Parse(input).BridgeId
-        : WriteOperations.Contains(operation)
-            ? WriteValidation.Parse(operation, input).BridgeId : Validation.Parse(operation, input).BridgeId;
+    public static string? ValidateBridge(string operation, JsonElement input) => operation switch
+    {
+        "capture_window" => VisualCaptureBridgeArguments.Parse(input).BridgeId,
+        WritePreviewRequest.Route => WritePreviewRequest.Parse(input).BridgeId,
+        _ => WriteOperations.Contains(operation) ? WriteValidation.Parse(operation, input).BridgeId : Validation.Parse(operation, input).BridgeId
+    };
 }
 
 public sealed record Request(string protocolVersion, string requestId, string operation, int timeoutMs, JsonElement arguments);
-public sealed record ReadContext(string bridge_instance_id, string document_id, string revision, string captured_at_utc);
+public sealed record ReadContext(string bridge_instance_id, string document_id, string revision, string captured_at_utc)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? write_revision => ScopedWriteRevision.Format(this);
+}
 public sealed record DomainError(string code, string message, bool retryable = false, object? details = null);
 public sealed record Result(string contract_version, string request_id, bool success, ReadContext? context,
     object? data, DomainError? error, string[] warnings)
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WriteReceipt432? receipt { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public WriteStateObservation? write_state { get; init; }
     public static Result Ok(string id, object data, ReadContext? context = null, params string[] warnings) =>
         new(Wire.Version, id, true, context, data, null, warnings);
     public static Result Fail(string id, DomainError error, ReadContext? context = null) =>
@@ -64,6 +72,7 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     public bool IncludeGeometrySources { get; init; }
     public string[]? SketchConstraintParameterIds { get; init; }
     public QueryBounds407? QueryBounds { get; init; }
+    public bool SummaryOnly { get; init; }
     public QueryText407? QueryText { get; init; }
     public QueryBlock407? QueryBlock { get; init; }
     public string[]? DetailSections { get; init; }
@@ -99,33 +108,33 @@ public static class Validation
         if (operation == "inspect_point_cloud") return PointCloudInspectValidation.Parse(input).Read;
         if (operation == "analyze_point_cloud") return PointCloudAnalysisValidation.Parse(input).Read;
         if (operation is "get_structure" or "inspect_block") return StructureValidation.Parse(operation, input);
-        if (input.ValueKind != JsonValueKind.Object) throw new DomainException("INVALID_ARGUMENT", "Arguments must be an object.");
+        if (input.ValueKind != JsonValueKind.Object) throw InputError.Create("$", "Expected an object.");
         var allowed = new HashSet<string>(StringComparer.Ordinal) { "bridge_instance_id" };
         if (operation == "get_document") allowed.Add("include_view");
         if (operation is "get_selection" or "query_objects" or "inspect_objects")
             allowed.UnionWith(new[] { "document_id", "expected_revision" });
         if (operation is "get_selection" or "query_objects") allowed.UnionWith(new[] { "page_size", "cursor" });
-        if (operation == "query_objects") allowed.UnionWith(new[] { "space", "types", "layers", "bounds", "text", "block_definition" });
+        if (operation == "query_objects") allowed.UnionWith(new[] { "space", "types", "layers", "bounds", "text", "block_definition", "summary_only" });
         if (operation == "inspect_objects") allowed.UnionWith(new[] { "handles", "sections", "erase_assessment" });
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in input.EnumerateObject())
             if (!seen.Add(property.Name) || !allowed.Contains(property.Name))
-                throw new DomainException("INVALID_ARGUMENT", $"Unknown or duplicate argument: {property.Name}.");
+                throw InputError.Create("$." + property.Name, "Unknown or duplicate field.");
         string? ReadString(string name, int max, bool required = false)
         {
             if (!input.TryGetProperty(name, out var item))
             {
-                if (required) throw new DomainException("INVALID_ARGUMENT", $"{name} is required.");
+                if (required) throw InputError.Create("$." + name, "Required field is missing.");
                 return null;
             }
             if (item.ValueKind != JsonValueKind.String || item.GetString() is not { Length: > 0 } s || s.Length > max)
-                throw new DomainException("INVALID_ARGUMENT", $"{name} must be a nonempty string of at most {max} characters.");
+                throw InputError.Create("$." + name, "Expected a nonempty string.", new { max_length = max });
             return s;
         }
         string? ReadId(string name, bool required = false)
         {
             var s = ReadString(name, 36, required);
-            if (s != null && !Guid.TryParseExact(s, "D", out _)) throw new DomainException("INVALID_ARGUMENT", $"{name} must be a UUID.");
+            if (s != null && !Guid.TryParseExact(s, "D", out _)) throw InputError.Create("$." + name, "Expected a UUID.");
             return s?.ToLowerInvariant();
         }
         string[]? ReadArray(string name, int? maxCount, int maxLength)
@@ -142,11 +151,21 @@ public static class Validation
         if (revision != null && (revision.Any(c => c is < '0' or > '9') || !ulong.TryParse(revision, out _)))
             throw new DomainException("INVALID_ARGUMENT", "expected_revision must be a decimal uint64 string.");
         revision = revision == null ? null : ulong.Parse(revision, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+        bool summaryOnly = false;
+        if (input.TryGetProperty("summary_only", out var summary))
+        {
+            if (summary.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new DomainException("INVALID_ARGUMENT", "summary_only must be a boolean.", false, new { path = "$.summary_only" });
+            summaryOnly = summary.GetBoolean();
+            foreach (var field in new[] { "page_size", "cursor" })
+                if (summaryOnly && input.TryGetProperty(field, out _))
+                    throw new DomainException("INVALID_ARGUMENT", $"{field} cannot be used with summary_only.", false, new { path = "$." + field });
+        }
         int pageSize = 100;
         if (input.TryGetProperty("page_size", out var page) && (page.ValueKind != JsonValueKind.Number || !page.TryGetInt32(out pageSize) || pageSize < 1))
-            throw new DomainException("INVALID_ARGUMENT", "page_size must be a positive Int32 integer.");
+            throw InputError.Create("$.page_size", "Expected a positive integer.", new { minimum = 1, maximum = int.MaxValue });
         var space = ReadString("space", 10);
-        if (space != null && space is not ("model" or "paper")) throw new DomainException("INVALID_ARGUMENT", "space must be model or paper; paper queries require an active sheet.");
+        if (space != null && space is not ("model" or "paper")) throw InputError.Create("$.space", "Paper queries require an active sheet.", new[] { "model", "paper" });
         var types = ReadArray("types", null, 32);
         if (types != null && types.Any(t => !new[] { "Line", "Circle", "Arc", "Ellipse", "Spline", "Helix", "Region", "Polyline", "Polyline2d", "Polyline3d", "Point", "Ray", "Xline", "Text", "MText", "Dimension", "Tolerance", "MLeader", "Table", "Hatch", "Solid3d", "BlockReference", "MInsertBlock", "Wipeout", "RasterImage", "DwfUnderlay", "DgnUnderlay", "PdfUnderlay", "PointCloud", "Unknown" }.Contains(t)))
             throw new DomainException("INVALID_ARGUMENT", "Unknown semantic entity type.");
@@ -173,6 +192,7 @@ public static class Validation
             layers?.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToArray(), handles, IncludeView: includeView, ReadSpace: space ?? "model")
         {
             QueryBounds = TargetedRead407.Bounds(input),
+            SummaryOnly = summaryOnly,
             QueryText = TargetedRead407.TextFilter(input),
             QueryBlock = TargetedRead407.BlockFilter(input),
             DetailSections = TargetedRead407.Sections(input),

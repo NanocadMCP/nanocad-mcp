@@ -47,6 +47,38 @@ internal sealed class WriteDispatcher : IDisposable
         _queue = queue; _writer = writer; _documents = documents; _views = views; _log = log;
         Application.DocumentManager.DocumentToBeDestroyed += Closing;
     }
+
+    public Result Preview(Request request, CancellationToken cancellation)
+    {
+        try
+        {
+            cancellation.ThrowIfCancellationRequested();
+            if (_scheduled != null || _documents.ApplicationOperationRunning)
+                throw new DomainException("HOST_BUSY", "Wait for the active write before checking a new request.", true);
+            var arguments = WritePreviewRequest.Parse(request.arguments);
+            object? predicted = null;
+            ReadContext? context;
+            switch (arguments)
+            {
+                case DocumentArguments document:
+                    (context, predicted) = _documents.Preview(document, cancellation.ThrowIfCancellationRequested);
+                    break;
+                case CameraChangeArguments camera:
+                    (context, predicted) = _views.Preview(camera, cancellation.ThrowIfCancellationRequested);
+                    break;
+                case IWriteArguments write:
+                    var state = _writer.Preflight(write, false, cancel: cancellation.ThrowIfCancellationRequested, observePlan: value => predicted = value);
+                    context = _writer.Context(state);
+                    break;
+                default:
+                    throw new DomainException("INVALID_ARGUMENT", "Unknown write preview request.");
+            }
+            cancellation.ThrowIfCancellationRequested();
+            return Result.Ok(request.requestId, new WritePreviewResult(arguments.Operation, "validated", false,
+                predicted is null ? "input_and_available_native_preflight" : "input_native_preflight_and_reported_effects", predicted), context);
+        }
+        catch (DomainException error) { return Result.Fail(request.requestId, error.Error); }
+    }
     public void Pump()
     {
         if (Environment.CurrentManagedThreadId != _uiThread) throw new InvalidOperationException("Write dispatch must stay on the host UI thread.");

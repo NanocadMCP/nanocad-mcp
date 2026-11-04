@@ -27,7 +27,7 @@ internal static class CreateSchema
         var style = Text(255); style["default"] = "Standard";
         var revision = Text(20); revision["pattern"] = "^[0-9]{1,20}$";
         var entities = new JsonArray(
-            Entity("Line", ("start", Point(), true), ("end", Point(), true)),
+            Line(),
             Entity("Circle", ("center", Point(), true), ("radius", Number(1e-9), true)),
             Entity("Arc", ("center", Point(), true), ("radius", Number(1e-9), true), ("start_angle", start, true), ("sweep_angle", sweep, true)),
             Entity("Polyline", ("vertices", new JsonObject { ["type"] = "array", ["minItems"] = 2, 
@@ -232,5 +232,20 @@ internal static class CreateSchema
             ["units"] = new JsonObject { ["type"] = "string", ["const"] = "Millimeters" },
             ["entities"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["items"] = new JsonObject { ["oneOf"] = entities } }
         }, "bridge_instance_id", "document_id", "operation_id", "expected_revision", "units", "entities"));
+    }
+
+    private static JsonObject Line()
+    {
+        var line = Entity("Line", ("start", Point(), false), ("end", Point(), false),
+            ("start_snap", NativeCurveSnapSchema.Input(), false), ("end_snap", NativeCurveSnapSchema.Input(), false));
+        JsonObject Required(string field) => new() { ["required"] = new JsonArray(field) };
+        JsonObject Endpoint(string field) => new() { ["oneOf"] = new JsonArray(Required(field), Required(field + "_snap")) };
+        line["allOf"] = new JsonArray(Endpoint("start"), Endpoint("end"), new JsonObject
+        {
+            ["if"] = new JsonObject { ["anyOf"] = new JsonArray(Required("start_snap"), Required("end_snap")) },
+            ["then"] = new JsonObject { ["not"] = Required("workplane") }
+        });
+        line["description"] = "Create a native Line. Supply start or start_snap and end or end_snap. With only literal endpoints, coordinates are WCS XY/Z0 or local XY in the optional workplane. If either endpoint uses a snap, omit workplane. Snapped endpoints use resolved WCS XYZ and any literal endpoint remains WCS XY/Z0. The created Line is independent.";
+        return line;
     }
 }

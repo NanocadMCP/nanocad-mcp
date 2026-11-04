@@ -64,7 +64,12 @@ internal static class OperationResultSchema432
         return data;
     }
     private static JsonObject Page(JsonObject item) => Object(("items", Array(item)), ("total_count", Integer()), ("returned_count", Integer()), ("complete", Bool()), ("next_cursor", Nullable(Text())));
-    private static JsonObject Context() => Object(("bridge_instance_id", Text()), ("document_id", Text()), ("revision", Text()), ("captured_at_utc", Text()));
+    private static JsonObject Context()
+    {
+        var context = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("revision", Text()), ("captured_at_utc", Text()));
+        context["properties"]!["write_revision"] = new JsonObject { ["type"] = "string", ["pattern"] = WriteRequestOptions.QualifiedRevisionPattern };
+        return context;
+    }
     private static JsonObject Uuid(string description) => new() { ["type"] = "string", ["format"] = "uuid", ["minLength"] = 36, ["maxLength"] = 36, ["description"] = description };
     private static JsonObject Text() => new() { ["type"] = "string" };
     private static JsonObject Integer() => new() { ["type"] = "integer" };

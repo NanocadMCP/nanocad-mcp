@@ -124,6 +124,45 @@ internal sealed class CameraViewWriter
             throw new DomainException("VIEW_UNAVAILABLE","The applied camera record identity changed.");
         return refreshed;
     }
+    internal (ReadContext Context, object Plan) Preview(CameraChangeArguments args, Action check)
+    {
+        check();
+        var state=Preflight(args);
+        var before=Capture(state);
+        var desired=Plan(args,state,before,check,out var warning);
+        return (Context(state),new { view=desired.View, warning });
+    }
+
+    private Snapshot Plan(CameraChangeArguments args, DocumentState state, Snapshot before, Action check, out string? framingWarning)
+    {
+        if(before.View.camera_token!=args.ExpectedCameraToken)throw new DomainException("CAMERA_CONTEXT_CHANGED","The camera changed since it was inspected.",true);
+        Snapshot desired;framingWarning=null;
+        if(args.Action=="restore")
+        {
+            if(!_saved.TryGetValue(args.RestoreToken!,out var saved)||saved.Document!=state.Id||saved.Camera.Space!=before.Space||saved.Camera.View.viewport_number!=before.View.viewport_number||saved.Camera.View.viewport_handle!=before.View.viewport_handle)
+                throw new DomainException("CAMERA_SNAPSHOT_UNAVAILABLE","The restore token does not belong to this document, viewport and bridge lifetime.");
+            desired=saved.Camera;
+            if(Math.Abs(desired.View.width/desired.View.height-before.View.width/before.View.height)>1e-10*Math.Max(1,before.View.width/before.View.height))
+                throw new DomainException("CAMERA_VIEWPORT_CHANGED","The viewport aspect ratio changed since this snapshot; restoration was not started.");
+        }
+        else
+        {
+            if(!state.Document.Database.TileMode&&(args.Preset!="top"||args.DisplayStyle!="preserve"))
+                throw new DomainException("INVALID_ARGUMENT","Observe the Paper sheet using preset top with its existing display style; 3D directions/shading belong to Model.");
+            desired=before with {View=before.View with {direction_wcs=CameraChangeValidation.Direction(args.Preset!),twist_radians=0}};
+            if(args.FrameHandles!=null)
+            {
+                try{desired=desired with{View=CameraObjectFraming.Frame(state,desired.View,args.FrameHandles,args.FramePadding,check)};}
+                catch(DomainException e) when(e.Error.code=="FRAME_BOUNDS_UNAVAILABLE")
+                {framingWarning="FRAMING_BOUNDS_UNAVAILABLE: Preset applied without object framing; inspect the rendered view and reframe after bounds become available.";}
+            }
+            if(args.DisplayStyle=="shaded_edges")desired=desired with {View=desired.View with {render_mode=nameof(ViewRenderModesEnum.FaceNEdgeFine)},Mode=ViewRenderModesEnum.FaceNEdgeFine,VisualStyle=Multicad.McObjectId.Null};
+            if(args.DisplayStyle=="wireframe_2d")desired=desired with {View=desired.View with {render_mode=nameof(ViewRenderModesEnum.Optimized2d)},Mode=ViewRenderModesEnum.Optimized2d,VisualStyle=Multicad.McObjectId.Null};
+            if(before.Renderer is {} renderer)desired=desired with{Renderer=NativeCameraRenderer370.Plan(renderer,desired.View)};
+        }
+        return desired;
+    }
+
     internal Result Execute(WriteJob job)
     {
         DocumentState? state=null;Snapshot? before=null;string? restore=null;bool started=false;
@@ -131,31 +170,7 @@ internal sealed class CameraViewWriter
         {
             var args=(CameraChangeArguments)job.Arguments;
             job.CheckCancellation();state=Preflight(args);before=Capture(state);
-            if(before.View.camera_token!=args.ExpectedCameraToken)throw new DomainException("CAMERA_CONTEXT_CHANGED","The camera changed since it was inspected.",true);
-            Snapshot desired;string? framingWarning=null;
-            if(args.Action=="restore")
-            {
-                if(!_saved.TryGetValue(args.RestoreToken!,out var saved)||saved.Document!=state.Id||saved.Camera.Space!=before.Space||saved.Camera.View.viewport_number!=before.View.viewport_number||saved.Camera.View.viewport_handle!=before.View.viewport_handle)
-                    throw new DomainException("CAMERA_SNAPSHOT_UNAVAILABLE","The restore token does not belong to this document, viewport and bridge lifetime.");
-                desired=saved.Camera;
-                if(Math.Abs(desired.View.width/desired.View.height-before.View.width/before.View.height)>1e-10*Math.Max(1,before.View.width/before.View.height))
-                    throw new DomainException("CAMERA_VIEWPORT_CHANGED","The viewport aspect ratio changed since this snapshot; restoration was not started.");
-            }
-            else
-            {
-                if(!state.Document.Database.TileMode&&(args.Preset!="top"||args.DisplayStyle!="preserve"))
-                    throw new DomainException("INVALID_ARGUMENT","Observe the Paper sheet using preset top with its existing display style; 3D directions/shading belong to Model.");
-                desired=before with {View=before.View with {direction_wcs=CameraChangeValidation.Direction(args.Preset!),twist_radians=0}};
-                if(args.FrameHandles!=null)
-                {
-                    try{desired=desired with{View=CameraObjectFraming.Frame(state,desired.View,args.FrameHandles,args.FramePadding,job.CheckCancellation)};}
-                    catch(DomainException e) when(e.Error.code=="FRAME_BOUNDS_UNAVAILABLE")
-                    {framingWarning="FRAMING_BOUNDS_UNAVAILABLE: Preset applied without object framing; inspect the rendered view and reframe after bounds become available.";}
-                }
-                if(args.DisplayStyle=="shaded_edges")desired=desired with {View=desired.View with {render_mode=nameof(ViewRenderModesEnum.FaceNEdgeFine)},Mode=ViewRenderModesEnum.FaceNEdgeFine,VisualStyle=Multicad.McObjectId.Null};
-                if(args.DisplayStyle=="wireframe_2d")desired=desired with {View=desired.View with {render_mode=nameof(ViewRenderModesEnum.Optimized2d)},Mode=ViewRenderModesEnum.Optimized2d,VisualStyle=Multicad.McObjectId.Null};
-                if(before.Renderer is {} renderer)desired=desired with{Renderer=NativeCameraRenderer370.Plan(renderer,desired.View)};
-            }
+            var desired=Plan(args,state,before,job.CheckCancellation,out var framingWarning);
             job.CheckCancellation();if(!job.TryStart())return job.Error("CANCELLED","Camera operation was cancelled before execution.","not_started");
             restore=Guid.NewGuid().ToString("D");_saved.Add(restore,(state.Id,before));
             bool refreshed=Apply(state,desired,out var rendererReadback,()=>{job.CheckCancellation();job.BeginCommit();started=true;});

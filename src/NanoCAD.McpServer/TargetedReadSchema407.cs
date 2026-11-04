@@ -32,7 +32,9 @@ internal static class TargetedReadSchema407
             ["value"] = new JsonObject { ["type"] = "string", ["minLength"] = 1 }, ["match"] = Enum("contains", "equals"), ["case_sensitive"] = Flag()
         }, "value");
         text["description"] = "Literal ordinary note content or explicit dimension override; decoded plain MTEXT/MLeader when available. No Field evaluation, Table-cell scan or nested block-attribute traversal. match defaults contains, case_sensitive defaults false.";
-        return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block };
+        var summary = Flag();
+        summary["description"] = "Count filtered objects by type and layer and combine available WCS XYZ bounds. Omit page_size and cursor.";
+        return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block, ["summary_only"] = summary };
     }
     internal static JsonObject InspectProperties() => new()
     {
@@ -50,8 +52,13 @@ internal static class TargetedReadSchema407
         if (operation is not ("query_objects" or "inspect_objects")) return input;
         var node = JsonNode.Parse(input.GetRawText())!.AsObject(); var properties = node["properties"]!.AsObject();
         foreach (var pair in operation == "query_objects" ? QueryProperties() : InspectProperties()) properties[pair.Key] = pair.Value!.DeepClone();
-        if (operation == "query_objects" && properties["types"]?["items"]?["enum"] is JsonArray types)
-            foreach (var type in new[] { "Polyline2d", "Polyline3d", "Point", "Ray", "Xline" }) if (!types.Any(value => value?.GetValue<string>() == type)) types.Add(type);
+        if (operation == "query_objects")
+        {
+            if (properties["types"]?["items"]?["enum"] is JsonArray types)
+                foreach (var type in new[] { "Polyline2d", "Polyline3d", "Point", "Ray", "Xline" }) if (!types.Any(value => value?.GetValue<string>() == type)) types.Add(type);
+            if (node["allOf"] == null) node["allOf"] = new JsonArray();
+            node["allOf"]!.AsArray().Add(JsonNode.Parse("""{"if":{"required":["summary_only"],"properties":{"summary_only":{"const":true}}},"then":{"not":{"anyOf":[{"required":["page_size"]},{"required":["cursor"]}]}}}"""));
+        }
         return JsonSerializer.SerializeToElement(node);
     }
     internal static JsonObject CompactEntityOutput(JsonObject reference)
@@ -84,5 +91,26 @@ internal static class TargetedReadSchema407
         return new JsonObject{["type"]="object",["additionalProperties"]=true,
             ["properties"]=new JsonObject{["spatial"]=new JsonObject{["anyOf"]=new JsonArray(spatial,new JsonObject{["type"]="null"})}},
             ["description"]="Actual combined-filter scope and per-page unavailable count; literal text/definition scope. Omitted when no additional filters were requested. bounds_kind identifies native versus conservative array envelope semantics."};
+    }
+    internal static JsonObject SummaryOutput()
+    {
+        static JsonObject Count() => new() { ["type"] = "integer", ["minimum"] = 0 };
+        static JsonObject Groups(string key) => new()
+        {
+            ["type"] = "array", ["items"] = Object(new JsonObject { [key] = Text(), ["count"] = Count() }, key, "count")
+        };
+        static JsonObject Point3() => new() { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = new JsonObject { ["type"] = "number" } };
+        var bounds = Object(new JsonObject
+        {
+            ["min"] = Point3(), ["max"] = Point3(), ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
+            ["kind"] = new JsonObject { ["const"] = "combined_candidate_envelope" }
+        }, "min", "max", "coordinate_system", "kind");
+        return Object(new JsonObject
+        {
+            ["summary_only"] = new JsonObject { ["const"] = true }, ["complete"] = new JsonObject { ["const"] = true },
+            ["total_count"] = Count(), ["by_type"] = Groups("type"), ["by_layer"] = Groups("layer"),
+            ["bounds"] = new JsonObject { ["anyOf"] = new JsonArray(bounds, new JsonObject { ["type"] = "null" }) },
+            ["bounds_unavailable_count"] = Count(), ["spatial_excluded_unavailable_bounds_count"] = Count(), ["space"] = Enum("model", "paper")
+        }, "summary_only", "complete", "total_count", "by_type", "by_layer", "bounds", "bounds_unavailable_count", "spatial_excluded_unavailable_bounds_count", "space");
     }
 }

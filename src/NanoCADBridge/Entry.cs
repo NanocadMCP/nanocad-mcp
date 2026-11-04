@@ -236,7 +236,8 @@ public sealed class Entry : IExtensionApplication
 #if BLOCK_POSITION_PROBE
             if (BlockPositionProbe.Pending) { _ready = false; return; }
 #endif
-            _queue.Pump(_reader!.Execute);
+            _queue.Pump((request, cancellation) => request.operation == WritePreviewRequest.Route
+                ? _writes!.Preview(request, cancellation) : _reader!.Execute(request, cancellation));
             _writes?.Pump();
 #if HATCH_UNDO_PROBE
             if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)

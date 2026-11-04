@@ -26,14 +26,14 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Download the installer or ready-to-run ZIP from [release 450](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/450).
+Download the installer or ready-to-run ZIP from [release 451](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/451).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-450.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-450.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-451.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-451.zip` | Manual setup, or installation from an extracted folder |
 
-The release page also provides `SHA256SUMS-450.txt` and archives of the source and documentation from the tagged build.
+The release page also provides `SHA256SUMS-451.txt` and archives of the source and documentation from the tagged build.
 
 ## Get started
 

@@ -19,9 +19,13 @@ internal static class PointSchema408
         {
             ["type"] = new JsonObject { ["type"] = "string", ["const"] = "Point" },
             ["layer"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 255, ["default"] = "0" },
-            ["position"] = Triple(), ["workplane"] = WorkplaneSchema.Input()
+            ["position"] = Triple(), ["workplane"] = WorkplaneSchema.Input(), ["position_snap"] = NativeCurveSnapSchema.Input()
         },
-        ["required"] = new JsonArray("type", "position"), ["description"] = Scope
+        ["required"] = new JsonArray("type"),
+        ["oneOf"] = new JsonArray(
+            new JsonObject { ["required"] = new JsonArray("position"), ["not"] = new JsonObject { ["required"] = new JsonArray("position_snap") } },
+            new JsonObject { ["required"] = new JsonArray("position_snap"), ["not"] = new JsonObject { ["required"] = new JsonArray("workplane") } }),
+        ["description"] = Scope + " To place a new Point at an existing native curve snap, supply position_snap instead of position and omit workplane. The created Point is independent."
     };
     internal static JsonObject PositionEdit() => new()
     {

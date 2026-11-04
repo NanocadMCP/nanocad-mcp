@@ -49,17 +49,12 @@ internal static class SchemaCompactor
             ?? throw new InvalidOperationException("Missing published variant branches.");
         if (items.ContainsKey("description"))
             throw new InvalidOperationException("Variant discovery would overwrite existing guidance.");
-        void MoveProse(JsonObject schema)
-        {
-            schema.Remove("description");
-            foreach (var child in Children(schema)) MoveProse(child);
-        }
         foreach (var branch in branches)
-            MoveProse(branch?.AsObject() ?? throw new InvalidOperationException("Invalid published branch."));
+            RemoveDescriptions(branch?.AsObject() ?? throw new InvalidOperationException("Invalid published branch."));
         string discriminator = operation == "create_entities" ? "kind or type" : "operation";
         items["description"] = "All input fields and validation remain inline. Field meanings and operating limits are in focused help. Before writing a variant, read " +
             $"get_guidance(topic=operation, operation={operation}, variant=exact {discriminator} value) " +
-            "for its full operating limits and complete input contract. No trial writes.";
+            "for its operating limits and item schema.";
         return JsonSerializer.SerializeToElement(root);
     }
 
@@ -86,30 +81,34 @@ internal static class SchemaCompactor
             ["required"] = new JsonArray("operation"),
             ["additionalProperties"] = true
         };
-        operations["description"] = "Ordered operations. Add the fields from each exact variant's focused input contract directly to its item. Follow the branch's batching and recovery rules.";
+        operations["description"] = "Ordered operations. Add the fields from each variant's focused item schema directly to its item.";
         return JsonSerializer.SerializeToElement(root);
     }
 
-    // Some MCP clients replace a root oneOf/anyOf without top-level properties by
-    // an empty object and then drop every argument. Publish the union of the
-    // alternatives: fields shared by all branches stay required, differing
-    // constraints are relaxed and branch values join one enum, so every request
-    // accepted before remains acceptable. The bridge still validates the exact branch.
+    // Some MCP clients discover arguments from top-level properties only.
+    // Expose the union of the fields for discovery. Keep the exact alternatives
+    // as a separate constraint, including their required and forbidden fields.
     public static JsonElement PublishFlatInput(JsonElement input)
     {
         var root = JsonNode.Parse(input.GetRawText())!.AsObject();
         if (root["properties"] is JsonObject || (root["oneOf"] is not JsonArray && root["anyOf"] is not JsonArray)) return input;
-        var notes = new List<string>();
-        var flat = Merge(Alternatives(root, notes).ToArray());
+        var flat = Merge(Alternatives(root).ToArray());
         flat["type"] = "object";
-        if (notes.Count > 0) flat["description"] = string.Join(" ", notes);
+        if (root["description"] is { } description) flat["description"] = description.DeepClone();
         else flat.Remove("description");
+        RemoveDescriptions(root);
+        flat["allOf"] = new JsonArray(root);
         return JsonSerializer.SerializeToElement(flat);
     }
 
-    private static IEnumerable<JsonObject> Alternatives(JsonObject node, List<string> notes)
+    private static void RemoveDescriptions(JsonObject schema)
     {
-        if (node["description"] is JsonValue note) notes.Add(note.GetValue<string>());
+        schema.Remove("description");
+        foreach (var child in Children(schema)) RemoveDescriptions(child);
+    }
+
+    private static IEnumerable<JsonObject> Alternatives(JsonObject node)
+    {
         var alternatives = node["oneOf"] as JsonArray ?? node["anyOf"] as JsonArray;
         if (alternatives is null) { yield return node; yield break; }
         foreach (var alternative in alternatives.OfType<JsonObject>())
@@ -129,7 +128,7 @@ internal static class SchemaCompactor
                     if (!required.Any(value => value!.GetValue<string>() == name)) required.Add(name);
                 branch["required"] = required;
             }
-            foreach (var leaf in Alternatives(branch, notes)) yield return leaf;
+            foreach (var leaf in Alternatives(branch)) yield return leaf;
         }
     }
 
@@ -152,23 +151,31 @@ internal static class SchemaCompactor
         }
         if (schemas.All(schema => schema["items"] is JsonObject))
             merged["items"] = Merge(schemas.Select(schema => (JsonObject)schema["items"]!).ToArray());
-        if (schemas.All(schema => schema["properties"] is JsonObject))
+        if (schemas.Any(schema => schema["properties"] is JsonObject))
         {
             var properties = new JsonObject();
-            foreach (string name in schemas.SelectMany(schema => ((JsonObject)schema["properties"]!).Select(pair => pair.Key)).Distinct(StringComparer.Ordinal))
-                properties[name] = Merge(schemas.Select(schema => schema["properties"]![name]).OfType<JsonObject>().ToArray());
+            foreach (string name in schemas.SelectMany(schema => (schema["properties"] as JsonObject ?? []).Select(pair => pair.Key)).Distinct(StringComparer.Ordinal))
+            {
+                var known = schemas.Select(schema => schema["properties"]?[name]).OfType<JsonObject>().ToArray();
+                bool unrestricted = schemas.Any(schema => schema["properties"]?[name] is not JsonObject && !HasClosedProperties(schema));
+                properties[name] = unrestricted || known.Length == 0 ? new JsonObject() : Merge(known);
+            }
             merged["properties"] = properties;
             var required = schemas
                 .Select(schema => (schema["required"] as JsonArray ?? []).Select(value => value!.GetValue<string>()))
                 .Aggregate((left, right) => left.Intersect(right, StringComparer.Ordinal).ToArray());
             if (required.Any()) merged["required"] = new JsonArray(required.Select(name => (JsonNode?)name).ToArray());
-            if (schemas.All(schema => schema["additionalProperties"] is JsonValue value && value.GetValueKind() == JsonValueKind.False))
+            if (schemas.All(HasClosedProperties))
                 merged["additionalProperties"] = false;
         }
         return merged;
     }
 
-    // Merged separately above; conditional and alternative keywords are left to the bridge validator.
+    private static bool HasClosedProperties(JsonObject schema) =>
+        schema["additionalProperties"] is JsonValue value && value.GetValueKind() == JsonValueKind.False &&
+        !schema.ContainsKey("patternProperties");
+
+    // Merged separately above. The exact schema retains every original condition.
     private static readonly HashSet<string> MergedKeywords =
         ["description", "enum", "const", "items", "properties", "required", "additionalProperties",
          "oneOf", "anyOf", "allOf", "if", "then", "else", "not", "prefixItems"];

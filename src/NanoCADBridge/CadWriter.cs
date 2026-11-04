@@ -14,7 +14,8 @@ internal sealed class CadWriter
     private readonly JsonLog _log;
     private readonly int _uiThread = Environment.CurrentManagedThreadId;
     public CadWriter(string instance, DocumentRegistry documents, JsonLog log) { _instance = instance; _documents = documents; _log = log; }
-    public DocumentState Preflight(IWriteArguments args, bool insideCommand, DocumentState? bound = null, Action? cancel = null)
+    public DocumentState Preflight(IWriteArguments args, bool insideCommand, DocumentState? bound = null, Action? cancel = null,
+        Action<object?>? observePlan = null)
     {
         if (Environment.CurrentManagedThreadId != _uiThread) throw new DomainException("UI_THREAD_MISMATCH", "Write access requires the host UI thread.");
         if (args.BridgeId != _instance) throw new DomainException("BRIDGE_UNAVAILABLE", "Request addresses another bridge lifetime.");
@@ -33,6 +34,7 @@ internal sealed class CadWriter
         using var tr = doc.Database.TransactionManager.StartTransaction();
         if (args is CreateArguments create)
         {
+            create = MaterializeSnaps(create,doc.Database,tr,cancel??(()=>{}));
             if(ProjectedDimensionWriter.Handles(create))ProjectedDimensionWriter.Preflight(create,state,tr,cancel??(()=>{}));
             else if(ModelExtrusionCreator.Handles(create))ModelExtrusionCreator.Preflight(create,state,tr);
             else Resolve(create, doc.Database, tr,cancel);
@@ -87,7 +89,17 @@ internal sealed class CadWriter
                 var expanded=CadTableFormulaRange350.Expand(modify,state,tr,cancel??(()=>{}));
                 CadModifier.Resolve(expanded,doc.Database,tr,cancel??(()=>{}));
             }
-            else CadModifier.Resolve(modify, doc.Database, tr, cancel ?? (() => { }));
+            else
+            {
+                var check=cancel??(()=>{});
+                var resolved=CadModifier.Resolve(modify,doc.Database,tr,check);
+                if(observePlan!=null)
+                {
+                    if(modify.Operations is [NativeContourFinishingSpec342])
+                        observePlan(CadNativeContourFinishing342.Preview(modify,resolved,doc.Database,tr,check,includeGeometry:true));
+                    else CadModifier.Preview(modify,resolved,tr,check);
+                }
+            }
         }
         else if (args is StructureWriteArguments structure)
         {
@@ -111,6 +123,18 @@ internal sealed class CadWriter
         { if(parameter.ScopeHandles!=null)ModelMultiExpressionWriter.Preflight(parameter,state,tr,cancel);else if(parameter.UsesExpressionPlan) ModelExpressionWriter.Preflight(parameter,state,tr,cancel); else ModelParameterWriter.Preflight(parameter,state,tr,cancel); }
         else throw new DomainException("INVALID_ARGUMENT", "Unknown write payload.");
         return state;
+    }
+
+    private static CreateArguments MaterializeSnaps(CreateArguments args, Database database, Transaction tr, Action cancel)
+    {
+        if (!args.Entities.Any(entity => entity is PointFromNativeSnapSpec or LineFromNativeSnapSpec)) return args;
+        var space = CadWriteSpace.Resolve(database, tr, args.TargetSpace);
+        return args with { Entities = args.Entities.Select<EntitySpec, EntitySpec>(entity => entity switch
+        {
+            PointFromNativeSnapSpec point => CadNativeCurveSnap.ResolvePoint(point, database, tr, space, cancel),
+            LineFromNativeSnapSpec line => CadNativeCurveSnap.ResolveLine(line, database, tr, space, cancel),
+            _ => entity
+        }).ToArray() };
     }
     private sealed record Dependencies(ObjectId Model, ObjectId[] Layers, ObjectId[] Styles, ObjectId[] AnnotationStyles, ObjectId[][] SolidSources,CadAssociativeHatch.Boundary?[] HatchBoundaries);
     private static Dependencies Resolve(CreateArguments args, Database db, Transaction tr,Action? cancel=null)
@@ -219,6 +243,7 @@ internal sealed class CadWriter
         {
             case WipeoutSpec431 mask:return CadWipeout431.CreateLocal(mask,cancel);
             case PointSpec408 point: return CadPointEditor408.Create(point);
+            case ResolvedNativeSnapLineSpec lineFromSnap: return CadNativeCurveSnap.CreateLine(lineFromSnap);
             case ConstructionCurve443 construction: return CadConstructionCurve443.Create(construction);
             case SmoothPolylineSpec409 smooth:return CadSmoothPolylineCreator409.CreateLocal(smooth,cancel);
             case FitSplineSpec408 fitSpline: return CadFitSplineCreator408.CreateLocal(fitSpline);
@@ -423,6 +448,7 @@ internal sealed class CadWriter
             object data;
             if (args is CreateArguments create)
             {
+                create = MaterializeSnaps(create,state.Document.Database,tr,job.CheckCancellation);
                 var dependencies = Resolve(create, state.Document.Database, tr,job.CheckCancellation);
                 var fitReports=new List<SmoothPolylineFit409>();
                 // Construct every detached entity before opening Model Space for write.
@@ -480,6 +506,7 @@ internal sealed class CadWriter
                     if(create.Entities[i] is SmoothPolylineSpec409 smooth)
                         fitReports[fitReports.FindIndex(report=>report.entity_index==i)]=CadSmoothPolylineCreator409.VerifyCreated((Polyline)entities[i],smooth,i,job.CheckCancellation);
                     if(create.Entities[i] is PointSpec408 pointSpec)CadPointEditor408.VerifyCreated((DBPoint)entities[i],pointSpec,job.CheckCancellation);
+                    if(create.Entities[i] is ResolvedNativeSnapLineSpec snappedLine)CadNativeCurveSnap.VerifyLine((Line)entities[i],snappedLine);
                     if(create.Entities[i] is ConstructionCurve443 construction)CadConstructionCurve443.VerifyCreated(entities[i],construction,job.CheckCancellation);
                     if(create.Entities[i] is FitSplineSpec408 fitSpline)CadFitSplineCreator408.VerifyCreated((Spline)entities[i],fitSpline,job.CheckCancellation);
                     if(create.Entities[i] is SpatialFitSplineSpec441 spatialSpline)CadSpatialCurveCreator441.VerifyCreated((Spline)entities[i],spatialSpline,job.CheckCancellation);

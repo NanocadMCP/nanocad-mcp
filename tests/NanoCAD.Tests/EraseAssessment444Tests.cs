@@ -64,7 +64,8 @@ internal static class EraseAssessment444Tests
             var flag = inspect.InputSchema.GetProperty("properties").GetProperty("erase_assessment");
             Check(flag.GetProperty("type").GetString() == "boolean" && !flag.GetProperty("default").GetBoolean(), "Published opt-in flag changed.");
             Check(!inspect.InputSchema.GetProperty("required").EnumerateArray().Any(value => value.GetString() == "erase_assessment"), "Assessment became mandatory.");
-            Check(inspect.Description!.Contains("exact complete selected handle set", StringComparison.Ordinal), "Whole-selected-set scope missing.");
+            Check(flag.GetProperty("description").GetString()!.Contains("all requested handles together", StringComparison.Ordinal),
+                "Whole-selected-set scope missing from the published opt-in field.");
             var output = inspect.OutputSchema!.Value.GetRawText();
             Check(output.Contains("erase_assessment") && output.Contains("not_assessed") && output.Contains("rechecked_at_write"), "Output omits technical admission versus permission.");
             var erase = ReadPreparation433.Extract("inspect_objects", Input(new { document_id = Document, handles = new[] { "A1" },

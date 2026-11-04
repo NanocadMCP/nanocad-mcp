@@ -107,7 +107,7 @@ public static partial class ModifyValidation
     private static double Number(JsonElement value, string path, double min = -1e9, double max = 1e9)
     {
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var number) || !double.IsFinite(number) || number < min || number > max)
-            throw Invalid(path, "Number is not finite or outside the supported range.", "INVALID_GEOMETRY");
+            throw InputError.Create(path, "Expected a finite number in the supported range.", new { minimum = min, maximum = max }, "INVALID_GEOMETRY");
         return number == 0 ? 0 : number;
     }
     private static Point2 Point(JsonElement value, string name, string path)
@@ -128,7 +128,7 @@ public static partial class ModifyValidation
         string bridge = Id("bridge_instance_id"), document = Id("document_id"), operation = Id("operation_id");
         string revision = Text(value, "expected_revision", "$", 20), units = Text(value, "units", "$", 32);
         if (revision.Any(c => c is < '0' or > '9') || !ulong.TryParse(revision, NumberStyles.None, CultureInfo.InvariantCulture, out var revisionNumber)) throw Invalid("$.expected_revision", "Expected decimal uint64 string.");
-        if (units != "Millimeters") throw Invalid("$.units", "Explicit Millimeters required.", "UNSUPPORTED_UNITS");
+        if (units != "Millimeters") throw InputError.Create("$.units", "Expected Millimeters.", new[] { "Millimeters" }, "UNSUPPORTED_UNITS");
         var operations = Required(value, "operations", "$");
         if (operations.ValueKind != JsonValueKind.Array || operations.GetArrayLength()<1) throw Invalid("$.operations", "Expected a nonempty operation list.");
         var edits = new List<EditSpec>(); var all = new HashSet<string>(StringComparer.Ordinal); var erased = new HashSet<string>(StringComparer.Ordinal);
@@ -253,7 +253,7 @@ public static partial class ModifyValidation
                 case "trim_curve":
                 case "extend_curve":
                 case "offset_curve":
-                    if(kind=="offset_curve"&&item.TryGetProperty("side",out var nativeSide)&&nativeSide.ValueKind==JsonValueKind.String&&NativeContourOffsetValidation341.HandlesSide(Text(item,"side",path,16)))
+                    if(kind=="offset_curve"&&NativeContourOffsetValidation341.NativeMode(item,path))
                     {
                         edits.Add(NativeContourOffsetValidation341.Parse(item,path,ids));
                         break;

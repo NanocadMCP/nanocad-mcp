@@ -30,6 +30,13 @@ internal static class NativeContourOffset341Tests
             Need(native.TargetSpace=="paper"&&native.Operations.Single() is NativeOffsetCurveSpec341{SignedDistance:-.00001},"Actual parse/Paper route differs.");
             var legacy=ModifyValidation.Parse(Payload(new{operation="offset_curve",handles=new[]{"A1"},side="left",distance=5}));
             Need(legacy.Operations.Single() is OffsetCurveSpec{Side:"left",Distance:5},"Legacy offset was rerouted.");
+            var explicitLegacy=ModifyValidation.Parse(Payload(new{operation="offset_curve",mode="legacy",handles=new[]{"A1"},side="left",distance=5}));
+            Need(explicitLegacy.Fingerprint()==legacy.Fingerprint(),"Explicit legacy mode changed existing behavior or request identity.");
+            var signed=ModifyValidation.Parse(Payload(new{operation="offset_curve",handles=new[]{"A1"},signed_distance=-.00001}));
+            Need(signed.Fingerprint()==native.Fingerprint(),"Signed native distance did not select the same existing native behavior.");
+            Reject(()=>ModifyValidation.Parse(Payload(new{operation="offset_curve",handles=new[]{"A1"},signed_distance=-2d,side="native_negative",distance=2d})));
+            Reject(()=>ModifyValidation.Parse(Payload(new{operation="offset_curve",mode="legacy",handles=new[]{"A1"},signed_distance=-2d})));
+            Reject(()=>ModifyValidation.Parse(Payload(new{operation="offset_curve",mode="native",handles=new[]{"A1"},side="left",distance=5d})));
             Reject(()=>ModifyValidation.Parse(Payload(new{operation="offset_curve",handles=new[]{"A1"},side="left",distance=.00001})),"INVALID_GEOMETRY");
             Reject(()=>ModifyValidation.Parse(Payload(new{operation="offset_curve",handles=new[]{"A1"},side="native_positive",distance=2},new{operation="erase",handles=new[]{"A2"}})),"INVALID_OPERATION_ORDER");
             var variants=ToolCatalog.Tools.Single(tool=>tool.Name=="nanocad.modify_entities").InputSchema.GetProperty("properties").GetProperty("operations").GetProperty("items").GetProperty("oneOf")

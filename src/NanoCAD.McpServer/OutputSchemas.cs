@@ -591,13 +591,24 @@ internal static class OutputSchemas
                 ("complete", Bool()), ("next_cursor", Nullable(Text())), ("selection_revision", Nullable(Text()))),
             _ => Object(("items", Array(Ref("item"))), ("complete", Bool()), ("failed_count", Integer()))
         };
-        if(operation=="query_objects")data["properties"]!["match_semantics"]=TargetedReadSchema407.MatchSemanticsOutput();
+        if (operation == "query_objects")
+        {
+            data["properties"]!["match_semantics"] = TargetedReadSchema407.MatchSemanticsOutput();
+            data = new JsonObject { ["anyOf"] = new JsonArray(data, TargetedReadSchema407.SummaryOutput()) };
+        }
         if(operation=="inspect_objects")data["properties"]!["erase_assessment"]=EraseAssessmentSchema444.Output();
+        definitions["context"]!["properties"]!["write_revision"] = Nullable(Text());
+        bool write = NanoCAD.Contracts.Wire.WriteOperations.Contains(operation);
+        var preview = Object(("operation", Text()), ("status", new JsonObject { ["const"] = "validated" }),
+            ("document_changed", new JsonObject { ["const"] = false }), ("validation_scope", Text()),
+            ("predicted_effects", Nullable(AnyObject())));
         var envelope = Object(("contract_version", Text()), ("request_id", Text()), ("success", Bool()), ("context", Nullable(Ref("context"))),
-            ("data", Nullable(operation is "create_entities" or "modify_entities" or "modify_structure" or "set_model_parameter" or "manage_document" or "set_view"
-                ? new JsonObject{["anyOf"]=new JsonArray(data,OperationResultSchema432.CompactWriteData())}
+            ("data", Nullable(write
+                ? new JsonObject{["anyOf"]=new JsonArray(data,OperationResultSchema432.CompactWriteData(),preview)}
                 : data)), ("error", Nullable(Ref("error"))), ("warnings", Array(Text())));
         envelope["properties"]!["receipt"] = OperationResultSchema432.Receipt();
+        if (write) envelope["properties"]!["write_state"] = Nullable(Object(("status", Text()), ("context", Nullable(Ref("context"))),
+            ("observations", Nullable(AnyObject())), ("reason", Nullable(Text()))));
         if (ReadPreparation433.Readers.Contains(operation, StringComparer.Ordinal)) envelope["properties"]!["preparation"] = ReadPreparationSchema433.Output();
         KeepReferencedDefinitions(envelope,definitions);
         envelope["$defs"] = definitions;

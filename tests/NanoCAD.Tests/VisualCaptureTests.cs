@@ -71,6 +71,64 @@ internal static class VisualCaptureTests
             VisualCaptureService.RequireCaptureArea(args with { ViewportOnly = false }, Wire.Element(new { }));
             return Task.CompletedTask;
         });
+        await test("WCS region capture validates bounds and requires bridge camera binding", () =>
+        {
+            var input = JsonSerializer.SerializeToNode(Input())!;
+            input["bounds"] = System.Text.Json.Nodes.JsonNode.Parse("""{"min":[-7,2],"max":[8,3]}""");
+            var args = VisualCaptureSchema.Parse(Wire.Element(input));
+            var bounds = new CaptureWorldBounds(-7, 2, 8, 3, 0);
+            if (!args.RequiresViewport || args.Bounds != bounds) throw new Exception("Bounds or z default lost");
+            foreach (var bad in new[] { "null", "{}", """{"min":[1,1],"max":[1,2]}""", """{"min":[0,0,0],"max":[1,1]}""",
+                """{"min":[0,0],"max":[1e400,1]}""", """{"min":[0,0],"max":[1,1],"z":"0"}""",
+                """{"min":[0,0],"max":[1,1],"z":0,"z":1}""", """{"min":[0,0],"max":[1,1],"pixels":true}""" })
+                Deny(() => CaptureWorldBounds.Parse(JsonDocument.Parse(bad).RootElement), "INVALID_ARGUMENT");
+            string id = Guid.NewGuid().ToString("N"), camera = new('A', 64);
+            var relay = VisualCaptureBridgeArguments.Parse(Wire.Element(new
+            {
+                bridge_instance_id = bridge, capture_id = id, max_edge = 1600, bounds = bounds.ToWire(), expected_camera_token = camera
+            }));
+            if (relay.Bounds != bounds || relay.CameraToken != camera || !relay.RequiresViewport) throw new Exception("Bounds relay lost camera or region");
+            Deny(() => VisualCaptureBridgeArguments.Parse(Wire.Element(new { bridge_instance_id = bridge, capture_id = id, max_edge = 1600, bounds = bounds.ToWire() })), "INVALID_ARGUMENT");
+            return Task.CompletedTask;
+        });
+        await test("WCS region maps logical canvas pixels to physical pixels and excludes layout chrome", () =>
+        {
+            var native = CaptureViewportPixels.Bind(1136, 479, 1136, 500, 1420, 625);
+            if (native != new CaptureViewportPixels(1420, 598, 1.25)) throw new Exception("Incorrect physical pixel scale or drawing extent.");
+            var identity = CaptureViewportPixels.Bind(1136, 479, 1136, 500, 1136, 500);
+            if (identity != new CaptureViewportPixels(1136, 479, 1)) throw new Exception("100 percent DPI must remain unchanged.");
+            Deny(() => CaptureViewportPixels.Bind(750, 479, 1136, 500, 1420, 625), "CAPTURE_BOUNDS_UNAVAILABLE");
+            Deny(() => CaptureViewportPixels.Bind(1136, 479, 1136, 500, 1420, 610), "CAPTURE_BOUNDS_UNAVAILABLE");
+            return Task.CompletedTask;
+        });
+        await test("WCS region uses a conservative viewport pixel envelope", () =>
+        {
+            var crop = CapturePixelRect.Enclose((12.75, 17), (25.5, 5.25), (30, 30.1), (42.75, 18.35), 80, 60);
+            if (crop != new CapturePixelRect(12, 5, 43, 31)) throw new Exception("Fractional or rotated bounds were truncated");
+            var entire = CapturePixelRect.Enclose((0, 60), (80, 60), (0, 0), (80, 0), 80, 60);
+            if (entire != new CapturePixelRect(0, 0, 80, 60)) throw new Exception("Viewport boundary should be allowed");
+            Deny(() => CapturePixelRect.Enclose((0, 5), (70, 5), (0, 30), (80.1, 30), 80, 60), "CAPTURE_BOUNDS_OUTSIDE_VIEWPORT");
+            Deny(() => CapturePixelRect.Enclose((2, 2), (3, 3), (4, 4), (5, 5), 80, 60), "CAPTURE_BOUNDS_UNAVAILABLE");
+            Deny(() => CapturePixelRect.Enclose((double.NaN, 2), (3, 3), (4, 5), (5, 6), 80, 60), "CAPTURE_BOUNDS_UNAVAILABLE");
+            return Task.CompletedTask;
+        });
+        await test("WCS region discards whole viewport, wrong bounds and contradictory worker pixels", () =>
+        {
+            var args = VisualCaptureSchema.Parse(Wire.Element(Input())) with { Bounds = new(-2, -3, 2, 3, 1) };
+            JsonElement Reply(CaptureWorldBounds? bounds, CapturePixelRect crop, int width = 40) => Wire.Element(new
+            {
+                viewport_only = true, capture_document_id = document, capture_revision = args.Revision, capture_bounds = bounds?.ToWire(),
+                crop_pixels = crop, viewport_width = 100, viewport_height = 60, source_width = width, source_height = 30
+            });
+            var region = new CapturePixelRect(10, 15, 50, 45);
+            VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds, region));
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Wire.Element(new { })), "CAPTURE_BOUNDS_UNAVAILABLE");
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(null, region)), "CAPTURE_BOUNDS_UNAVAILABLE");
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds! with { Z = 0 }, region)), "CAPTURE_BOUNDS_UNAVAILABLE");
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds, region, 41)), "CAPTURE_BOUNDS_UNAVAILABLE");
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds, new(80, 15, 120, 45))), "CAPTURE_BOUNDS_UNAVAILABLE");
+            return Task.CompletedTask;
+        });
         await test("visual capture inline image crosses the real IPC text-page budget", async () =>
         {
             var descriptor = Discovery.Describe(bridge, "capture-transport-test");

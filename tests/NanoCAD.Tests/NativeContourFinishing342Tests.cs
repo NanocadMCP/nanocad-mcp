@@ -43,5 +43,52 @@ internal static class NativeContourFinishing342Tests
             }
             return Task.CompletedTask;
         });
+        await test("native trim accepts one explicit curve snap and a kept-piece preview count",()=>
+        {
+            var pick=new { handle="0a1",expected_curve_token=token.ToLowerInvariant(),snap="nearest",reference_point_wcs=new[]{4d,5d,6d},tolerance=.1 };
+            var trim=new { operation="trim_curve",handles=new[]{"A1"},boundary_handles=new[]{"A2"},expected_curve_token=token,pick_snap=pick,expected_kept_pieces=2 };
+            var parsed=Parse(trim,"trim_curve");
+            Need(parsed.PickSnap is { Handle:"A1", Snap:"nearest", Tolerance:.1 } snap && snap.ExpectedCurveToken==token &&
+                snap.ReferencePointWcs==new Point3(4,5,6) && parsed.PickPointWcs==null && parsed.ExpectedKeptPieces==2,"Resolved input meaning or preview guard lost.");
+            Reject(()=>Parse(new{trim.operation,trim.handles,trim.boundary_handles,trim.expected_curve_token,trim.pick_snap,pick_point_wcs=new[]{4d,5d,6d}},"trim_curve"));
+            Reject(()=>Parse(new{trim.operation,trim.handles,trim.boundary_handles,trim.expected_curve_token,trim.pick_snap,expected_kept_pieces=0},"trim_curve"));
+            Reject(()=>Parse(new{trim.operation,trim.handles,trim.boundary_handles,trim.expected_curve_token,trim.pick_snap,mode="legacy"},"trim_curve"));
+            var extend=Parse(new{operation="extend_curve",handles=new[]{"A1"},expected_curve_token=token,end="end",target_point_wcs=new[]{5d,6d,7d}},"extend_curve");
+            Need(extend.TargetPointWcs==new Point3(5,6,7),"Unambiguous native extension inputs did not select native dispatch.");
+            return Task.CompletedTask;
+        });
+        await test("Point placement accepts a finite existing-curve intersection snap as its WCS coordinate",()=>
+        {
+            var pick=new{handle="A1",expected_curve_token=token,snap="intersection",other_handle="0a2",other_expected_curve_token=token,
+                reference_point_wcs=new[]{4d,5d,6d},tolerance=.5};
+            EntitySpec ParsePoint(object value)=>CreateValidation.ParseEntities(Wire.Element(new[]{value}),allowDimensions:true).Single();
+            var value=ParsePoint(new{type="Point",position_snap=pick});
+            Need(value is PointFromNativeSnapSpec { PositionSnap:{ Snap:"intersection",OtherHandle:"A2",Tolerance:.5 } },"Intersection snap did not reach the normal Point route.");
+            Need(ParsePoint(new{type="Point",position=new[]{4d,5d,6d}}) is PointSpec408,"Literal Point behavior changed.");
+            Reject(()=>ParsePoint(new{type="Point",position_snap=pick,position=new[]{4d,5d,6d}}));
+            Reject(()=>ParsePoint(new{type="Point",position_snap=pick,workplane=new{origin=new[]{0,0,0}}}));
+            Reject(()=>ParsePoint(new{type="Point",position_snap=new{pick.handle,pick.expected_curve_token,pick.snap,other_handle="0a1",pick.other_expected_curve_token,pick.reference_point_wcs,pick.tolerance}}));
+            Reject(()=>ParsePoint(new{type="Point",position_snap=new{pick.handle,pick.expected_curve_token,snap="nearest",pick.reference_point_wcs,tolerance=0d}}));
+            return Task.CompletedTask;
+        });
+        await test("Line endpoints can independently use literal coordinates or native snaps",()=>
+        {
+            var start=new{handle="A1",expected_curve_token=token,snap="start"};
+            var end=new{handle="A2",expected_curve_token=token,snap="mid"};
+            EntitySpec ParseLine(object value)=>CreateValidation.ParseEntities(Wire.Element(new[]{value}),allowDimensions:true).Single();
+            Need(ParseLine(new{type="Line",start_snap=start,end_snap=end}) is LineFromNativeSnapSpec
+                {Start:null,End:null,StartSnap:{Snap:"start"},EndSnap:{Snap:"mid"}},"Snapped endpoints did not reach native Line construction.");
+            Need(ParseLine(new{type="Line",start=new[]{1d,2d},end_snap=end}) is LineFromNativeSnapSpec
+                {Start:{X:1,Y:2},StartSnap:null,EndSnap:{Snap:"mid"}},"Mixed literal/snapped endpoints lost their independent meaning.");
+            Need(ParseLine(new{type="Line",start=new[]{1d,2d},end=new[]{3d,4d}}) is LineSpec,"Literal Line behavior changed.");
+            Reject(()=>ParseLine(new{type="Line",start=new[]{1d,2d},start_snap=start,end_snap=end}));
+            Reject(()=>ParseLine(new{type="Line",start_snap=start}));
+            Reject(()=>ParseLine(new{type="Line",start_snap=start,end_snap=end,workplane=new{origin=new[]{0,0,0}}}));
+            var entities=ToolCatalog.Tools.Single(t=>t.Name=="nanocad.create_entities").InputSchema.GetProperty("properties").GetProperty("entities").GetProperty("items").GetProperty("oneOf");
+            var line=entities.EnumerateArray().Single(branch=>branch.GetProperty("properties").GetProperty("type").GetProperty("const").GetString()=="Line");
+            Need(line.GetProperty("properties").GetProperty("start_snap").GetProperty("properties").TryGetProperty("expected_curve_token",out _) &&
+                line.GetProperty("properties").TryGetProperty("end_snap",out _),"The focused Line schema hides snap inputs.");
+            return Task.CompletedTask;
+        });
     }
 }

@@ -7,6 +7,7 @@ using NanoCAD.Ipc;
 using Multicad.DatabaseServices;
 using Teigha.Geometry;
 using Application = HostMgd.ApplicationServices.Application;
+using NativePoint = Multicad.Geometry.Point3d;
 
 namespace NanoCADBridge;
 
@@ -17,10 +18,13 @@ internal static class DesktopCaptureBridge
     // The IPC listener never accepts this operation. Only capture_window queues it.
     internal const string ViewportTargetRead = "internal_capture_viewport_target";
     private sealed record ViewportTarget(IntPtr Window, int Width, int Height, int ViewportNumber,
-        string NativeDocument, string DocumentId, string Revision);
+        string NativeDocument, string DocumentId, string Revision, RegionProjection? Region);
+    private sealed record RegionProjection(CapturePixelRect Crop, (double, double) Origin, (double, double) X,
+        (double, double) Y, (double, double) Far);
 
     internal static Result ReadViewportTarget(Request request, DocumentRegistry documents)
     {
+        var args = VisualCaptureBridgeArguments.Parse(request.arguments);
         var document = Application.DocumentManager.MdiActiveDocument
             ?? throw new DomainException("NO_DOCUMENT", "No active drawing is open.");
         if (HostReadGate.IsBusy(document))
@@ -36,21 +40,48 @@ internal static class DesktopCaptureBridge
         int viewport = number switch { int n => n, short n => n, _ => 0 };
         if (viewport <= 0 || view.Handle == IntPtr.Zero || view.DocID.IsNull ||
             Application.GetSystemVariable("SCREENSIZE") is not Point2d size ||
-            size.X < 1 || size.Y < 1 || size.X > int.MaxValue || size.Y > int.MaxValue ||
+            !double.IsFinite(size.X) || !double.IsFinite(size.Y) || size.X < 1 || size.Y < 1 || size.X > int.MaxValue || size.Y > int.MaxValue ||
             size.X != Math.Truncate(size.X) || size.Y != Math.Truncate(size.Y))
             throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "Native drawing window or viewport pixel dimensions are unavailable.");
 
-        var target = new ViewportTarget(view.Handle, (int)size.X, (int)size.Y, viewport,
-            view.DocID.ToString(), state.Id, revision);
+        RegionProjection? region = null;
+        int pixelWidth = (int)size.X, pixelHeight = (int)size.Y;
+        if (args.Bounds is { } bounds)
+        {
+            if (!document.Database.TileMode || (int)document.Database.Insunits != 4)
+                throw new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "WCS bounds capture requires Model space with millimetre drawing units.");
+            var camera = CameraViewReader.Read(args.BridgeId, state).view;
+            if (camera == null)
+                throw new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "WCS bounds capture requires an unclipped orthographic Model view.");
+            if (camera.camera_token != args.CameraToken)
+                throw new DomainException("CAMERA_CONTEXT_CHANGED", "The camera changed before the native bounds projection.", true);
+            // The native window DC may use logical pixels; WGC uses physical pixels.
+            if (!view.MatrWorldToDC(out var matrix))
+                throw new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "The native renderer did not supply its orthographic pixel projection.");
+            var mapping = DesktopViewportPixels.Read(view.Handle, pixelWidth, pixelHeight);
+            pixelWidth = mapping.Width; pixelHeight = mapping.Height;
+            (double, double) Project(double x, double y)
+            {
+                var pixel = new NativePoint(x, y, bounds.Z).TransformBy(matrix);
+                return (pixel.X * mapping.Scale, pixel.Y * mapping.Scale);
+            }
+            var origin = Project(bounds.MinX, bounds.MinY);
+            var x = Project(bounds.MaxX, bounds.MinY);
+            var y = Project(bounds.MinX, bounds.MaxY);
+            var far = Project(bounds.MaxX, bounds.MaxY);
+            region = new(CapturePixelRect.Enclose(origin, x, y, far, pixelWidth, pixelHeight), origin, x, y, far);
+        }
+        var target = new ViewportTarget(view.Handle, pixelWidth, pixelHeight, viewport,
+            view.DocID.ToString(), state.Id, revision, region);
         if (!ReferenceEquals(Application.DocumentManager.MdiActiveDocument, document) || state.Revision != revision)
             throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The document changed during viewport observation.", true);
         return Result.Ok(request.requestId, target);
     }
 
-    private static async Task<ViewportTarget> GetViewportTarget(ReadQueue queue, CancellationToken cancellation)
+    private static async Task<ViewportTarget> GetViewportTarget(ReadQueue queue, JsonElement arguments, CancellationToken cancellation)
     {
         var result = await queue.SubmitAsync(new Request(Wire.Version, Guid.NewGuid().ToString("D"),
-            ViewportTargetRead, 2000, Wire.Element(new { })), cancellation);
+            ViewportTargetRead, 2000, arguments), cancellation);
         if (result.error is { } error)
             throw new DomainException(error.code, error.message, error.retryable, error.details);
         return result.data as ViewportTarget
@@ -73,7 +104,8 @@ internal static class DesktopCaptureBridge
         var args=VisualCaptureBridgeArguments.Parse(request.arguments);
         if(args.BridgeId!=descriptor.bridge_instance_id)throw new DomainException("BRIDGE_UNAVAILABLE","Capture targets another bridge lifetime.");
         var window=MainWindow();
-        var viewport = args.ViewportOnly ? await GetViewportTarget(queue, cancellation) : null;
+        var viewport = args.RequiresViewport ? await GetViewportTarget(queue, request.arguments, cancellation) : null;
+        var crop = viewport?.Region?.Crop;
         string root=LocalSecurity.SecureDirectory(Path.Combine(Discovery.Root,"visual-captures"));
         string directory=Path.Combine(root,args.InlineImage ? Guid.NewGuid().ToString("N") : args.CaptureId);
         if(args.InlineImage)LocalSecurity.SecureDirectory(directory);
@@ -95,6 +127,12 @@ internal static class DesktopCaptureBridge
             foreach (var value in new[] { "--viewport", viewport.Window.ToInt64().ToString(CultureInfo.InvariantCulture),
                 viewport.Width.ToString(CultureInfo.InvariantCulture), viewport.Height.ToString(CultureInfo.InvariantCulture) })
                 start.ArgumentList.Add(value);
+        if (crop != null)
+        {
+            start.ArgumentList.Add("--region");
+            foreach (var edge in new[] { crop.left, crop.top, crop.right, crop.bottom })
+                start.ArgumentList.Add(edge.ToString(CultureInfo.InvariantCulture));
+        }
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(TimeSpan.FromSeconds(8));
         string output;
@@ -110,7 +148,18 @@ internal static class DesktopCaptureBridge
                 await child.WaitForExitAsync(deadline.Token);
                 output=await stdout;_ = await stderr;
                 if (child.ExitCode == 4 && viewport != null)
-                    throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The active viewport could not be matched to the captured window. Request the whole window for this view.");
+                {
+                    string? reason = null;
+                    try
+                    {
+                        using var failure = JsonDocument.Parse(output);
+                        if (failure.RootElement.TryGetProperty("reason", out var value) && value.ValueKind == JsonValueKind.String)
+                            reason = value.GetString();
+                    }
+                    catch (JsonException) { }
+                    throw new DomainException(crop == null ? "CAPTURE_VIEWPORT_UNAVAILABLE" : "CAPTURE_BOUNDS_UNAVAILABLE",
+                        "The active viewport could not be matched to the captured window.", false, new { reason });
+                }
                 if(child.ExitCode!=0||output.Length>8192)
                     throw new DomainException("CAPTURE_FAILED","Windows did not provide a usable window image.");
             }
@@ -128,11 +177,15 @@ internal static class DesktopCaptureBridge
             throw new DomainException("CAPTURE_FAILED","Desktop worker identity or result differs.");
         if (viewport != null)
         {
+            int sourceWidth = crop == null ? viewport.Width : crop.right - crop.left;
+            int sourceHeight = crop == null ? viewport.Height : crop.bottom - crop.top;
             if (!frame.TryGetProperty("viewport_only", out var applied) || applied.ValueKind != JsonValueKind.True ||
-                frame.GetProperty("source_width").GetInt32() != viewport.Width ||
-                frame.GetProperty("source_height").GetInt32() != viewport.Height)
+                frame.GetProperty("source_width").GetInt32() != sourceWidth ||
+                frame.GetProperty("source_height").GetInt32() != sourceHeight)
                 throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The visual worker did not confirm the native viewport crop.");
-            if (await GetViewportTarget(queue, cancellation) != viewport)
+            if (crop != null && (!frame.TryGetProperty("crop_pixels", out var appliedCrop) || CapturePixelRect.Read(appliedCrop) != crop))
+                throw new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "The visual worker did not confirm the requested bounds crop.");
+            if (await GetViewportTarget(queue, request.arguments, cancellation) != viewport)
                 throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The active native viewport changed during capture.", true);
         }
         var info=new FileInfo(framePath);
@@ -142,6 +195,7 @@ internal static class DesktopCaptureBridge
         return Result.Ok(request.requestId,new{
             capture_id=args.CaptureId,process_id=descriptor.process_id,
             viewport_only=viewport!=null, capture_document_id=viewport?.DocumentId, capture_revision=viewport?.Revision,
+            capture_bounds=args.Bounds?.ToWire(), crop_pixels=crop, viewport_width=viewport?.Width, viewport_height=viewport?.Height,
             png_base64=args.InlineImage ? Convert.ToBase64String(await File.ReadAllBytesAsync(framePath,cancellation)) : null,
             width=frame.GetProperty("width").GetInt32(),height=frame.GetProperty("height").GetInt32(),
             source_width=frame.GetProperty("source_width").GetInt32(),source_height=frame.GetProperty("source_height").GetInt32(),

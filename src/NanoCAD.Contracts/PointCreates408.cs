@@ -3,6 +3,7 @@ using System.Text.Json;
 namespace NanoCAD.Contracts;
 
 public sealed record PointSpec408(Point3 Position, string LayerName) : EntitySpec("Point", LayerName);
+public sealed record PointFromNativeSnapSpec(NativeCurveSnap PositionSnap, string LayerName) : EntitySpec("Point", LayerName);
 
 public static class PointCoordinates408
 {
@@ -29,9 +30,14 @@ public static class PointCoordinates408
 
 public static partial class CreateValidation
 {
-    internal static PointSpec408 ParsePoint408(JsonElement item, string path, string layer)
+    internal static EntitySpec ParsePoint408(JsonElement item, string path, string layer)
     {
-        Shape(item, path, "type", "layer", "position");
-        return new(PointCoordinates408.Parse(Required(item, "position", path), path + ".position"), layer);
+        Shape(item, path, "type", "layer", "position", "position_snap");
+        if (item.TryGetProperty("position_snap", out var snap))
+        {
+            if (item.TryGetProperty("position", out _)) throw Invalid(path, "Choose one position or position_snap.");
+            return new PointFromNativeSnapSpec(NativeCurveSnap.Parse(snap, path + ".position_snap"), layer);
+        }
+        return new PointSpec408(PointCoordinates408.Parse(Required(item, "position", path), path + ".position"), layer);
     }
 }

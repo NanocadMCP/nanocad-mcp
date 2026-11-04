@@ -13,8 +13,8 @@ internal static class CadNativeContourFinishing342
 {
     private sealed record PlaneValue(Point3d Point,Vector3d Normal);
     private sealed record State(JsonElement Shape,JsonElement Display,JsonElement Metadata,PlaneValue? Plane);
-    private sealed record Plan(Curve Source,State Before,Curve[] Boundaries,State[] BoundaryStates,double[] Cuts,Point3d? Pick,Point3d[] RetainedPoints,string[] Warnings);
-    private sealed record Generated(Entity[] Owned,Curve[] Kept,JsonElement[] Shapes);
+    private sealed record Plan(Curve Source,State Before,Curve[] Boundaries,State[] BoundaryStates,double[] Cuts,Point3d? Pick,Point3d[] RetainedPoints,string[] Warnings,int? ExpectedKeptPieces);
+    private sealed record Generated(Entity[] Owned,Curve[] Kept,JsonElement[] Shapes,JsonElement? RemovedShape,Point3d[] CutPoints);
     private sealed class Notices
     {
         private readonly List<string> items=[];private readonly HashSet<string> seen=new(StringComparer.Ordinal);private long bytes;private bool omitted;
@@ -174,15 +174,56 @@ internal static class CadNativeContourFinishing342
         CheckSource(entity,edit,db,tr,cancel);var source=(Curve)entity;var notices=new Notices();var before=Snapshot(source,db,tr,cancel,notices) with{Plane=SelectedPlane(source,edit.Workplane,cancel)};var budget=new Budget(cancel);budget.Add(new{before.Shape,before.Display,before.Metadata});
         var boundaries=new List<Curve>();var states=new List<State>();foreach(string handle in edit.BoundaryHandles)
         {cancel();var boundary=readBoundary(handle);CheckBoundary(boundary,cancel);var state=Snapshot((Curve)boundary,db,tr,cancel,notices);budget.Add(new{state.Shape,state.Display,state.Metadata});boundaries.Add((Curve)boundary);states.Add(state);}
-        Point3d? pick=edit.PickPointWcs==null?null:Point(edit.PickPointWcs);var cuts=edit.Kind=="trim_curve"?Cuts(source,boundaries.ToArray(),before.Plane,pick!.Value,cancel,budget):edit.CutParameters;
+        Point3d? pick=edit.PickSnap is {} snap?CadNativeCurveSnap.Resolve(snap,db,tr,source.OwnerId,cancel):
+            edit.PickPointWcs==null?null:Point(edit.PickPointWcs);
+        var cuts=edit.Kind=="trim_curve"?Cuts(source,boundaries.ToArray(),before.Plane,pick!.Value,cancel,budget):edit.CutParameters;
         var retained=edit.Kind=="extend_curve"?RetainedPoints(source,cancel):[];
         if(source.HasFields)notices.Add("NATIVE_FINISHING_SOURCE_FIELDS_UNVERIFIED: Split-copy retains the source field flag/refs/observable shape; referenced field internals are not universally inspected.");
         if(source is Spline{HasFitData:true})notices.Add("NATIVE_FINISHING_SPLINE_FIT_OBSERVATION: Full current NURBS shape/available native fit observations are checked; no promise of unavailable original fit-construction metadata.");
         if(edit.Kind=="extend_curve")notices.Add("NATIVE_EXTENSION_LOCUS_OBSERVATION: Original native endpoints and native knot/segment breakpoint/midpoint loci are checked after extension; this is not a symbolic proof of every original point.");
-        return new(source,before,boundaries.ToArray(),states.ToArray(),cuts,pick,retained,notices.Read());
+        return new(source,before,boundaries.ToArray(),states.ToArray(),cuts,pick,retained,notices.Read(),edit.ExpectedKeptPieces);
     }
-    internal static void Preview(ModifyArguments args,CadModifier.Resolved resolved,Database db,Transaction tr,Action cancel)
-    {var edit=(NativeContourFinishingSpec342)args.Operations.Single();_=Prepare(edit,(Entity)tr.GetObject(resolved.Sources[edit.Handles[0]],OpenMode.ForRead),h=>(Entity)tr.GetObject(resolved.Sources[h],OpenMode.ForRead),db,tr,cancel);}
+    internal static object? Preview(ModifyArguments args,CadModifier.Resolved resolved,Database db,Transaction tr,Action cancel,bool includeGeometry=false)
+    {
+        var edit=(NativeContourFinishingSpec342)args.Operations.Single();
+        var plan=Prepare(edit,(Entity)tr.GetObject(resolved.Sources[edit.Handles[0]],OpenMode.ForRead),
+            h=>(Entity)tr.GetObject(resolved.Sources[h],OpenMode.ForRead),db,tr,cancel);
+        if(edit.Kind!="trim_curve"||(!includeGeometry&&edit.ExpectedKeptPieces==null))return null;
+        var generated=Split(plan,cancel);
+        Exception? primary=null;
+        try
+        {
+            VerifyReadOnly(plan,db,tr,cancel,true);
+            if(!includeGeometry)return null;
+            double[] Wcs(Point3d point)=>[point.X,point.Y,point.Z];
+            var preview=new
+            {
+                operation=edit.Kind,
+                source=new EntityRef(args.BridgeId,args.DocumentId,edit.Handles[0]),
+                expected_curve_token=edit.ExpectedCurveToken,
+                pick_point_wcs=Wcs(plan.Pick!.Value),
+                cut_parameters=plan.Cuts,
+                cut_points_wcs=generated.CutPoints.Select(Wcs).ToArray(),
+                expected_kept_pieces=generated.Kept.Length,
+                kept_pieces=generated.Shapes,
+                removed_piece=generated.RemovedShape,
+                warnings=plan.Warnings
+            };
+            SerializedCapacity357.Check(preview,Wire.PayloadBudget-16384,cancel);
+            return preview;
+        }
+        catch(Exception error){primary=error;throw;}
+        finally
+        {
+            var failures=new List<Exception>();
+            foreach(var entity in generated.Owned)try{entity.Dispose();}catch(Exception error){failures.Add(error);}
+            if(failures.Count>0)
+            {
+                if(primary!=null)failures.Insert(0,primary);
+                throw new AggregateException("Native trim preview detached-piece cleanup failed.",failures);
+            }
+        }
+    }
     private static void Independent(Entity entity,Action cancel)
     {cancel();using var refs=entity.GetPersistentReactorIds();using var data=entity.XData;Need(!entity.HasFields&&entity.ExtensionDictionary.IsNull&&refs.Count==0&&(data==null||data.AsArray().Length==0),"A generated root inherited source dependency/application data; nothing was stripped or silently dropped.","UNSUPPORTED_SPLIT_RESULT");}
     private static void PrimitiveThickness(Curve source,Curve result,Action cancel)
@@ -242,7 +283,7 @@ internal static class CadNativeContourFinishing342
             }
             if(acquisitionError!=null)throw acquisitionError;
             foreach(var item in owned){cancel();identities.Add(new{pointer=item.UnmanagedObject.ToString("X"),runtime_type=item.GetType().FullName});}
-            Need(owned.Count>0,"Native split produced no pieces.","NO_SPLIT_RESULT");var kept=new List<Curve>();var shapes=new List<JsonElement>();var endpoints=new List<Point3d>();var budget=new Budget(cancel);int removed=0;
+            Need(owned.Count>0,"Native split produced no pieces.","NO_SPLIT_RESULT");var kept=new List<Curve>();var shapes=new List<JsonElement>();var endpoints=new List<Point3d>();var budget=new Budget(cancel);int removed=0;JsonElement? removedShape=null;
             foreach(var item in owned)
             {
                 cancel();Need(item is Curve&&Supported(item.GetType()),"Native split returned an unsupported root; no piece was silently omitted.","UNSUPPORTED_SPLIT_RESULT");var curve=(Curve)item;Independent(curve,cancel);if(plan.Before.Plane!=null)SamePlane(curve,plan.Before.Plane,cancel);
@@ -252,14 +293,17 @@ internal static class CadNativeContourFinishing342
                 endpoints.Add(curve.StartPoint);endpoints.Add(curve.EndPoint);
                 foreach(var point in new[]{curve.StartPoint,curve.EndPoint,curve.GetPointAtParameter(curve.StartParam/2+curve.EndParam/2)})
                 {cancel();Need(Near(plan.Source.GetClosestPointTo(point,false),point),"Native split returned an observed point outside the original source locus.","NATIVE_FINISHING_MISMATCH");}
-                if(plan.Pick.HasValue&&Near(curve.GetClosestPointTo(plan.Pick.Value,false),plan.Pick.Value)){removed++;continue;}
+                if(plan.Pick.HasValue&&Near(curve.GetClosestPointTo(plan.Pick.Value,false),plan.Pick.Value)){removed++;removedShape=shape;continue;}
                 kept.Add(curve);shapes.Add(shape);
             }
             bool Endpoint(Point3d point){foreach(var endpoint in endpoints){cancel();if(Near(point,endpoint))return true;}return false;}
             foreach(var point in cutPoints){cancel();Need(Endpoint(point),"A requested native cut did not become an actual result endpoint.","NATIVE_FINISHING_MISMATCH");}
             if(!plan.Source.Closed)Need(Endpoint(plan.Source.StartPoint)&&Endpoint(plan.Source.EndPoint),"Native split lost an original open source endpoint.","NATIVE_FINISHING_MISMATCH");
             Need(!plan.Pick.HasValue||removed==1,"Native trim pick belongs to zero or multiple actual pieces; no ambiguous piece was removed.","AMBIGUOUS_PICK");
-            var result=new Generated(owned.Cast<Entity>().ToArray(),kept.ToArray(),shapes.ToArray());Release();return result;
+            if(plan.ExpectedKeptPieces is int expected&&expected!=kept.Count)
+                throw new DomainException("TRIM_PIECE_COUNT_CHANGED","The native trim kept-piece count differs from expected_kept_pieces.",false,
+                    new{expected_kept_pieces=expected,actual_kept_pieces=kept.Count});
+            var result=new Generated(owned.Cast<Entity>().ToArray(),kept.ToArray(),shapes.ToArray(),removedShape,cutPoints.ToArray());Release();return result;
         }
         catch(Exception primary)
         {var failures=new List<Exception>();if(!releaseAttempted)try{Release();}catch(Exception e){failures.Add(e);}foreach(var item in owned)try{item.Dispose();}catch(Exception e){failures.Add(e);}if(failures.Count>0)throw new AggregateException("Native split cleanup failed; recovery is unknown.",new[]{primary}.Concat(failures));throw;}

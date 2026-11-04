@@ -44,7 +44,7 @@ void CheckTarget(HWND window,DWORD pid,uint64_t ticks) {
 }
 
 struct ViewportUnavailable : std::runtime_error {
-    ViewportUnavailable() : std::runtime_error("viewport_unavailable") { }
+    explicit ViewportUnavailable(const char* reason) : std::runtime_error(reason) { }
 };
 
 struct ViewportTarget {
@@ -52,26 +52,32 @@ struct ViewportTarget {
     int width, height;
 };
 
-RECT ViewportInFrame(HWND window, DWORD pid, ViewportTarget viewport, int width, int height) {
+RECT ViewportInFrame(HWND window, DWORD pid, ViewportTarget viewport, int width, int height, const RECT* region) {
     DWORD owner = 0;
     GetWindowThreadProcessId(viewport.window, &owner);
     RECT frame{}, client{};
-    if (owner != pid || !IsChild(window, viewport.window) || !IsWindowVisible(viewport.window) ||
-        FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) ||
-        frame.right - frame.left != width || frame.bottom - frame.top != height ||
-        !GetClientRect(viewport.window, &client)) throw ViewportUnavailable();
+    if (owner != pid || !IsChild(window, viewport.window) || !IsWindowVisible(viewport.window))
+        throw ViewportUnavailable("native_window_not_visible_child");
+    if (FAILED(DwmGetWindowAttribute(window, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(frame))) ||
+        frame.right - frame.left != width || frame.bottom - frame.top != height)
+        throw ViewportUnavailable("dwm_frame_size_mismatch");
+    if (!GetClientRect(viewport.window, &client)) throw ViewportUnavailable("viewport_client_rect_unavailable");
 
     POINT corners[]{{client.left, client.top}, {client.right, client.bottom}};
     SetLastError(ERROR_SUCCESS);
     if (!MapWindowPoints(viewport.window, nullptr, corners, 2) && GetLastError() != ERROR_SUCCESS)
-        throw ViewportUnavailable();
+        throw ViewportUnavailable("viewport_pixel_origin_unavailable");
     // DWM bounds and WGC frame size must describe the same physical rectangle.
-    // An exact SCREENSIZE match prevents cropping a document container instead of a viewport.
     RECT crop{corners[0].x - frame.left, corners[0].y - frame.top,
         corners[1].x - frame.left, corners[1].y - frame.top};
-    if (crop.left < 0 || crop.top < 0 || crop.right > width || crop.bottom > height ||
-        crop.right - crop.left != viewport.width || crop.bottom - crop.top != viewport.height)
-        throw ViewportUnavailable();
+    if (crop.left < 0 || crop.top < 0 || crop.right > width || crop.bottom > height)
+        throw ViewportUnavailable("viewport_outside_frame");
+    // The bridge already mapped region coordinates to physical pixels.
+    // Layout tabs may occupy space below the rendering canvas.
+    if (crop.right - crop.left != viewport.width ||
+        (!region && crop.bottom - crop.top != viewport.height) ||
+        (region && crop.bottom - crop.top < viewport.height))
+        throw ViewportUnavailable("viewport_client_size_mismatch");
     return crop;
 }
 
@@ -82,7 +88,7 @@ IDirect3DSurface CropSurface(const IDirect3DSurface& surface, const com_ptr<ID3D
     D3D11_TEXTURE2D_DESC description{};
     source->GetDesc(&description);
     if (static_cast<UINT>(crop.right) > description.Width || static_cast<UINT>(crop.bottom) > description.Height)
-        throw ViewportUnavailable();
+        throw ViewportUnavailable("crop_outside_surface");
     description.Width = static_cast<UINT>(crop.right - crop.left);
     description.Height = static_cast<UINT>(crop.bottom - crop.top);
     description.MipLevels = description.ArraySize = 1;
@@ -104,28 +110,38 @@ IDirect3DSurface CropSurface(const IDirect3DSurface& surface, const com_ptr<ID3D
 int wmain(int argc,wchar_t** argv) {
     SetErrorMode(SEM_FAILCRITICALERRORS|SEM_NOGPFAULTERRORBOX);
     if(argc==2&&std::wstring(argv[1])==L"--help") {
-        std::cout<<"--capture <pid> <process_start_dotnet_ticks> <hwnd_decimal> <new_png_absolute_path> [--max-edge <pixels> [--viewport <hwnd> <width> <height>]]\n"
+        std::cout<<"--capture <pid> <process_start_dotnet_ticks> <hwnd_decimal> <new_png_absolute_path> [--max-edge <pixels> [--viewport <hwnd> <width> <height> [--region <left> <top> <right> <bottom>]]]\n"
                     "One WGC window frame; no input, UIA, PrintWindow or CAD SDK. Caller must authorize and validate target/output and enforce timeout.\n";
         return 0;
     }
     try {
-        if((argc!=6&&argc!=8&&argc!=12)||std::wstring(argv[1])!=L"--capture")throw std::invalid_argument("arguments");
+        if((argc!=6&&argc!=8&&argc!=12&&argc!=17)||std::wstring(argv[1])!=L"--capture")throw std::invalid_argument("arguments");
         const auto maxEdge=argc>=8?Number(argv[7]):2048;
         if((argc>=8&&std::wstring(argv[6])!=L"--max-edge")||maxEdge<256||maxEdge>2048)throw std::invalid_argument("max_edge");
         const auto pid64=Number(argv[2]);if(pid64==0||pid64>MAXDWORD)throw std::invalid_argument("pid");
         const auto pid=static_cast<DWORD>(pid64);const auto ticks=Number(argv[3]);
         const auto window=reinterpret_cast<HWND>(static_cast<uintptr_t>(Number(argv[4])));
         ViewportTarget viewport{};
-        if (argc == 12) {
+        RECT region{};
+        const bool captureRegion = argc == 17;
+        if (argc >= 12) {
             if (std::wstring(argv[8]) != L"--viewport") throw std::invalid_argument("viewport_argument");
             viewport.window = reinterpret_cast<HWND>(static_cast<uintptr_t>(Number(argv[9])));
             const auto width = Number(argv[10]);
             const auto height = Number(argv[11]);
             if (!viewport.window || width == 0 || height == 0 || width > INT_MAX || height > INT_MAX)
-                throw ViewportUnavailable();
+                throw ViewportUnavailable("invalid_viewport_dimensions");
             viewport.width = static_cast<int>(width);
             viewport.height = static_cast<int>(height);
-            if (!SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) throw ViewportUnavailable();
+            if (!SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+                throw ViewportUnavailable("physical_dpi_context_unavailable");
+        }
+        if (captureRegion) {
+            if (std::wstring(argv[12]) != L"--region") throw std::invalid_argument("region_argument");
+            const auto left = Number(argv[13]), top = Number(argv[14]), right = Number(argv[15]), bottom = Number(argv[16]);
+            if (left >= right || top >= bottom || right > static_cast<uint64_t>(viewport.width) || bottom > static_cast<uint64_t>(viewport.height))
+                throw ViewportUnavailable("region_outside_viewport");
+            region = RECT{static_cast<LONG>(left), static_cast<LONG>(top), static_cast<LONG>(right), static_cast<LONG>(bottom)};
         }
         const std::filesystem::path output(argv[5]);
         if(!output.is_absolute()||output.extension()!=L".png"||std::filesystem::exists(output)||!std::filesystem::is_directory(output.parent_path()))
@@ -144,7 +160,7 @@ int wmain(int argc,wchar_t** argv) {
         const auto size=item.Size();
         if(size.Width<=0||size.Height<=0||static_cast<int64_t>(size.Width)*size.Height>16000000)throw std::runtime_error("frame_size_limit");
         RECT crop{};
-        if (viewport.window) crop = ViewportInFrame(window, pid, viewport, size.Width, size.Height);
+        if (viewport.window) crop = ViewportInFrame(window, pid, viewport, size.Width, size.Height, captureRegion ? &region : nullptr);
         auto pool=Direct3D11CaptureFramePool::CreateFreeThreaded(device,DirectXPixelFormat::B8G8R8A8UIntNormalized,2,size);
         handle signal(CreateEventW(nullptr,FALSE,FALSE,nullptr));check_bool(static_cast<bool>(signal));
         auto arrived=pool.FrameArrived(auto_revoke,[event=signal.get()](auto const&,auto const&){SetEvent(event);});
@@ -166,8 +182,10 @@ int wmain(int argc,wchar_t** argv) {
         const auto frameTime=frame.SystemRelativeTime().count();
         auto surface = frame.Surface();
         if (viewport.window) {
-            auto after = ViewportInFrame(window, pid, viewport, content.Width, content.Height);
-            if (!EqualRect(&crop, &after)) throw ViewportUnavailable();
+            auto after = ViewportInFrame(window, pid, viewport, content.Width, content.Height, captureRegion ? &region : nullptr);
+            if (!EqualRect(&crop, &after)) throw ViewportUnavailable("viewport_moved_during_capture");
+            if (captureRegion)
+                crop = RECT{crop.left + region.left, crop.top + region.top, crop.left + region.right, crop.top + region.bottom};
             surface = CropSurface(surface, nativeDevice, crop);
         }
         auto bitmap=SoftwareBitmap::CreateCopyFromSurfaceAsync(surface).get();
@@ -177,8 +195,8 @@ int wmain(int argc,wchar_t** argv) {
         auto file=folder.CreateFileAsync(output.filename().wstring(),CreationCollisionOption::FailIfExists).get();
         auto stream=file.OpenAsync(FileAccessMode::ReadWrite).get();
         auto encoder=BitmapEncoder::CreateAsync(BitmapEncoder::PngEncoderId(),stream).get();
-        const int sourceWidth = viewport.window ? viewport.width : content.Width;
-        const int sourceHeight = viewport.window ? viewport.height : content.Height;
+        const int sourceWidth = viewport.window ? crop.right - crop.left : content.Width;
+        const int sourceHeight = viewport.window ? crop.bottom - crop.top : content.Height;
         const double scale=(std::min)(1.0,static_cast<double>(maxEdge)/(std::max)(sourceWidth,sourceHeight));
         const auto width=static_cast<uint32_t>((std::max)(1.0,sourceWidth*scale));
         const auto height=static_cast<uint32_t>((std::max)(1.0,sourceHeight*scale));
@@ -187,11 +205,14 @@ int wmain(int argc,wchar_t** argv) {
         CheckTarget(window,pid,ticks);
         std::cout<<"{\"captured\":true,\"source\":\"windows_graphics_capture\",\"document_consistency\":\"unverified\",\"width\":"<<width
                  <<",\"height\":"<<height<<",\"source_width\":"<<sourceWidth<<",\"source_height\":"<<sourceHeight
-                 <<",\"viewport_only\":"<<(viewport.window ? "true" : "false")
-                 <<",\"capture_started_system_relative_ticks\":\""<<startedTicks<<"\",\"frame_system_relative_ticks\":\""<<frameTime<<"\",\"pid\":"<<pid<<"}\n";
+                 <<",\"viewport_only\":"<<(viewport.window ? "true" : "false");
+        if (captureRegion)
+            std::cout<<",\"crop_pixels\":{\"left\":"<<region.left<<",\"top\":"<<region.top
+                     <<",\"right\":"<<region.right<<",\"bottom\":"<<region.bottom<<"}";
+        std::cout<<",\"capture_started_system_relative_ticks\":\""<<startedTicks<<"\",\"frame_system_relative_ticks\":\""<<frameTime<<"\",\"pid\":"<<pid<<"}\n";
         return 0;
-    } catch (ViewportUnavailable const&) {
-        std::cout<<"{\"captured\":false,\"error\":\"viewport_unavailable\"}\n";return 4;
+    } catch (ViewportUnavailable const& error) {
+        std::cout<<"{\"captured\":false,\"error\":\"viewport_unavailable\",\"reason\":\""<<error.what()<<"\"}\n";return 4;
     } catch(hresult_error const& e) {
         std::cout<<"{\"captured\":false,\"error\":\"windows_capture_error\",\"hresult\":"<<static_cast<int32_t>(e.code())<<"}\n";return 3;
     } catch(std::exception const& e) {
