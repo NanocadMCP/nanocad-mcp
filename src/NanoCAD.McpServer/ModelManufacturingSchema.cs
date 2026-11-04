@@ -7,6 +7,11 @@ internal static class ModelManufacturingSchema
     static JsonObject Flag()=>new(){["type"]="boolean"};
     static JsonObject Token()=>new(){["type"]="string",["pattern"]="^[0-9A-Fa-f]{64}$"};
     static JsonObject Object(JsonObject p)=>new(){["type"]="object",["additionalProperties"]=false,["properties"]=p,["required"]=new JsonArray(p.Select(x=>(JsonNode?)JsonValue.Create(x.Key)).ToArray())};
+    private static JsonObject RequireHoleSeatFields(string seat, params string[] fields) => new()
+    {
+        ["if"] = new JsonObject { ["properties"] = new JsonObject { ["seat"] = new JsonObject { ["const"] = seat } } },
+        ["then"] = new JsonObject { ["required"] = new JsonArray(fields.Select(field => (JsonNode?)JsonValue.Create(field)).ToArray()) }
+    };
     internal static IEnumerable<JsonObject> Operations()
     {
         var support=Object(new(){["operation"]=new JsonObject{["type"]="string",["const"]="set_model_sketch_support"},["handles"]=BasicModelingSchema.List(BasicModelingSchema.Handle(),1),["expected_last_item_id"]=Id(),["feature_id"]=Id(),["definition"]=Object(new(){["reference_plane"]=new JsonObject{["type"]="string",["enum"]=new JsonArray("XY","YZ","ZX")},["offset"]=Number(-1e6)})});
@@ -72,6 +77,14 @@ internal static class ModelManufacturingSchema
             } else {d["plane_id"]=Id();d["reference_plane"]=new JsonObject{["type"]="string",["enum"]=new JsonArray("XY","YZ","ZX")};}
             if(add&&(kind=="circular_pattern"||kind=="mirror"))d["source_feature_ids"]=new JsonObject{["type"]="array",["minItems"]=1,["uniqueItems"]=true,["items"]=Id()};
             var definition=Object(d);
+            if (kind == "hole")
+            {
+                definition["required"] = new JsonArray(d.Where(pair => !pair.Key.StartsWith("seat_", StringComparison.Ordinal))
+                    .Select(pair => (JsonNode?)JsonValue.Create(pair.Key)).ToArray());
+                definition["allOf"] = new JsonArray(
+                    RequireHoleSeatFields("counterbore", "seat_diameter", "seat_depth"),
+                    RequireHoleSeatFields("countersink", "seat_diameter", "seat_angle_degrees"));
+            }
             if(kind=="circular_pattern")
             {
                 definition["required"]=add?new JsonArray("count","angle_degrees","source_feature_ids"):new JsonArray("count","angle_degrees");
@@ -95,7 +108,7 @@ internal static class ModelManufacturingSchema
             schema["description"]="Native parametric "+kind+". Read current body/history and native model topology before choosing real engineering datums. Sole operation; parameters in millimeters; angles in degrees except explicitly named taper_angle in radians. Use returned body_ref after rebuild. ROLLBACK_NOT_GUARANTEED. "+(kind switch{
                 "loft"=>"Create/update regular native loft join/cut using ordered profile_ids owned by this body. Retains profile references. Updates replace regular loft sections; this editor does not discard guide bindings from guided lofts. For a new loft body including guides use model_loft creation.",
                 "sweep"=>"General native swept join/cut or update. Select profile_id from this body history and ordered connected path_handles from the current drawing. Taper angle is radians; orientation is normal_to_path or parallel_to_profile. Maintains native profile/path references. An unchanged taper retains its driver expression. Changing a formula-driven taper requires explicit replace_driver_formulas=true to replace it with the supplied literal; read variables first. A changed body representation may have a new handle; use returned body_ref.",
-                "hole"=>"Edit an existing native TwoEdges hole using its actual retained support/datum-edge bindings, signed offsets and sector. This edit does not create a new placement or silently convert a fixed-center hole. TwoEdges creation is unavailable on this host; choose fixed placement only when it expresses the task, otherwise retain the needed positional dependencies through a supported sketch cut. Simple hole with optional counterbore/countersink. Blind depth must be positive; counterbore depth below blind depth; seat diameter exceeds bore. Unused depths/diameters may be zero; unused angles still require a valid angle.",
+                "hole"=>"Edit an existing native TwoEdges hole using its actual retained support/datum-edge bindings, signed offsets and sector. This edit does not create a new placement or silently convert a fixed-center hole. TwoEdges creation is unavailable on this host; choose fixed placement only when it expresses the task, otherwise retain the needed positional dependencies through a supported sketch cut. Blind depth must be positive. Counterbore requires diameter and depth; countersink requires diameter and angle. Seat diameter exceeds bore, and counterbore depth is below blind depth.",
                 "thread"=>"Stores a native ThreadFeature on a cylindrical face with a circular start boundary edge. Read topology tokens and IDs; select internal/external from the actual surface and task. This feature alone does not establish physical helical B-rep geometry. Do not promise a modeled helix or silently substitute this representation when real helical geometry is required. Partial length must be positive.",
                 "circular_pattern"=>"Retained native circular feature pattern of one part, using a healthy original source_feature_ids group. Choose definition.axis: global_axis X/Y/Z, an existing same-owner work_axis, explicit fixed_axis WCS origin/nonzero direction, native line, or current same-part linear/circular edge. The legacy edge_token/axis_edge_id creation pair remains supported. Native global/fixed WorkAxis construction is resolved/created only inside the write. Count is a positive native Int32 and includes the original. angle_degrees is a finite signed angular step, not total sweep; for a full ring use 360/N. Small/zero/full-turn steps are not silently clamped: native update decides validity and a stored pattern alone does not certify distinct material instances. Updates preserve axes/sources unless explicitly changed: axis requires expected_axis_id from current history.parameters.axis.native_id; source_feature_ids requires expected_source_feature_ids containing the original same-part feature IDs, never generated source_item_ids. Optional expected_count/expected_angle_degrees strengthen value preconditions. Retained native step mode, reversal, original identities/links and suppression of retained positions are checked. Range/fill interpretation is not edited here. Unchanged count/angle values preserve their exact owning expressions; a changed formula requires replace_driver_formulas=true or use set_model_parameter with current expected_expression. Read resulting native axis, driver IDs and mode from history/manufacturing_changes parameters, then inspect the intended repeated geometry.",
                 _=>"Creation mirrors selected healthy features of the same body across a native WorkPlane. Choose reference_plane XY/YZ/ZX, or plane_id from existing body history; supply exactly one. Native reference datums are resolved during the write, never created by inspection. Update changes its plane while retaining sources."});
@@ -103,8 +116,10 @@ internal static class ModelManufacturingSchema
             if(kind=="hole"){
                 var fixedSchema=(JsonObject)schema.DeepClone();var definition2=(JsonObject)fixedSchema["properties"]!["definition"]!;var properties=(JsonObject)definition2["properties"]!;
                 foreach(var key in new[]{"offset1","offset2","sector","edge_token","first_edge_id","second_edge_id"})properties.Remove(key);
-                properties["center"]=BasicModelingSchema.Point();definition2["required"]=new JsonArray(properties.Where(x=>x.Key!="replace_driver_formulas").Select(x=>(JsonNode?)JsonValue.Create(x.Key)).ToArray());
-                fixedSchema["description"]="Native parametric hole with an explicit fixed WCS center on a selected planar support face. Keeps HoleFeature dimensions and face support but adds NO edge-offset constraints; use only when explicit placement matches the task, never present it as TwoEdges placement. Do not silently replace a constrained hole. Updates require an existing fixed-placement hole. Sole operation, current expected_last_item_id; creation requires face_token/face_id from native model topology. Read body_ref after rebuild; ROLLBACK_NOT_GUARANTEED. Assess the hole geometry and required dimensions; native feature status alone does not prove the result.";
+                properties["center"] = BasicModelingSchema.Point();
+                definition2["required"] = new JsonArray(definition2["required"]!.AsArray()
+                    .Where(field => properties.ContainsKey(field!.GetValue<string>())).Select(field => field!.DeepClone()).Append(JsonValue.Create("center")).ToArray());
+                fixedSchema["description"]="Native parametric hole with an explicit fixed WCS center on a selected planar support face. Keeps HoleFeature dimensions and face support but adds NO edge-offset constraints; use only when explicit placement matches the task, never present it as TwoEdges placement. Updates require an existing fixed-placement hole. Sole operation. Get expected_last_item_id from inspect_model_history. For creation get face_token and the planar native model face ID from inspect_solid_topology with include_native_model_faces=true. Omit seat_* for seat=none. Read body_ref after rebuild; ROLLBACK_NOT_GUARANTEED. Assess the hole geometry and required dimensions.";
                 yield return fixedSchema;
             }
         }

@@ -15,6 +15,15 @@ internal static class PaperDrawingViewScope356
         McObjectId[] Sources,CadDrawingViewEditState.Snapshot Before,Dictionary<Db.ObjectId,JsonElement> SourceMetadata);
     internal static void Need([DoesNotReturnIf(false)] bool ok,string message,string code="PAPER_VIEW_SCOPE_MISMATCH")
     {if(!ok)throw new DomainException(code,message);}
+    internal static McDocument RequireSheet(McDocument lookup,Db.ObjectId space)
+    {
+        var sheet=McDocumentsManager.GetActiveSheet();
+        var nativeSpace=McObjectId.FromHandle(space.Handle.Value,lookup.ID);
+        Need(sheet!=null&&!sheet.ID.IsNull&&sheet.IsLayout&&!sheet.IsModel&&nativeSpace==sheet.ID&&
+            sheet.TopDoc!=null&&lookup.TopDoc!=null&&sheet.TopDoc.ID==lookup.TopDoc.ID,
+            "The current native sheet must map to this drawing's exact active Paper block record.","DOCUMENT_CONTEXT_MISMATCH");
+        return sheet;
+    }
     internal static Scope Prepare(StructureWriteArguments args,DocumentState state,Db.Transaction tx,Action cancel)
     {
         var spec=(CreateDrawingViewsEdit)args.Operations[0];
@@ -24,11 +33,7 @@ internal static class PaperDrawingViewScope356
         var lookup=CadDrawingViewEditState.Context(state);var db=state.Document.Database;
         var space=CadBlockSpace.RequireWriteSpace(db,tx,"paper",cancel);var selected=CadBlockSpace.RequireSpace(db,tx,space);
         Need(CadDrawingViewLifecycleState345.Handle(selected.Layout)==spec.LayoutHandle,"Activate the exact requested ordinary Paper layout outside its model viewport.","DOCUMENT_CONTEXT_MISMATCH");
-        var sheet=McDocumentsManager.GetActiveSheet();
-        var nativeSpace=McObjectId.FromHandle(space.Handle.Value,lookup.ID);
-        Need(sheet!=null&&!sheet.ID.IsNull&&sheet.IsLayout&&!sheet.IsModel&&nativeSpace==sheet.ID&&
-            sheet.TopDoc!=null&&lookup.TopDoc!=null&&sheet.TopDoc.ID==lookup.TopDoc.ID,
-            "The current native sheet must map to this drawing's exact active Paper block record.","DOCUMENT_CONTEXT_MISMATCH");
+        var sheet=RequireSheet(lookup,space);
         var layer=(Db.LayerTableRecord)tx.GetObject(db.Clayer,Db.OpenMode.ForRead);
         Need(layer.Name=="0"&&!layer.IsOff&&!layer.IsFrozen&&!layer.IsLocked&&!layer.IsDependent,"Current layer0 must be available.","LAYER_UNAVAILABLE");
         var layers=(Db.LayerTable)tx.GetObject(db.LayerTableId,Db.OpenMode.ForRead);

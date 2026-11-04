@@ -2,7 +2,7 @@ namespace NanoCAD.Contracts;
 
 public static class WriteRecovery
 {
-    public const string Warning="ROLLBACK_NOT_GUARANTEED: This operation is available, but transactional rollback and Undo cannot be relied on. A started failure may leave partial changes; inspect the document before further writes. Never treat unknown as rolled_back or repeat it with a new operation_id.";
+    public const string Warning="ROLLBACK_NOT_GUARANTEED: A failure after native work starts can leave partial changes. If the outcome is unknown, inspect the affected document state before further writes and retain the original operation_id.";
     public static bool NotGuaranteed(IOperationArguments args)=>
         args is StructureWriteArguments fromObjects407&&fromObjects407.Operations.Any(e=>e is CreateBlockFromObjects407)||
         args is ModifyArguments edits345&&edits345.Operations.Any(e=>e is ModelRebuildSpec419 or SetDrawOrder407 or CopyTransform2d407 or PolarRepeat2d407 or MLeaderGeometryEdit388 or NativeStretchEdit345 or NativeWindowStretchEdit387 or ModelFeatureReorderSpec345 or ModelProfileRebindSpec349 or ModelProfileRegionsSpec350 or ModelProfileElementsSpec358 or ModelExtrusionExtentsSpec351 or ModelDatumPlaneCreate353 or ModelFaceDatumPlaneCreate356 or ModelDatumPlaneRevisionSpec354 or SetHatchBoundarySpec349 or SetHatchAssociation358)||

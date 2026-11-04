@@ -2,6 +2,17 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 450
+
+Aligned dimensions can follow a selected line of an ordinary unit-scale
+drawing view in Model Space or on an active Paper sheet. The native reference
+retains the selected line at shared corners. An A4 dimension updated from 12 to
+18 mm after a change to the source extrusion. Paper view creation verifies its
+resident view and source history after the nanoCAD command completes.
+
+The fixed-center native Hole feature applies and verifies through extent.
+This package uses server 0.253.0, bridge 0.208.0 and IPC protocol 0.144.
+
 ## Build 449
 
 Server 0.252.0 publishes top-level input fields for `manage_document` and

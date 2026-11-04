@@ -21,9 +21,15 @@ internal static class WriteRecoveryTests
             return Task.CompletedTask;
         });
         await test("write recovery is visible before invoking hatch or viewport and does not require approval",()=>{
-            foreach(string name in new[]{"nanocad.create_entities","nanocad.modify_structure"})
-                if(ToolCatalog.Tools.Single(t=>t.Name==name).Description?.Contains("rollback",StringComparison.OrdinalIgnoreCase)!=true)throw new Exception("No upfront recovery notice.");
-            if(!ServerGuidance.Instructions.Contains("without demanding an extra permission")||ServerGuidance.Instructions.Contains("bootstrap.dxf"))throw new Exception("Agent guidance not aligned with user policy.");
+            foreach (var route in new[] { ("create_entities", "Hatch"), ("modify_structure", "create_viewport") })
+            {
+                if (!AuditServerContractSupport.Help(route.Item1, route.Item2).Contains("ROLLBACK_NOT_GUARANTEED", StringComparison.Ordinal))
+                    throw new Exception("Missing operation-specific recovery warning before a write.");
+            }
+            if (!ServerGuidance.Instructions.Contains("does not require permission or refusal", StringComparison.Ordinal) ||
+                ServerGuidance.Instructions.Contains("bootstrap.dxf", StringComparison.Ordinal) ||
+                WriteRecovery.Warning.Contains("Undo", StringComparison.Ordinal))
+                throw new Exception("Agent guidance conflates a started failure with user Undo or authorization.");
             return Task.CompletedTask;
         });
     }

@@ -72,6 +72,16 @@ internal static class OutputSchemas
         data["properties"]!["parameter_changes"]!["items"]!["properties"]!["value_unit"]=Text();
         data["properties"]!["parameter_changes"]!["items"]!["properties"]!["body_ref"]=Ref("ref");
         data["properties"]!["rebuilt_bodies"]=Array(Ref("ref"));
+        data["properties"]!["model_healthy"] = new JsonObject
+        {
+            ["type"] = "boolean",
+            ["description"] = "True when post-command verification observed healthy native history for the checked bodies, including intentional suppression. Omitted when this verification is unavailable."
+        };
+        data["properties"]!["downstream_values_changed"] = new JsonObject
+        {
+            ["type"] = "boolean",
+            ["description"] = "Whether any verified downstream parameter value changed outside the native value comparison tolerance. Excludes the edited variable. Omitted when this verification is unavailable."
+        };
         foreach(var fields in new[]{data["properties"]!.AsObject(),data["properties"]!["parameter_changes"]!["items"]!["properties"]!.AsObject()})
         {
             fields["owner_kind"]=new JsonObject{["type"]="string",["enum"]=new JsonArray("feature","sketch_dimension","user")};
@@ -222,6 +232,11 @@ internal static class OutputSchemas
     {
         var faces=Array(Object(("native_id",Text()),("surface_runtime_type",Text()),("area",Nullable(Number())),("area_unavailable_reason",Nullable(Text())),("bounds",Object(("min",Point()),("max",Point()))),("forward",Bool())));
         faces["items"]!["properties"]!["bounds_kind"]=new JsonObject{["type"]="string",["description"]="planar_boundary gives extrema of the complete planar face boundary; body_conservative encloses a curved face using the source body bounds and cannot locate that face precisely. Omitted by older bridges."};
+        faces["items"]!["properties"]!["analytic_surface"] = new JsonObject
+        {
+            ["type"] = "string", ["enum"] = new JsonArray("plane", "circular_cylinder"),
+            ["description"] = "Native supporting surface hint when available. Use the face's native_id with analyze_geometry to read a diameter or measure supporting axes and planes."
+        };
         var edges=Array(Object(("native_id",Text()),("curve_runtime_type",Text()),("start_vertex",Nullable(Point())),("end_vertex",Nullable(Point())),("forward",Bool())));
         edges["items"]!["properties"]!["circle"]=Nullable(Object(("center",Point()),("normal",Point()),("radius",Number())));
         var result=Object(("source_ref",Ref("ref")),("coordinate_system",Text()),("reference_scope",Text()),
@@ -247,6 +262,10 @@ internal static class OutputSchemas
             ("geometry_details_complete",Bool()),("element_identity",Text()),
             ("items",Array(Object(("index",Integer()),("native_geometry_type",Nullable(Text())),
                 ("status",Text()),("geometry",Nullable(AnyObject())),("unavailable_reason",Nullable(Text()))))));
+        var projectedSource = Object(("status", Text()), ("unavailable_reason", Nullable(Text())),
+            ("view_marker", Nullable(Text())), ("source_ref", Nullable(Ref("ref"))),
+            ("native_edge_id", Nullable(Text())), ("native_ref_key", Nullable(Text())));
+        AddOptional(projected["properties"]!["items"]!["items"]!.AsObject(), "projection_source", projectedSource);
         AddOptional(projected,"geometry_scope",Text());AddOptional(projected,"total_elements",Integer());AddOptional(projected,"start_index",Integer());
         AddOptional(projected,"next_index",Nullable(Integer()));AddOptional(projected,"complete",Bool());
         var result=Object(("layout_ref",Ref("ref")),("layout_name",Text()),("space",Text()),("identity_scope",Text()),

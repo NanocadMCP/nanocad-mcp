@@ -22,7 +22,14 @@ public sealed record ModelParameterResult(string operation_id, string status, bo
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] EntityRef[]? rebuilt_bodies = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? owner_kind = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? sketch_id = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? constraint_id = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? constraint_id = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? model_healthy { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? downstream_values_changed { get; init; }
+}
 public sealed record ModelParameterChange(string variable_id, string? feature_id, string previous_expression,
     string expression, double previous_value, double value,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? value_unit = null,

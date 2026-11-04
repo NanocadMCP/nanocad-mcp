@@ -78,6 +78,14 @@ public static class ReadPreparation433
         }
         output["candidates"] = candidates;
         output["input_fields"] = fields;
+        if (reader == "get_document" && selection is { Operation: "modify_entities", Variant: "add_model_hole" })
+        {
+            output["next_reads"] = new JsonObject
+            {
+                ["inspect_model_history"] = "Read expected_last_item_id from the selected part's last_item_id.",
+                ["inspect_solid_topology"] = "Set include_native_model_faces=true to read the current planar native model face ID and face_token."
+            };
+        }
         var facts = new JsonObject
         {
             ["request_distance_unit"] = units.ValueKind == JsonValueKind.Object && units.TryGetProperty("const", out var distance) ? JsonNode.Parse(distance.GetRawText()) : null,

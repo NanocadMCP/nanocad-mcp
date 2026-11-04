@@ -31,9 +31,16 @@ public static class DrawingViewsValidation
             return number;
         }
         int start=PageValue("geometry_start_index",0,0,int.MaxValue),size=PageValue("geometry_page_size",100,1,int.MaxValue);
+        bool geometrySources = false;
+        if (values.Remove("include_geometry_sources", out var sourceOption))
+        {
+            if (geometryViewHandle == null || sourceOption.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new DomainException("INVALID_ARGUMENT", "include_geometry_sources requires a selected geometry_view_handle and a boolean value.");
+            geometrySources = sourceOption.GetBoolean();
+        }
         if(!values.Remove("layout_handle",out var layout) || values.ContainsKey("handle"))
             throw new DomainException("INVALID_ARGUMENT","Explicit layout_handle from get_structure layouts is required.");
         values.Add("handle",layout);
-        return ModelVariablesValidation.Parse(Wire.Element(values)) with {GeometryViewHandle=geometryViewHandle,GeometryStartIndex=start,GeometryPageSize=size,DrawingViewSourceIdentityHandle=sourceIdentityHandle};
+        return ModelVariablesValidation.Parse(Wire.Element(values)) with {GeometryViewHandle=geometryViewHandle,GeometryStartIndex=start,GeometryPageSize=size,DrawingViewSourceIdentityHandle=sourceIdentityHandle,IncludeGeometrySources=geometrySources};
     }
 }

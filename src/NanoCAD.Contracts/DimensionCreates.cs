@@ -5,12 +5,23 @@ namespace NanoCAD.Contracts;
 public interface IDimensionCreation { string DimensionStyle { get; } string TextOverride { get; } }
 public sealed record DimensionSpec(string Kind, Point2 First, Point2 Second, Point2? DimLinePoint, double Rotation,
     double LeaderLength, string DimensionStyle, string TextOverride, string LayerName, DimensionSourcePoint385[]? Associations=null) : EntitySpec("Dimension", LayerName),IDimensionCreation;
+public sealed record ProjectedAlignedDimensionSpec(string ViewHandle, int LineIndex, Point2 DimLinePoint, string LayerName)
+    : EntitySpec("Dimension", LayerName);
 
 public static partial class CreateValidation
 {
     private static EntitySpec ParseDimension(JsonElement item, string path, string layer)
     {
-        string kind = Text(item, "kind", path, 16);
+        string kind = Text(item, "kind", path, 24);
+        if (kind == "projected_aligned")
+        {
+            Shape(item, path, "type", "kind", "layer", "view_handle", "line_index", "dimline_point");
+            string view = Validation.NormalizeHandle(Text(item, "view_handle", path, 16));
+            var lineIndex = Required(item, "line_index", path);
+            if (lineIndex.ValueKind != JsonValueKind.Number || !lineIndex.TryGetInt32(out int index) || index < 0)
+                throw Invalid(path + ".line_index", "Use the nonnegative current projection geometry index.");
+            return new ProjectedAlignedDimensionSpec(view, index, Point(item, "dimline_point", path), layer);
+        }
         string style = Text(item, "dimension_style", path, 255);
         string text = Text(item, "text_override", path, 4096, "<>");
         if(kind is "angular_3point" or "angular_2line" or "ordinate")return ParseAngularOrdinate(item,kind,path,style,text,layer);

@@ -183,7 +183,7 @@ internal static class ModelManufacturingWriter
         foreach(var profile in binding.ProfileConsumers??[])
             ModelProfileConsumers410.VerifyRetained(profile.Before,profile.Profile,profile.Owner,cancel,changingConsumer:add?default:feature,addedConsumer:add?feature:default);
     }
-    static void Hole(HoleFeature h,JsonElement d,bool updatePlacement,ModelHoleParameter412.NumericEdit? offsets=null) {
+    static void Hole(HoleFeature h,JsonElement d,bool updatePlacement,bool deferBlindDepth,ModelHoleParameter412.NumericEdit? offsets=null) {
         if(updatePlacement&&offsets!=null)ModelHoleParameter412.ApplyNumeric(h,offsets);
         else if(updatePlacement) {
             var original=h.GetPlacement();Need(original!=null,"MODEL_STATE_UNAVAILABLE","Hole placement is unavailable.");
@@ -195,11 +195,21 @@ internal static class ModelManufacturingWriter
                 Need(placement.SetFixedPosition(new Multicad.Geometry.Point3d(center[0].GetDouble(),center[1].GetDouble(),center[2].GetDouble())).IsSuccess(),"MODEL_UPDATE_FAILED","Native fixed placement rejected its center.");
             }else{Need(placement.DefType==IppDefinitionType.TwoEdges,"INVALID_ARGUMENT","Edge-offset edits require TwoEdges placement.");placement.Param1=N(d,"offset1");placement.Param2=N(d,"offset2");placement.Sector=d.GetProperty("sector").GetInt32();}Need(h.SetPlacement(placement),"MODEL_UPDATE_FAILED","Hole placement was rejected.");
         }
-        h.Diameter=N(d,"diameter");h.IsFullDepth=B(d,"through");if(!h.IsFullDepth)h.Depth=N(d,"depth");
-        h.SeatType=S(d,"seat") switch{"counterbore"=>HoleSeatType.Counterbore,"countersink"=>HoleSeatType.Countersink,_=>HoleSeatType.Flat};
-        if(h.SeatType!=HoleSeatType.Flat){h.SeatDiameter=N(d,"seat_diameter");if(h.SeatType==HoleSeatType.Counterbore)h.SeatDepth=N(d,"seat_depth");else h.SeatAngle=R(d,"seat_angle_degrees");}
+        h.Diameter=N(d,"diameter");h.IsFullDepth=B(d,"through");if(!h.IsFullDepth&&!deferBlindDepth)h.Depth=N(d,"depth");
+        var seat = RequestedSeat(d);
+        h.SeatType = seat;
+        Need(h.SeatType == seat, "MODEL_UPDATE_FAILED", "Native hole rejected the requested seat type.");
+        if (seat != HoleSeatType.Flat) h.SeatDiameter = N(d, "seat_diameter");
+        if (seat == HoleSeatType.Counterbore) h.SeatDepth = N(d, "seat_depth");
+        if (seat == HoleSeatType.Countersink) h.SeatAngle = R(d, "seat_angle_degrees");
         h.FlatBottom=B(d,"flat_bottom");if(!h.FlatBottom)h.BottomAngle=R(d,"bottom_angle_degrees");
     }
+    private static HoleSeatType RequestedSeat(JsonElement definition) => S(definition, "seat") switch
+    {
+        "counterbore" => HoleSeatType.Counterbore,
+        "countersink" => HoleSeatType.Countersink,
+        _ => HoleSeatType.Flat
+    };
     static void Thread(ThreadFeature t,JsonElement d){t.IsRight=B(d,"right_handed");t.IsInternal=B(d,"internal");t.Pitch=N(d,"pitch");t.IsFullLength=B(d,"full_length");if(!t.IsFullLength)t.Length=N(d,"length");}
     static void VerifyValues(McObjectId id,ModelManufacturingEdit edit) {
         var d=edit.Definition;bool Near(double x,double y)=>Math.Abs(x-y)<=1e-8*Math.Max(1,Math.Max(Math.Abs(x),Math.Abs(y)));
@@ -209,7 +219,21 @@ internal static class ModelManufacturingWriter
         else if(edit.Kind=="set_model_extrusion_extent")ok=ModelExtrusionExtentEditor.Verify(id.GetObjectOfType<ExtrudeFeature>()!,d);
         else if(edit.Kind.EndsWith("_loft")){var f=id.GetObjectOfType<LoftFeature>()!;ok=f.LoftType==LoftType.Regular&&f.PartOperation==(S(d,"part_operation")=="cut"?PartFeatureOperation.Cut:PartFeatureOperation.Join);}
         else if(edit.Kind.EndsWith("_sweep")){var f=id.GetObjectOfType<ExtrudeAlongPathFeature>()!;ok=Same(f.ProfileID,S(d,"profile_id"))&&Near(f.Angle,N(d,"taper_angle"))&&f.ProfileOrientation==(S(d,"orientation")=="normal_to_path"?SweepProfileOrientation.NormalToPath:SweepProfileOrientation.ParallelToOriginalProfile)&&f.PartOperation==(S(d,"part_operation")=="cut"?PartFeatureOperation.Cut:PartFeatureOperation.Join);}
-        else if(edit.Kind.EndsWith("_hole")){var h=id.GetObjectOfType<HoleFeature>()!;ok=Near(h.Diameter,N(d,"diameter"))&&h.IsFullDepth==B(d,"through")&&(h.IsFullDepth||Near(h.Depth,N(d,"depth")))&&h.FlatBottom==B(d,"flat_bottom")&&(h.FlatBottom||Near(h.BottomAngle,R(d,"bottom_angle_degrees")))&&h.SeatType.ToString()==(S(d,"seat")=="none"?"Flat":S(d,"seat")=="counterbore"?"Counterbore":"Countersink");var p=h.GetPlacement();ok&=p!=null&&(d.TryGetProperty("center",out _)?p.DefType==IppDefinitionType.Fixed:Near(p.Param1,N(d,"offset1"))&&Near(p.Param2,N(d,"offset2"))&&p.Sector==d.GetProperty("sector").GetInt32());if(h.SeatType!=HoleSeatType.Flat)ok&=Near(h.SeatDiameter,N(d,"seat_diameter"))&&(h.SeatType==HoleSeatType.Counterbore?Near(h.SeatDepth,N(d,"seat_depth")):Near(h.SeatAngle,R(d,"seat_angle_degrees")));}
+        else if (edit.Kind.EndsWith("_hole", StringComparison.Ordinal))
+        {
+            var hole = id.GetObjectOfType<HoleFeature>()!;
+            var seat = RequestedSeat(d);
+            var placement = hole.GetPlacement();
+            ok = hole.SeatType == seat && Near(hole.Diameter, N(d, "diameter")) &&
+                hole.IsFullDepth == B(d, "through") && (hole.IsFullDepth || Near(hole.Depth, N(d, "depth"))) &&
+                hole.FlatBottom == B(d, "flat_bottom") && (hole.FlatBottom || Near(hole.BottomAngle, R(d, "bottom_angle_degrees"))) &&
+                placement != null && (d.TryGetProperty("center", out _) ? placement.DefType == IppDefinitionType.Fixed :
+                    Near(placement.Param1, N(d, "offset1")) && Near(placement.Param2, N(d, "offset2")) &&
+                    placement.Sector == d.GetProperty("sector").GetInt32());
+            if (ok && seat != HoleSeatType.Flat)
+                ok = Near(hole.SeatDiameter, N(d, "seat_diameter")) && (seat == HoleSeatType.Counterbore
+                    ? Near(hole.SeatDepth, N(d, "seat_depth")) : Near(hole.SeatAngle, R(d, "seat_angle_degrees")));
+        }
         else if(edit.Kind.EndsWith("_thread")){var t=id.GetObjectOfType<ThreadFeature>()!;ok=Near(t.Pitch,N(d,"pitch"))&&t.IsRight==B(d,"right_handed")&&t.IsInternal==B(d,"internal")&&t.IsFullLength==B(d,"full_length")&&(t.IsFullLength||Near(t.Length,N(d,"length")));}
         else if(edit.Kind.EndsWith("_circular_pattern")){var p=id.GetObjectOfType<CircularPatternFeature>()!;ok=p.Size==d.GetProperty("count").GetInt32()&&Near(p.Angle,R(d,"angle_degrees"));}
         else ok=id.GetObjectOfType<MirrorFeature>()!=null;
@@ -225,6 +249,9 @@ internal static class ModelManufacturingWriter
             var e=(ModelManufacturingEdit)args.Operations.Single();var d=e.Definition;bool add=e.Kind.StartsWith("add_");
             using(var tx=state.Document.Database.TransactionManager.StartTransaction())b=Resolve(e,args,state,tx,job.CheckCancellation);
             if(b.Datum!=null)ModelDatumPlaneMirror353.PreWrite(b.Datum,args,state,job.CheckCancellation);
+            var setHoleExtent = e.Kind.EndsWith("_hole", StringComparison.Ordinal) &&
+                (B(d, "through") || (!add && b.Feature.GetObjectOfType<HoleFeature>()!.IsFullDepth))
+                ? NativeModelHistory421.LoadHoleExtent() : null;
             job.CheckCancellation();ModelViewFollowers.CheckStandalone(b.Body,b.Views,job.CheckCancellation);tracker=new McUndoPoint(false);tracker.Start();started=true;stage="native_write";
             if(add)ModelViewFollowers.PrepareInsertion(b.Views,false);
             feature=b.Feature;
@@ -254,7 +281,7 @@ internal static class ModelManufacturingWriter
                     else{placement.SetAssocParams(new McGeomParam{ID=b.Edge1},new McGeomParam{ID=b.Edge2});placement.Param1=N(d,"offset1");placement.Param2=N(d,"offset2");placement.Sector=d.GetProperty("sector").GetInt32();}
                     h=b.Body.AddHoleFeature(HoleFeatureType.Simple,placement);Need(h!=null,"MODEL_UPDATE_FAILED","Native hole creation failed.");feature=h!.ID;}
                 else h=feature.GetObjectOfType<HoleFeature>()!;
-                Hole(h,d,!add,b.HoleOffsets);
+                Hole(h,d,!add,setHoleExtent!=null,b.HoleOffsets);
             } else if(e.Kind.EndsWith("_thread")) {
                 var t=add?b.Body.AddThreadFeature(b.Face,B(d,"right_handed")):feature.GetObjectOfType<ThreadFeature>();Need(t!=null,"MODEL_UPDATE_FAILED","Native thread creation failed.");feature=t!.ID;if(add){t.FrontEdgeId=b.Edge1;t.DbEntity.Update();}Thread(t,d);
             } else if(e.Kind.EndsWith("_circular_pattern")) {
@@ -271,6 +298,16 @@ internal static class ModelManufacturingWriter
             }
             var item=feature.GetObjectOfType<HistoryItem>()!;
             if(add){if(item.OrderObjBefore!=b.Views.LastModelItem)Need(item.SetOrderObjBefore(b.Views.LastModelItem,false),"MODEL_UPDATE_FAILED","Feature predecessor was rejected.");ModelViewFollowers.CompleteInsertion(b.Views,feature);}
+            if (setHoleExtent != null)
+            {
+                // Select the SDK extent mode explicitly and recalculate the through depth.
+                stage = "set_hole_extent";
+                bool through = B(d, "through");
+                var extentStatus = setHoleExtent(b.Body.DbEntity.Document.ID.ToString(), b.Body.ID.ToString(),
+                    feature.ToString(), through ? 1 : 0);
+                Need(extentStatus == 0, "MODEL_UPDATE_FAILED", $"Native hole extent was not confirmed (HRESULT 0x{unchecked((uint)extentStatus):X8}).");
+                if (!through) feature.GetObjectOfType<HoleFeature>()!.Depth = N(d, "depth");
+            }
             item.DbEntity.Update();stage="rebuild";McObjectManager.UpdateAll();if(!add){Need(b.Body.RebuildPart(),"MODEL_UPDATE_FAILED","Native model rebuild failed.");McObjectManager.UpdateAll();}job.CheckCancellation();stage="verify";
             var contents=ModelInventoryBudget.History(b.Body,job.CheckCancellation);Need(b.Contents.Where(x=>!b.ExternalSources.Contains(x.ToString())).All(contents.Contains)&&contents.Contains(feature),"MODEL_STATE_UNAVAILABLE","Existing history was lost.");
             var currentPaths=NativePathSources.Read(contents!,job.CheckCancellation);

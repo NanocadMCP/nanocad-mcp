@@ -64,7 +64,7 @@ internal static class GuidanceCatalog
             string operation = value.GetString()!;
             string inputContract=ReadSchema(operation,hasVariant?variant.GetString():null);
             text=hasVariant
-                ?ToolUsage.Purpose(operation)+ToolUsage.Contract(operation)
+                ?ToolUsage.Purpose(operation)+" Use topic=recovery for an uncertain outcome."
                 :OperationGuidance357.Read(operation)+"\n\n"+ToolCatalog.DetailedDescription(operation);
             text+="\n\nActual input contract (JSON):\n"+inputContract;
         }
@@ -102,12 +102,14 @@ internal static class GuidanceCatalog
         {
             var envelope = (JsonObject)properties.DeepClone();
             envelope.Remove(field);
-            return new JsonObject {
+            var index = new JsonObject {
                 ["tool"] = "nanocad." + operation, ["array_field"] = field,
                 ["request_fields"] = envelope, ["required"] = schema["required"]!.DeepClone(),
                 ["variants"] = new JsonArray(branches.Select(b => Key(b!)).Distinct().Select(k => (JsonNode?)JsonValue.Create(k)).ToArray()),
                 ["next"] = "Read topic=schema with this operation and the exact needed variant. The response is its complete input schema. Use it for the real task; no trial writes are needed."
-            }.ToJsonString();
+            };
+            if (operation == "modify_entities") index["host_limits"] = ToolUsage.ModifyEntitiesHostLimits;
+            return index.ToJsonString();
         }
         var selected = branches.Where(b => Key(b!) == variant).ToArray();
         if (selected.Length == 0) throw new McpProtocolException("Unknown variant. Read the schema branch index first.", McpErrorCode.InvalidParams);

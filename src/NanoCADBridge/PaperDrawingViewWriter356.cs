@@ -126,7 +126,10 @@ internal static class PaperDrawingViewWriter356
                 {Need(seen.Add(id),"Created view history chain is cyclic.");Need(current.Previous.TryGetValue(id,out var next),"Created view predecessor unavailable.");id=next;}
                 return id;
             }
-            Need(Skip(current.Last)==old.Last,"Native source terminal changed outside the exact added view chain.","DRAWING_VIEW_UPDATE_MISMATCH");
+            var retainedLast=Skip(current.Last);
+            if(retainedLast!=old.Last)
+                throw new DomainException("DRAWING_VIEW_UPDATE_MISMATCH","Native source terminal changed outside the exact added view chain.",false,
+                    new{expected=CadDrawingViewEditState.Id(old.Last),actual=CadDrawingViewEditState.Id(current.Last),retained=CadDrawingViewEditState.Id(retainedLast)});
             foreach(var node in old.Nodes.EnumerateArray())
             {
                 var identity=node.GetProperty("id").GetString();var retainedNode=current.Nodes.EnumerateArray().Single(item=>item.GetProperty("id").GetString()==identity);
@@ -152,6 +155,10 @@ internal static class PaperDrawingViewWriter356
     {
         McUndoPoint? tracker=null;bool started=false;var observedIds=new List<string>();
         void Close(){var owned=tracker;tracker=null;if(owned!=null)try{owned.Stop();}finally{owned.Dispose();}}
+        Result Failure(Exception error,Exception? cleanup=null)=>job.Error(
+            started||cleanup!=null?"WRITE_OUTCOME_UNKNOWN":error is DomainException domain?domain.Error.code:"MODEL_UPDATE_FAILED",
+            "Native Paper view creation did not complete verified readback; inspect the exact affected sheet and Model sources.",started||cleanup!=null?"unknown":"not_started",context,
+            new{error_type=error.GetType().Name,message=error.Message,native_details=(error as DomainException)?.Error.details,observed_native_view_ids=observedIds,cleanup_error=cleanup?.GetType().Name});
         try
         {
             Scope scope;using(var tx=state.Document.Database.TransactionManager.StartTransaction())scope=Prepare(args,state,tx,job.CheckCancellation);
@@ -170,20 +177,22 @@ internal static class PaperDrawingViewWriter356
                 child.Name=spec.NamePrefix+" "+placement.Name;child.DbEntity.DScale=spec.Scale;child.DbEntity.Scale=1;views.Add(child);
             }
             McObjectManager.UpdateAll();job.CheckCancellation();
+            var viewIds=views.Select(view=>view.ID).ToArray();var rootId=viewIds[0];
             (StructureChange[] Changes,PaperDrawingViewCreation356[] Details) Readback()
             {
                 Current(scope,state,job.CheckCancellation);using var tx=state.Document.Database.TransactionManager.StartTransaction();
-                var after=CadDrawingViewLifecycleState345.Capture(state,tx,job.CheckCancellation);Retained(scope,after,created.ToArray(),state.Document.Database,tx,job.CheckCancellation);
+                var after=CadDrawingViewLifecycleState345.Capture(state,tx,job.CheckCancellation);Retained(scope,after,viewIds,state.Document.Database,tx,job.CheckCancellation);
                 var changes=new List<StructureChange>();var details=new List<PaperDrawingViewCreation356>();
-                for(int index=0;index<views.Count;index++)
+                for(int index=0;index<viewIds.Length;index++)
                 {
-                    var native=views[index];var item=after.Views.SingleOrDefault(view=>view.Id==native.ID);var placement=placements[index];
-                    Need(item!=null&&item.Space==scope.Space&&item.Layout==scope.Layout&&native.DbEntity.DocumentID==scope.Sheet.ID,
+                    var item=after.Views.SingleOrDefault(view=>view.Id==viewIds[index]);var placement=placements[index];
+                    Need(item!=null&&item.Space==scope.Space&&item.Layout==scope.Layout&&item.Native.DbEntity.DocumentID==scope.Sheet.ID,
                         "New native view has no unique representation in the exact requested Paper layout.","OBJECT_IDENTITY_MISMATCH");
+                    var native=item.Native;
                     Need(native.Name==spec.NamePrefix+" "+placement.Name&&native.DirectionType==placement.Direction&&native.Status.ToString()=="Ok"&&!native.IsSuppressed&&
                         native.DbEntity.DScale==spec.Scale&&native.DbEntity.Scale==1&&native.SectionID.IsNull&&!native.IsBasedOnSection&&!native.IsSlice,
                         "New ordinary Paper view name/direction/status/scale/section state differs.","DRAWING_VIEW_UPDATE_MISMATCH");
-                    Need(native.RootViewID==front.ID&&(index==0?native.ParentViewID.IsNull:native.ParentViewID==front.ID),"Created native projection tree differs.","DRAWING_VIEW_UPDATE_MISMATCH");
+                    Need(native.RootViewID==rootId&&(index==0?native.ParentViewID.IsNull:native.ParentViewID==rootId),"Created native projection tree differs.","DRAWING_VIEW_UPDATE_MISMATCH");
                     Need(Math.Abs(native.ViewPlane.Origin.X-placement.Origin.X)<=1e-8&&Math.Abs(native.ViewPlane.Origin.Y-placement.Origin.Y)<=1e-8&&Math.Abs(native.ViewPlane.Origin.Z)<=1e-8,
                         "Native Paper placement differs from requested sheet XY coordinates.","DRAWING_VIEW_UPDATE_MISMATCH");
                     if(index==0)Need(RequestedPlane(native.ProjPlane,Projection(spec)),
@@ -206,24 +215,28 @@ internal static class PaperDrawingViewWriter356
                     details.Add(new(reference,new(args.BridgeId,args.DocumentId,spec.LayoutHandle!),scope.Sheet.ID.ToString(),token,tokenReason,refs.Refs!,sources.top_source_ids,
                         CadDrawingViewEditState.Id(native.ParentViewID),native.RootViewID.ToString(),CadDrawingViewEditState.Ids(native.ChildViews,"Created view children"),Geometry(native,job.CheckCancellation)));
                 }
-                Need(front.ChildViews.ToHashSet().SetEquals(views.Skip(1).Select(view=>view.ID))&&views.Skip(1).All(view=>view.ChildViews.Count==0),"New native group has unexpected children.","DRAWING_VIEW_UPDATE_MISMATCH");
+                var group=after.Views.Where(view=>viewIds.Contains(view.Id)).ToArray();
+                Need(group.Single(view=>view.Id==rootId).Native.ChildViews.ToHashSet().SetEquals(viewIds.Skip(1))&&
+                    group.Where(view=>view.Id!=rootId).All(view=>view.Native.ChildViews.Count==0),"New native group has unexpected children.","DRAWING_VIEW_UPDATE_MISMATCH");
                 return(changes.ToArray(),details.ToArray());
             }
-            var observed=Readback();
             var warnings=new[]{WriteRecovery.Warning,"NATIVE_PAPER_VIEW_CREATION: Fresh views belong to the explicit active native Paper sheet; their selected sources remain Model solids. Opaque source internals are unobserved; layout transfer and annotation association are not inferred. Inspect the rendered sheet before relying on projection detail."};
-            Result ResultOf((StructureChange[] Changes,PaperDrawingViewCreation356[] Details) value)=>Result.Ok(job.OriginalRequestId,
-                new ModifiedStructure(args.OperationId,"committed",false,value.Changes,"not_guaranteed",drawing_view_creation_results:value.Details),context,warnings);
-            Need(JsonSerializer.SerializeToUtf8Bytes(ResultOf(observed),Wire.Json).Length<=Wire.PayloadBudget-8192,"Actual Paper view response exceeds wire bytes.","RESPONSE_LIMIT_EXCEEDED");
-            job.CheckCancellation();job.BeginCommit();Close();var verified=Readback();
-            var result=ResultOf(verified);Need(JsonSerializer.SerializeToUtf8Bytes(result,Wire.Json).Length<=Wire.PayloadBudget-8192,"Committed Paper view response exceeds wire bytes.","RESPONSE_LIMIT_EXCEEDED");
-            job.RecordCommit(result);return result;
+            // Source history can settle after the host finishes the command.
+            // Keep the same ownership and terminal checks at that boundary.
+            job.CheckCancellation();job.BeginCommit();Close();
+            return NativePostCommandVerification422.Defer(job,()=>
+            {
+                var value=Readback();
+                var result=Result.Ok(job.OriginalRequestId,
+                    new ModifiedStructure(args.OperationId,"committed",false,value.Changes,"not_guaranteed",drawing_view_creation_results:value.Details),context,warnings);
+                Need(JsonSerializer.SerializeToUtf8Bytes(result,Wire.Json).Length<=Wire.PayloadBudget-8192,"Committed Paper view response exceeds wire bytes.","RESPONSE_LIMIT_EXCEEDED");
+                job.RecordCommit(result);return result;
+            },error=>Failure(error));
         }
         catch(Exception error)
         {
             if(job.CommittedResult is {} committed)return committed;Exception? cleanup=null;try{Close();}catch(Exception failure){cleanup=failure;}
-            return job.Error(started||cleanup!=null?"WRITE_OUTCOME_UNKNOWN":error is DomainException domain?domain.Error.code:"MODEL_UPDATE_FAILED",
-                "Native Paper view creation did not complete verified readback; inspect the exact affected sheet and Model sources.",started||cleanup!=null?"unknown":"not_started",context,
-                new{error_type=error.GetType().Name,message=error.Message,native_details=(error as DomainException)?.Error.details,observed_native_view_ids=observedIds,cleanup_error=cleanup?.GetType().Name});
+            return Failure(error,cleanup);
         }
     }
 }

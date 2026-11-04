@@ -14,7 +14,7 @@ internal static class McpPresentation
     {
         var description = tool.Name switch
         {
-            "nanocad.modify_entities" => "Edit native geometry, annotations or part history, or add the next feature. Read get_guidance(topic=operation, operation=modify_entities, variant=the exact item operation) before writing. For Model Space erase, read inspect_objects with erase_assessment=true for the whole set. Preserve sources and dependencies. Recover pending outcomes by ID.",
+            "nanocad.modify_entities" => "Edit native geometry, annotations or part history, or add the next feature. Read get_guidance(topic=operation, operation=modify_entities, variant=the exact item operation) before writing. For Model Space erase, read inspect_objects with erase_assessment=true for the whole set. Preserve sources and dependencies. Recover pending outcomes by ID. " + ToolUsage.ModifyEntitiesHostLimits,
             "nanocad.modify_structure" => "Edit layers, styles, blocks, views, layouts or viewports. Read get_guidance(topic=operation, operation=modify_structure, variant=the exact item operation) before writing. Follow its batching and ownership rules. Recover pending outcomes by ID.",
             _ => null
         };

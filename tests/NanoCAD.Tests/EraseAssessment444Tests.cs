@@ -71,9 +71,9 @@ internal static class EraseAssessment444Tests
                 prepare_for = new { operation = "modify_entities", variant = "erase" } })).Selection!.Schema.GetRawText();
             Check(erase.Contains("native") && erase.Contains("shared") && erase.Contains("erase_assessment"), "Erase protection or evidence workflow missing.");
             Check(erase.Contains("Hatch") && erase.Contains("unselected boundary"), "Hatch source protection regressed.");
-            foreach (var name in Wire.WriteOperations)
-                Check(ToolCatalog.Tools.Single(tool => tool.Name == "nanocad." + name).Description!.Contains("proven-unused", StringComparison.Ordinal),
-                    name + " omits task-owned cleanup from compact guidance.");
+            Check(ServerGuidance.Instructions.Contains("proven-unused", StringComparison.Ordinal) &&
+                ServerGuidance.Instructions.Contains("erase_assessment=true", StringComparison.Ordinal),
+                "Engineering guidance omits task-owned cleanup and its assessment requirement.");
             return Task.CompletedTask;
         });
     }

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NanoCAD.Contracts;
 using NanoCAD.Ipc;
 
@@ -15,7 +16,7 @@ public static class VisualCaptureService
     private static readonly SemaphoreSlim Gate=new(1,1);
     // Only a hint about observation quality. Identical pixels after a camera
     // change cannot prove that the CAD view has rendered the new state.
-    private sealed record CaptureFingerprint(string Bridge,string Document,string Camera,string Sha256);
+    private sealed record CaptureFingerprint(string Bridge,string Document,string Camera,string Sha256,bool ViewportOnly);
     private static CaptureFingerprint? _lastCapture;
     public static void RequireContext(VisualCaptureArguments args,JsonElement data)
     {
@@ -28,6 +29,16 @@ public static class VisualCaptureService
     public static void RequireUnchanged(JsonElement before,JsonElement after)
     {
         if(!JsonElement.DeepEquals(before,after))throw new DomainException("CAPTURE_CONTEXT_CHANGED","The document context changed during capture; the image was discarded.",true);
+    }
+
+    public static void RequireCaptureArea(VisualCaptureArguments args, JsonElement result)
+    {
+        bool viewportOnly = result.TryGetProperty("viewport_only", out var viewport) && viewport.ValueKind == JsonValueKind.True;
+        if (viewportOnly != args.ViewportOnly)
+            throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The bridge did not confirm the requested capture area.");
+        if (viewportOnly && (!result.TryGetProperty("capture_document_id", out var document) || document.ValueKind != JsonValueKind.String || document.GetString() != args.DocumentId ||
+            !result.TryGetProperty("capture_revision", out var revision) || revision.ValueKind != JsonValueKind.String || revision.GetString() != args.Revision))
+            throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The observed viewport belongs to another document or revision.", true);
     }
     public static void RequirePng(byte[] png,int width,int height,int maxEdge)
     {
@@ -92,12 +103,21 @@ public static class VisualCaptureService
             // still cannot render the CAD graphics surface. The bridge lives
             // in nanoCAD's desktop, so use its read-only WGC worker in both
             // cases. Keep the server-side window identity check when possible.
+            var workerInput = new JsonObject
+            {
+                ["bridge_instance_id"] = args.BridgeId, ["capture_id"] = captureId,
+                ["max_edge"] = args.MaxEdge, ["inline_image"] = true
+            };
+            if (args.ViewportOnly) workerInput["viewport_only"] = true;
             var response=await client.CallAsync(descriptor,new Request(Wire.Version,Guid.NewGuid().ToString("D"),"capture_window",9000,
-                Wire.Element(new{bridge_instance_id=args.BridgeId,capture_id=captureId,max_edge=args.MaxEdge,inline_image=true})),deadline.Token);
+                Wire.Element(workerInput)),deadline.Token);
+            if (args.ViewportOnly && response.error is { code: "INVALID_ARGUMENT", message: "Unknown capture argument." })
+                throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The loaded bridge does not support viewport-only capture.");
             if(!response.success)throw new DomainException(response.error!.code,response.error.message,response.error.retryable,response.error.details);
             var remote=Wire.Element(response.data!);
             if(remote.GetProperty("capture_id").GetString()!=captureId||remote.GetProperty("process_id").GetInt32()!=descriptor.process_id)
                 throw new DomainException("CAPTURE_FAILED","Bridge capture token or process identity differs.");
+            RequireCaptureArea(args, remote);
             frame=Wire.Element(new{captured=true,pid=descriptor.process_id,
                 width=remote.GetProperty("width").GetInt32(),height=remote.GetProperty("height").GetInt32(),
                 source_width=remote.GetProperty("source_width").GetInt32(),source_height=remote.GetProperty("source_height").GetInt32(),
@@ -117,13 +137,15 @@ public static class VisualCaptureService
                 ?token.GetString()??"": "";
             var previous=_lastCapture;
             bool identicalAfterCameraChange=previous!=null&&previous.Bridge==args.BridgeId&&previous.Document==args.DocumentId&&
-                previous.Camera.Length>0&&cameraToken.Length>0&&previous.Camera!=cameraToken&&previous.Sha256==digest;
-            _lastCapture=new(args.BridgeId,args.DocumentId,cameraToken,digest);
+                previous.ViewportOnly==args.ViewportOnly&&previous.Camera.Length>0&&cameraToken.Length>0&&previous.Camera!=cameraToken&&previous.Sha256==digest;
+            _lastCapture=new(args.BridgeId,args.DocumentId,cameraToken,digest,args.ViewportOnly);
             var data=new {frame_id=id,source="windows_graphics_capture",mime_type="image/png",width,height,
                 source_width=frame.GetProperty("source_width").GetInt32(),source_height=frame.GetProperty("source_height").GetInt32(),
                 png_sha256=digest,process_id=descriptor.process_id,process_start_utc_ticks=descriptor.process_start_utc_ticks.ToString(CultureInfo.InvariantCulture),
                 started_at_utc=started,completed_at_utc=DateTime.UtcNow.ToString("O"),frame_system_relative_ticks=timestamp,capture_started_system_relative_ticks=captureStart,
-                document=afterData,document_metadata_unchanged=true,camera_consistency=cameraVerified?"camera_metadata_unchanged":"unverified",scope="main_window_observation; camera metadata comparison is not an atomic model-render synchronization barrier"};
+                document=afterData,document_metadata_unchanged=true,camera_consistency=cameraVerified?"camera_metadata_unchanged":"unverified",
+                scope=args.ViewportOnly ? "native_viewport_observation; camera metadata comparison is not an atomic model-render synchronization barrier" :
+                    "main_window_observation; camera metadata comparison is not an atomic model-render synchronization barrier"};
             var warnings=identicalAfterCameraChange
                 ?new[]{"Visual observation only: verify dimensions and write outcomes with exact APIs; separate dialogs/menus may be absent.",
                     "CAPTURE_IDENTICAL_AFTER_CAMERA_CHANGE: Pixels match the previous frame despite a different camera token. Inspect the actual image; rendering may not have updated. This does not imply a CAD write failure."}

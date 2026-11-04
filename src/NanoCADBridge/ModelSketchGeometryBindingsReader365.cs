@@ -34,7 +34,8 @@ internal static class ModelSketchGeometryBindingsReader365
         "not_established_by_membership_marker_or_constraint_reference",
         "not_evaluated; native_edit_mode_not_entered",
         "observation_only; no_geometry_setter_or_driving_variable_storage_binding_proved");
-    internal static ModelSketchGeometryBindings365 Read(PlanarSketch sketch,McDocument owner,JsonElement constraints,Action cancel)
+    internal static ModelSketchGeometryBindings365 Read(PlanarSketch sketch,McDocument owner,JsonElement constraints,Action cancel,
+        bool observeConstraintState = false)
     {
         Dictionary<McObjectId,EntityGeometry>? geometry=null;Constraints2D? manager=null;
         ModelSketchGeometryMember365[]? members=null;ModelSketchSolverScope365? scope=null;
@@ -71,6 +72,14 @@ internal static class ModelSketchGeometryBindingsReader365
                 }
                 var member=new ModelSketchGeometryMember365(Key(pair.Key),pair.Value.GeometryType.ToString(),objects.Contains(pair.Key),
                     projections.Contains(pair.Key),marker==-1?null:marker.ToString(CultureInfo.InvariantCulture),Optional(mapped),status,equivalent);
+                if (observeConstraintState)
+                {
+                    // MAPI documents this const query on a sketch geometry ID.
+                    // The ID is the exact key from this sketch's current geometry.
+                    try { member = member with { fully_constrained = sketch.IsGeomFullyConstrained(pair.Key) }; }
+                    catch (Exception error) when (error is not OperationCanceledException)
+                    { member = member with { fully_constrained_unavailable_reason = "Native query unavailable: " + error.GetType().Name }; }
+                }
                 budget.Add(member);observed.Add(member);
             }
             members=observed.ToArray();cancel();

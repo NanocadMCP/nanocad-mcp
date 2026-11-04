@@ -15,7 +15,12 @@ internal static class DrawingViewsSchema
         properties["source_identity_view_handle"]!["description"]="Optional exact current view in this layout. Read native simple sources and complete complex insertion chains separately, plus sliced-body IDs and stored native source-generation settings for a Section view, without regeneration or traversal. Stored settings and actual projection participation are separate observations. Default omits this inventory.";
         properties["geometry_start_index"]=new JsonObject{["type"]="integer",["minimum"]=0,["maximum"]=int.MaxValue,["default"]=0};
         properties["geometry_page_size"]=new JsonObject{["type"]="integer",["minimum"]=1,["maximum"]=int.MaxValue,["default"]=100};
-        schema["dependentRequired"]=new JsonObject{["geometry_start_index"]=new JsonArray("geometry_view_handle"),["geometry_page_size"]=new JsonArray("geometry_view_handle")};
+        properties["include_geometry_sources"] = new JsonObject
+        {
+            ["type"] = "boolean", ["default"] = false,
+            ["description"] = "With geometry_view_handle, observe the exact native source edge of a visible Line in a healthy ordinary view of one local solid, when the projection marker and source key agree. Markers are scoped to the current view and revision. Unresolved rows report a reason."
+        };
+        schema["dependentRequired"]=new JsonObject{["geometry_start_index"]=new JsonArray("geometry_view_handle"),["geometry_page_size"]=new JsonArray("geometry_view_handle"),["include_geometry_sources"]=new JsonArray("geometry_view_handle")};
         schema["required"]=new JsonArray("bridge_instance_id","document_id","expected_revision","layout_handle");
         return JsonSerializer.SerializeToElement(schema);
     }

@@ -49,7 +49,7 @@ Cloud source points and storage remain read-only. The integration does not impor
 - **Dimensions:** annotation dimensions and driving sketch dimensions differ. Display of native driving annotations outside the sketch editor is not assured in every context. General parameter links to arbitrary text, table cells and properties are unavailable.
 - **Blocks and rich content:** there is no general dynamic-block editor or universal editor for Fields, rich text and external data links. Basic Ray/Xline support does not include every curve-editing operation.
 - **Modeling scope:** persistent assembly mates, general surface modeling, additional specialist modules, printing and PDF export are outside this integration. Placing parts together does not create an assembly mate.
-- **Recovery:** operations do not provide a universal Undo or rollback guarantee. An uncertain result must be reconciled with the actual drawing before continuing.
+- **Recovery:** some failures after native work starts can leave partial changes. Check the affected drawing state before continuing from an uncertain result.
 
 ## Verification
 

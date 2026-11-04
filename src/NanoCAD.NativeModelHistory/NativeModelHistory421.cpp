@@ -3,6 +3,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <cwchar>
@@ -72,6 +73,88 @@ extern "C" __declspec(dllexport) std::uint32_t __cdecl
 NanoCAD_NativeModelHistoryAbiVersion()
 {
     return 1;
+}
+
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_SetHoleExtent(const wchar_t* documentGuid, const wchar_t* bodyGuid,
+    const wchar_t* featureGuid, int through)
+{
+    if (through != 0 && through != 1) return E_INVALIDARG;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, featureGuid, object);
+        if (FAILED(status)) return status;
+        mcsWorkID bodyId;
+        status = ParseId(bodyGuid, bodyId);
+        if (FAILED(status)) return status;
+        IMc3dHolePtr hole = object;
+        if (!hole || hole->getHostSolidID() != bodyId) return E_INVALIDARG;
+
+        const auto extent = through ? kHoleExtType_All : kHoleExtType_Dist;
+        hole->setExtent(extent);
+        if (through) hole->updateDepth();
+        return hole->getExtent() == extent && hole->isFullDepth() == (through != 0) ? S_OK : E_FAIL;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadProjectedDimensionAnchors(const wchar_t* documentGuid, const wchar_t* viewGuid,
+    int marker, const double* endpoints, double* parameters, std::int64_t* data)
+{
+    if (!endpoints || !parameters || !data || marker < 0) return E_INVALIDARG;
+    for (int i = 0; i < 6; i++) if (!std::isfinite(endpoints[i])) return E_INVALIDARG;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, viewGuid, object);
+        if (FAILED(status)) return status;
+        IMc3dDrawingViewPtr view = object;
+        if (!view) return E_NOINTERFACE;
+        const mcsPoint start(endpoints[0], endpoints[1], endpoints[2]);
+        const mcsPoint end(endpoints[3], endpoints[4], endpoints[5]);
+        const mcsPoint midpoint((start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2);
+        McGeometryParam origin;
+        if (!view->getOrigParamAtPoint(midpoint, origin) || origin.isNull())
+            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        const mcsComplexWorkID simpleView(object->ID());
+        if (origin.getID() != object->ID() || origin.getComplexID() != simpleView ||
+            origin.isInViewport() || origin.iGSMarker != marker) return E_NOINTERFACE;
+
+        const auto matches = [&](const McGeometryParam& anchor, const mcsPoint& endpoint)
+        {
+            if (anchor.isNull() || anchor.getID() != origin.getID() ||
+                anchor.getComplexID() != origin.getComplexID() || anchor.idViewport != origin.idViewport ||
+                anchor.iGSMarker != marker) return false;
+            mcsPoint evaluated, original;
+            return SUCCEEDED(anchor.getPoint(evaluated)) && evaluated.distanceTo(endpoint) <= 1e-7 &&
+                view->getOrigGeomByParam(anchor, original) && original.distanceTo(endpoint) <= 1e-7;
+        };
+        int index = 0;
+        for (const auto& endpoint : {start, end})
+        {
+            McGeometryParam anchor = origin;
+            status = anchor.setPoint(endpoint);
+            if (FAILED(status) || !matches(anchor, endpoint))
+            {
+                // Picking a shared corner can replace the marker with an
+                // adjacent line. Evaluate the relative line ends on the
+                // already identified primitive without picking another one.
+                anchor = origin;
+                anchor.rParam = 0;
+                if (!matches(anchor, endpoint))
+                {
+                    anchor.rParam = 1;
+                    if (!matches(anchor, endpoint)) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+                }
+            }
+            parameters[index] = anchor.rParam;
+            data[index++] = anchor.iData;
+        }
+        return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
 }
 
 // Exact read-only public array binding. No factories, setters, marker sync,

@@ -36,6 +36,7 @@ internal static class CadSolidMeasurement409
         }
     }
     private sealed record Witness(PlanarFace First,PlanarFace Second,Point3d A,Point3d B,double Distance,string Method,string? FirstEdge=null,string? SecondEdge=null);
+    private sealed record AnalyticSupport(Point3d Origin, Vector3d Direction, double? Diameter);
 
     internal static object Read(GeometryAnalysisArguments args,DocumentState state,Transaction tx,ObjectId modelId,string instance,CancellationToken cancellation)
     {
@@ -56,12 +57,14 @@ internal static class CadSolidMeasurement409
         var captured=new Dictionary<string,Boundary>(StringComparer.Ordinal);
         try
         {
+            var units=new{name=state.Document.Database.Insunits.ToString(),value=(int)state.Document.Database.Insunits};
+            if (SolidMeasurementValidation409.IsAxisMeasurement(request.Mode))
+                return ReadAxisMeasurement(request, bodies, Ref, units, Check);
             foreach(var item in bodies)
             {
                 var selected=request.Mode=="face_distance"?request.Faces!.Where(f=>f.Handle==item.Key).Select(f=>f.NativeId).ToHashSet(StringComparer.Ordinal):null;
                 Check();captured.Add(item.Key,Capture(item.Value,selected,Check));
             }
-            var units=new{name=state.Document.Database.Insunits.ToString(),value=(int)state.Document.Database.Insunits};
             object FaceRef(PlanarFace face,Boundary owner)=>new{body_ref=Ref(owner.Body),native_id=face.Id};
             object Accuracy()=>new{point_tolerance=Tolerance.Global.EqualPoint,vector_tolerance=Tolerance.Global.EqualVector,finite_edge_verification_tolerance=CurveDistanceVerification.AbsoluteTolerance,
                 policy="native finite-edge closest pairs and trimmed-face containment; double-precision planar projections; no tessellation or certified error bound"};
@@ -110,7 +113,7 @@ internal static class CadSolidMeasurement409
         }
         catch(Teigha.Runtime.Exception error)
         {
-            throw new DomainException("NATIVE_SOLID_MEASUREMENT_UNAVAILABLE","Native geometry could not complete this measurement; no distance or thickness is inferred from bounds.",false,
+            throw new DomainException("NATIVE_SOLID_MEASUREMENT_UNAVAILABLE","Native geometry could not complete this measurement; no measurement is inferred from bounds.",false,
                 new{mode=request.Mode,api_status=error.ErrorStatus.ToString()});
         }
         finally
@@ -119,6 +122,98 @@ internal static class CadSolidMeasurement409
             foreach(var boundary in captured.Values)try{boundary.Dispose();}catch(System.Exception error){failure??=error;}
             if(failure!=null)throw failure;
         }
+    }
+
+    private static object ReadAxisMeasurement(SolidMeasurement409 request, Dictionary<string, Solid3d> bodies,
+        Func<Solid3d, EntityRef> reference, object units, Action check)
+    {
+        var selections = request.Faces!;
+        var supports = new Dictionary<SolidFaceSelection409, AnalyticSupport>();
+        foreach (var body in bodies)
+        {
+            var selected = selections.Where(face => face.Handle == body.Key).ToDictionary(face => face.NativeId, StringComparer.Ordinal);
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            check();
+            using var brep = new Brep(body.Value);
+            Need(!brep.IsNull, "Native body B-rep is unavailable.", "OBJECT_READ_FAILED");
+            foreach (Face face in brep.Faces)
+            using (face)
+            {
+                check();
+                var id = Identity(face, body.Value, SubentityType.Face);
+                Need(seen.Add(id), "Native body has duplicate face identities.", "SUBENTITY_IDENTITY_UNAVAILABLE");
+                if (!selected.TryGetValue(id, out var selection)) continue;
+                using var surface = face.Surface;
+                if (request.Mode == "axis_plane_distance" && selection == selections[1])
+                {
+                    var plane = ReadPlane(surface, id, check);
+                    supports.Add(selection, new(plane.Origin, plane.Normal, null));
+                }
+                else
+                    supports.Add(selection, ReadCylinder(surface, id, check));
+            }
+            Need(selected.Keys.All(seen.Contains), "Selected native face IDs do not belong to the current source body.", "SUBENTITY_NOT_FOUND");
+        }
+
+        object FaceReference(SolidFaceSelection409 face) => new { body_ref = reference(bodies[face.Handle]), native_id = face.NativeId };
+        object CylinderData(SolidFaceSelection409 face, AnalyticSupport geometry) => new
+        {
+            face = FaceReference(face), axis_origin = Point(geometry.Origin), axis_direction = Point(geometry.Direction), diameter = geometry.Diameter!.Value
+        };
+        const string solver = "native_analytic_supporting_surfaces";
+        const string coordinate_system = "WCS";
+        var first = supports[selections[0]];
+        var cylinder = CylinderData(selections[0], first);
+        check();
+        if (request.Mode == "cylinder_diameter")
+            return new { mode = request.Mode, coordinate_system, units, solver, cylinder };
+
+        var second = supports[selections[1]];
+        var delta = second.Origin - first.Origin;
+        var cross = first.Direction.CrossProduct(second.Direction);
+        double sine = Number(cross.Length);
+        double cosine = Number(Math.Abs(first.Direction.DotProduct(second.Direction)));
+        double vectorTolerance = Number(Tolerance.Global.EqualVector);
+        if (request.Mode == "axis_axis_distance")
+        {
+            bool parallel = sine <= vectorTolerance;
+            double distance = parallel ? delta.CrossProduct(first.Direction).Length : Math.Abs(delta.DotProduct(cross * (1 / sine)));
+            return new { mode = request.Mode, coordinate_system, units, solver, first_cylinder = cylinder,
+                second_cylinder = CylinderData(selections[1], second), distance = Number(distance), angle_radians = Math.Atan2(sine, cosine),
+                parallel_within_native_tolerance = parallel, vector_tolerance = vectorTolerance,
+                result_scope = "Infinite supporting axes. Within the native vector tolerance, distance is the second axis origin's offset from the first axis." };
+        }
+
+        bool parallelToPlane = cosine <= vectorTolerance;
+        return new { mode = request.Mode, coordinate_system, units, solver, cylinder,
+            plane = new { face = FaceReference(selections[1]), origin = Point(second.Origin), normal = Point(second.Direction) },
+            distance = parallelToPlane ? Number(Math.Abs(delta.DotProduct(second.Direction))) : 0,
+            angle_radians = Math.Atan2(cosine, sine), parallel_within_native_tolerance = parallelToPlane, vector_tolerance = vectorTolerance,
+            result_scope = "Infinite axis and supporting plane. Distance is zero for an intersection; within the native vector tolerance it is the first axis origin's offset from the plane." };
+    }
+
+    private static AnalyticSupport ReadCylinder(Teigha.Geometry.Surface surface, string faceId, Action check)
+    {
+        AnalyticSupport Observe(Cylinder cylinder)
+        {
+            check();
+            var origin = cylinder.Origin;
+            var axis = cylinder.AxisOfSymmetry;
+            double diameter = Number(2 * cylinder.Radius);
+            double length = Number(axis.Length);
+            Need(length > 0 && diameter > 0, "Native cylindrical face has no nonzero axis or positive diameter.", "DEGENERATE_GEOMETRY");
+            check();
+            return new(origin, axis.GetNormal(), diameter);
+        }
+
+        if (surface is Cylinder native) return Observe(native);
+        if (surface is ExternalBoundedSurface bounded && bounded.IsCylinder)
+        {
+            using var support = ReadOwnedBaseSurface(bounded, faceId, check);
+            if (support is Cylinder cylinder) return Observe(cylinder);
+        }
+        throw new DomainException("UNSUPPORTED_MEASUREMENT_GEOMETRY", "Use a face that exposes a native circular cylinder supporting surface.", false,
+            new { face_native_id = faceId, surface_runtime_type = surface.GetType().FullName });
     }
 
     private static Boundary Capture(Solid3d body,HashSet<string>? selected,Action check)
@@ -189,11 +284,20 @@ internal static class CadSolidMeasurement409
             throw new DomainException("NATIVE_FACE_PLANE_UNAVAILABLE","This external planar surface does not expose the supported owned BaseSurface Plane path.",false,
                 new{face_native_id=faceId,surface_runtime_type=surface.GetType().FullName,api="ExternalBoundedSurface.BaseSurface"});
 
+        using var baseSurface = ReadOwnedBaseSurface(bounded, faceId, check);
+        check();if(baseSurface is not Teigha.Geometry.Plane plane)
+            throw new DomainException("NATIVE_FACE_PLANE_UNAVAILABLE","The native planar face BaseSurface did not return an actual geometric Plane.",false,
+                new{face_native_id=faceId,surface_runtime_type=surface.GetType().FullName,base_surface_runtime_type=baseSurface?.GetType().FullName,api="ExternalBoundedSurface.BaseSurface"});
+        return Observe(plane);
+    }
+
+    private static Teigha.Geometry.Surface? ReadOwnedBaseSurface(ExternalBoundedSurface surface, string faceId, Action check)
+    {
         // Installed SDK get_BaseSurface obtains OdGeSurface* and calls
         // Wrapped.CreateRaw<OdGeSurface>(pointer, bOwner:true). The resulting
         // geometric object is owned, unlike an arbitrarily borrowed child.
         // Read values and dispose it while its external parent remains alive.
-        check();var baseSurface=bounded.BaseSurface;
+        check();var baseSurface=surface.BaseSurface;
         if(baseSurface!=null&&(ReferenceEquals(baseSurface,surface)||baseSurface.UnmanagedObject==IntPtr.Zero||
             baseSurface.UnmanagedObject==surface.UnmanagedObject||!baseSurface.AutoDelete))
         {
@@ -201,13 +305,7 @@ internal static class CadSolidMeasurement409
             throw new DomainException("NATIVE_SURFACE_OWNERSHIP_UNAVAILABLE","Native BaseSurface did not prove a distinct owned geometric wrapper; an unproved alias was not disposed.",false,
                 new{face_native_id=faceId,api="ExternalBoundedSurface.BaseSurface"});
         }
-        using(baseSurface)
-        {
-            check();if(baseSurface is not Teigha.Geometry.Plane plane)
-                throw new DomainException("NATIVE_FACE_PLANE_UNAVAILABLE","The native planar face BaseSurface did not return an actual geometric Plane.",false,
-                    new{face_native_id=faceId,surface_runtime_type=surface.GetType().FullName,base_surface_runtime_type=baseSurface?.GetType().FullName,api="ExternalBoundedSurface.BaseSurface"});
-            return Observe(plane);
-        }
+        return baseSurface;
     }
 
     private static Solid3d Detached(Solid3d source,IEnumerable<IntPtr> forbidden)

@@ -13,7 +13,7 @@ internal static class VisualCaptureTests
         await test("visual capture input preserves identity precision and rejects unrelated window controls", () =>
         {
             var args = VisualCaptureSchema.Parse(Wire.Element(Input()));
-            if (args.BridgeId != bridge || args.DocumentId != document || args.Revision != "18446744073709551615" || args.MaxEdge != 1600) throw new Exception("Capture context changed");
+            if (args.BridgeId != bridge || args.DocumentId != document || args.Revision != "18446744073709551615" || args.MaxEdge != 1600 || args.ViewportOnly) throw new Exception("Capture context or default changed");
             foreach (int edge in new[] { 255, 2049 }) Deny(() => VisualCaptureSchema.Parse(Wire.Element(Input(edge))));
             var valid = JsonSerializer.SerializeToNode(Input())!;
             foreach (var key in new[] { "hwnd", "path", "pid", "command", "camera" }) { var bad = valid.DeepClone(); bad[key] = "1"; Deny(() => VisualCaptureSchema.Parse(Wire.Element(bad))); }
@@ -48,11 +48,27 @@ internal static class VisualCaptureTests
             var request = Wire.Element(new { bridge_instance_id = bridge, capture_id = token, max_edge = 1600 });
             var parsed = VisualCaptureBridgeArguments.Parse(request);
             if (!VisualCaptureBridgeArguments.Parse(Wire.Element(new { bridge_instance_id = bridge, capture_id = token, max_edge = 1600, inline_image = true })).InlineImage) throw new Exception("Inline transport flag lost");
-            if (parsed.BridgeId != bridge || parsed.CaptureId != token || parsed.MaxEdge != 1600 ||
+            if (parsed.BridgeId != bridge || parsed.CaptureId != token || parsed.MaxEdge != 1600 || parsed.ViewportOnly ||
                Wire.ValidateBridge("capture_window", request) != bridge) throw new Exception("Internal capture identity changed");
             Deny(() => VisualCaptureBridgeArguments.Parse(Wire.Element(new { bridge_instance_id = bridge, capture_id = token, max_edge = 2049 })));
             Deny(() => VisualCaptureBridgeArguments.Parse(Wire.Element(new { bridge_instance_id = bridge, capture_id = token, max_edge = 1600, hwnd = "1" })));
             Deny(() => VisualCaptureBridgeArguments.Parse(Wire.Element(new { bridge_instance_id = bridge, capture_id = "../frame", max_edge = 1600 })));
+            return Task.CompletedTask;
+        });
+        await test("viewport capture requires the native crop and matching context", () =>
+        {
+            var input = JsonSerializer.SerializeToNode(Input())!;
+            input["viewport_only"] = true;
+            var args = VisualCaptureSchema.Parse(Wire.Element(input));
+            var relay = Wire.Element(new { bridge_instance_id = bridge, capture_id = Guid.NewGuid().ToString("N"), max_edge = 1600, viewport_only = true });
+            if (!args.ViewportOnly || !VisualCaptureBridgeArguments.Parse(relay).ViewportOnly)
+                throw new Exception("Viewport choice did not survive parsing");
+            input["viewport_only"] = "true";
+            Deny(() => VisualCaptureSchema.Parse(Wire.Element(input)));
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Wire.Element(new { })), "CAPTURE_VIEWPORT_UNAVAILABLE");
+            Deny(() => VisualCaptureService.RequireCaptureArea(args, Wire.Element(new { viewport_only = true, capture_document_id = document, capture_revision = "1" })), "CAPTURE_CONTEXT_CHANGED");
+            VisualCaptureService.RequireCaptureArea(args, Wire.Element(new { viewport_only = true, capture_document_id = document, capture_revision = args.Revision }));
+            VisualCaptureService.RequireCaptureArea(args with { ViewportOnly = false }, Wire.Element(new { }));
             return Task.CompletedTask;
         });
         await test("visual capture inline image crosses the real IPC text-page budget", async () =>

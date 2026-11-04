@@ -32,6 +32,8 @@ internal sealed class CadReader
             if (Environment.CurrentManagedThreadId != _uiThread)
                 throw new DomainException("UI_THREAD_MISMATCH", "Native reads must execute on the bridge initialization thread.");
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.operation == DesktopCaptureBridge.ViewportTargetRead)
+                return DesktopCaptureBridge.ReadViewportTarget(request, _documents);
             var args = Validation.Parse(request.operation, request.arguments);
             if (request.operation == "get_documents")
                 return new CadDocuments(_instance, _documents).List(request, cancellationToken);

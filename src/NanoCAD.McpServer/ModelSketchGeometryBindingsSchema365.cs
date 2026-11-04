@@ -18,6 +18,9 @@ internal static class ModelSketchGeometryBindingsSchema365
     {
         var member=Object(("element_id",Text()),("native_geometry_type",Text()),("contained_nonprojection",Bool()),("contained_projection",Bool()),
             ("native_gs_marker",Nullable(Text())),("marker_element_id",Nullable(Text())),("marker_status",Text()),("marker_geometry_equivalent",Nullable(Bool())));
+        member["properties"]!["fully_constrained"] = new JsonObject { ["type"] = "boolean",
+            ["description"] = "Native PlanarSketch Boolean for this exact current geometry member, when available. False does not distinguish remaining degrees of freedom from overconstraint." };
+        member["properties"]!["fully_constrained_unavailable_reason"] = Text();
         var solver=Object(("native_object_id",Text()),("constraint_ids",Array(Text())),("current_geometry_id",Nullable(Text())),("current_marker_roundtrip_proved",Bool()));
         var scope=Object(("document_id",Text()),("sketch_id",Nullable(Text())),("scope_id",Nullable(Text())),("network",Text()));
         var result=Object(("scope",Text()),("sketch_id",Text()),("native_document_id",Text()),("geometry_members_complete",Bool()),("geometry_members",Nullable(Array(member))),

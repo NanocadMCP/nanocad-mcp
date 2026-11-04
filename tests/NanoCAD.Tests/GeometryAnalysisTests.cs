@@ -71,5 +71,37 @@ internal static class GeometryAnalysisTests
             if (!schema.GetProperty("properties").TryGetProperty("workplane", out _)) throw new Exception("Analysis frame missing from MCP schema.");
             return Task.CompletedTask;
         });
+        await test("cylinder analysis admits only the current selected face operands", () =>
+        {
+            var first = new { handle = "0a", native_id = "7" };
+            var second = new { handle = "B", native_id = "7" };
+            var diameter = Input("cylinder_diameter", "A");
+            diameter["faces"] = new[] { first };
+            var parsed = GeometryAnalysisValidation.Parse(Wire.Element(diameter));
+            if (parsed.SolidMeasurement?.Faces is not [{ Handle: "A", NativeId: "7" }])
+                throw new Exception("Cylinder face selection lost the native identity.");
+            diameter["faces"] = new[] { first, second }; Reject(diameter);
+            diameter["faces"] = new[] { first }; diameter["point"] = new[] { 0, 0, 0 }; Reject(diameter);
+
+            foreach (var mode in new[] { "axis_axis_distance", "axis_plane_distance" })
+            {
+                var pair = Input(mode, "B", "A");
+                pair["faces"] = new[] { first, second };
+                parsed = GeometryAnalysisValidation.Parse(Wire.Element(pair));
+                if (parsed.SolidMeasurement?.Faces is not [{ Handle: "A", NativeId: "7" }, { Handle: "B", NativeId: "7" }])
+                    throw new Exception("Axis analysis changed the ordered source faces.");
+                pair["handles"] = new[] { "A" }; Reject(pair);
+                pair["faces"] = new[] { first, first }; Reject(pair);
+                pair["faces"] = new[] { first, new { handle = "0A", native_id = "11" } };
+                GeometryAnalysisValidation.Parse(Wire.Element(pair));
+            }
+
+            var modes = AuditServerContractSupport.Input("analyze_geometry").GetProperty("oneOf")[2].GetProperty("oneOf")
+                .EnumerateArray().ToDictionary(branch => branch.GetProperty("properties").GetProperty("mode").GetProperty("const").GetString()!);
+            if (modes["cylinder_diameter"].GetProperty("properties").GetProperty("faces").GetProperty("maxItems").GetInt32() != 1 ||
+                modes["axis_plane_distance"].GetProperty("properties").GetProperty("faces").GetProperty("minItems").GetInt32() != 2)
+                throw new Exception("Published axis analysis schema lost the mode-specific face counts.");
+            return Task.CompletedTask;
+        });
     }
 }

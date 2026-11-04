@@ -109,7 +109,7 @@ internal static class ModelSketchLifecycleReader362
             new(V(value.Plane.Origin),V(value.Plane.XAxis),V(value.Plane.YAxis),V(DrawingWorkplane.Normal(value.Plane))),value.Geometry,
             value.Profiles.EnumerateArray().Select(item=>item.GetProperty("profile_id").GetString()!).ToArray(),value.Projections.Ids.Select(Key).ToArray(),value.Projections.Sources.Select(source=>source.id).Concat(value.Projections.NativeReferences.Select(Key)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),value.Constraints,
             value.Sketch.HostSolidID.IsNull?"document_construction":"native_host_affinity",
-            ModelSketchGeometryBindingsReader365.Read(value.Sketch,owner,value.Constraints,cancel),
+            ModelSketchGeometryBindingsReader365.Read(value.Sketch,owner,value.Constraints,cancel,observeConstraintState:true),
             NativeSketchMembers385.Observe(value.Sketch,state,tx,cancel),ModelSketchSupportState396.Observe(body,value.Sketch,value.Plane,state,tx,bridge,cancel));
     }
     internal static ModelSketchDiscovery362 Read(DocumentState state,Db.Transaction tx,Action cancel,bool includeInventory,string? cursor,string[]? sketchIds,string[] bodyHandles,string bridge)

@@ -8,7 +8,7 @@ internal static class SolidGeometryAnalysisSchema
     {
         var modes=(JsonArray)schema["properties"]!["mode"]!["enum"]!;
         modes.Add("solid_containment");modes.Add("solid_interference");
-        schema["properties"]!["mode"]!["description"]="Curve modes retain their existing scope. solid_containment classifies one WCS point against one top-level native Solid3d body, including cavities. solid_interference checks exactly two top-level native Solid3d shapes using detached copies. It does not measure a clearance or classify mere touching. Solid modes do not accept workplane. New in332; native acceptance pending.";
+        schema["properties"]!["mode"]!["description"]="solid_containment checks one WCS point against one top-level native Solid3d. Native bounds can prove the point is outside. Points within those bounds require whole-body B-rep classification, which can be unavailable on the host. solid_interference checks two top-level native Solid3d shapes using detached copies. It does not measure clearance or classify touching. These solid modes do not accept workplane.";
         var conditions=(JsonArray)schema["allOf"]!;
         conditions.Add(JsonNode.Parse("""
           {"if":{"properties":{"mode":{"const":"solid_containment"}}},

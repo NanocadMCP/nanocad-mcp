@@ -12,7 +12,7 @@ internal static class ModelParameterSchema
      "properties":{
        "bridge_instance_id":{"type":"string","format":"uuid"},"document_id":{"type":"string","format":"uuid"},
        "operation_id":{"type":"string","format":"uuid"},"expected_revision":{"type":"string","pattern":"^[0-9]{1,20}$"},
-       "units":{"const":"Millimeters"},"handle":{"type":"string","pattern":"^[0-9A-Fa-f]{1,16}$"},
+       "units":{"type":"string","const":"Millimeters"},"handle":{"type":"string","pattern":"^[0-9A-Fa-f]{1,16}$"},
        "variable_id":{"type":"string","pattern":"^\\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\\}$"},
        "expected_expression":{"type":"string","minLength":1,"description":"Exact currently stored native expression from get_model_variables. Limited by the actual request frame, not the new-expression grammar."},
        "value":{"type":"number","description":"Finite scalar in the exact verified owning control's units and value domain; counts require positive integers. Current target expression must be a numeric literal. Native owner validation occurs before writing."},

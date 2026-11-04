@@ -10,7 +10,7 @@ internal static class DrawingViewsTests
         await test("drawing views require explicit current layout context and reject write controls", () =>
         {
             var args = Validation.Parse("get_drawing_views", Wire.Element(Input()));
-            if (args.Handles![0] != "AB") throw new Exception("Layout handle not normalized.");
+            if (args.Handles![0] != "AB" || args.IncludeGeometrySources) throw new Exception("Layout context or geometry-source default changed.");
             var selected = Input(); selected["geometry_view_handle"] = "000cd";
             if (Validation.Parse("get_drawing_views", Wire.Element(selected)).GeometryViewHandle != "CD")
                 throw new Exception("Selected projection view handle not normalized.");
@@ -29,6 +29,23 @@ internal static class DrawingViewsTests
                 try { Validation.Parse("get_drawing_views", Wire.Element(value)); } catch (DomainException) { continue; }
                 throw new Exception("Unsupported control accepted: " + name);
             }
+            return Task.CompletedTask;
+        });
+        await test("drawing view source observations require an explicit selected geometry page", () =>
+        {
+            var input = Input();
+            input["include_geometry_sources"] = true;
+            try { Validation.Parse("get_drawing_views", Wire.Element(input)); throw new Exception("Geometry source observation was accepted without a selected view."); }
+            catch (DomainException) { }
+            input["geometry_view_handle"] = "CD";
+            if (!Validation.Parse("get_drawing_views", Wire.Element(input)).IncludeGeometrySources)
+                throw new Exception("Explicit geometry source observation was dropped.");
+            input["include_geometry_sources"] = "true";
+            try { Validation.Parse("get_drawing_views", Wire.Element(input)); throw new Exception("A non-boolean geometry source option was accepted."); }
+            catch (DomainException) { }
+            var output = AuditServerContractSupport.Output("get_drawing_views").GetRawText();
+            if (!output.Contains("projection_source") || !output.Contains("native_ref_key"))
+                throw new Exception("The optional native source observation schema is missing.");
             return Task.CompletedTask;
         });
         await test("drawing views catalog exposes stored read-only metadata and excludes quarantined capabilities", () =>

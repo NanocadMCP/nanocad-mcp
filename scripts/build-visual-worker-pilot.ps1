@@ -11,7 +11,7 @@ $includes=@('/I'+(Join-Path $msvc 'include'))
 foreach($part in @('ucrt','shared','um','winrt','cppwinrt')){$includes+=('/I'+(Join-Path $sdk "Include\$version\$part"))}
 $libs=@(('/LIBPATH:'+(Join-Path $msvc 'lib\x64')),('/LIBPATH:'+(Join-Path $sdk "Lib\$version\um\x64")),('/LIBPATH:'+(Join-Path $sdk "Lib\$version\ucrt\x64")))
 $compiler=Join-Path $msvc 'bin\Hostx64\x64\cl.exe'
-& $compiler /nologo /std:c++20 /EHsc /O2 /MD /W3 /WX @includes (Join-Path $root 'src\NanoCAD.VisualWorker\VisualWorker.cpp') ('/Fo'+(Join-Path $out 'VisualWorker.obj')) ('/Fe'+(Join-Path $out 'VisualWorker.exe')) /link @libs windowsapp.lib d3d11.lib user32.lib
+& $compiler /nologo /std:c++20 /EHsc /O2 /MD /W3 /WX @includes (Join-Path $root 'src\NanoCAD.VisualWorker\VisualWorker.cpp') ('/Fo'+(Join-Path $out 'VisualWorker.obj')) ('/Fe'+(Join-Path $out 'VisualWorker.exe')) /link @libs windowsapp.lib d3d11.lib user32.lib dwmapi.lib
 if($LASTEXITCODE -ne 0){throw 'Visual worker build failed'}
 & (Join-Path $out 'VisualWorker.exe') --help
 if($LASTEXITCODE -ne 0){throw 'Visual worker help failed'}

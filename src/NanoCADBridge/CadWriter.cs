@@ -33,7 +33,8 @@ internal sealed class CadWriter
         using var tr = doc.Database.TransactionManager.StartTransaction();
         if (args is CreateArguments create)
         {
-            if(ModelExtrusionCreator.Handles(create))ModelExtrusionCreator.Preflight(create,state,tr);
+            if(ProjectedDimensionWriter.Handles(create))ProjectedDimensionWriter.Preflight(create,state,tr,cancel??(()=>{}));
+            else if(ModelExtrusionCreator.Handles(create))ModelExtrusionCreator.Preflight(create,state,tr);
             else Resolve(create, doc.Database, tr,cancel);
         }
         else if (args is ModifyArguments modify)
@@ -343,6 +344,7 @@ internal sealed class CadWriter
                 args=CadTableFormulaRange350.Expand(rangeArgs,state,selector,job.CheckCancellation);
             }
             if(args is CreateArguments modelArgs&&ModelExtrusionCreator.Handles(modelArgs))return ModelExtrusionCreator.Execute(modelArgs,state,job,context,_log);
+            if(args is CreateArguments dimensionArgs&&ProjectedDimensionWriter.Handles(dimensionArgs))return ProjectedDimensionWriter.Execute(dimensionArgs,state,job,context,_log);
             if(args is ModifyArguments eraseModelArgs)
             {
                 bool nativeErase;

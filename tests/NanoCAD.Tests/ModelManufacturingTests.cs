@@ -52,6 +52,42 @@ internal static class ModelManufacturingTests
             catch (DomainException error) when (error.Error.code == "CAPABILITY_UNAVAILABLE") { }
             return Task.CompletedTask;
         });
+        await test("manufacturing hole requires only the selected seat fields", () =>
+        {
+            foreach (bool add in new[] { true, false })
+            {
+                var edit = Edit("hole", add);
+                var definition = edit["definition"]!.AsObject();
+                definition["seat"] = "none";
+                definition.Remove("seat_diameter");
+                definition.Remove("seat_depth");
+                definition.Remove("seat_angle_degrees");
+                Parse(edit);
+
+                definition["seat"] = "counterbore";
+                definition["seat_diameter"] = 12;
+                Reject(edit);
+                definition["seat_depth"] = 3;
+                Parse(edit);
+
+                definition["seat"] = "countersink";
+                definition.Remove("seat_depth");
+                Reject(edit);
+                definition["seat_angle_degrees"] = 90;
+                Parse(edit);
+            }
+
+            var branches = ToolCatalog.Tools.Single(t => t.Name == "nanocad.modify_entities").InputSchema
+                .GetProperty("properties").GetProperty("operations").GetProperty("items").GetProperty("oneOf").EnumerateArray();
+            foreach (var branch in branches.Where(branch => branch.GetProperty("properties").GetProperty("operation").GetProperty("const").GetString() is "add_model_hole" or "set_model_hole"))
+            {
+                var definition = branch.GetProperty("properties").GetProperty("definition");
+                if (definition.GetProperty("required").EnumerateArray().Any(field => field.GetString()!.StartsWith("seat_", StringComparison.Ordinal)) ||
+                    definition.GetProperty("allOf").GetArrayLength() != 2)
+                    throw new Exception("Published hole branch requires unused seat fields or lacks seat conditions.");
+            }
+            return Task.CompletedTask;
+        });
         await test("manufacturing block rejects malformed identities and impossible definitions", () =>
         {
             var e = Edit("hole", true); e["definition"]!["center"] = new JsonArray("10", 20, 0); Reject(e);

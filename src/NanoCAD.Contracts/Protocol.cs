@@ -61,6 +61,7 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     bool IncludeDocumentProfiles = false, string? DocumentProfileCursor = null, string[]? ModelProfileIds = null, string[]? ModelProfileRegionIds = null, string[]? ModelExtrusionExtentIds = null, bool IncludeDocumentDatumPlanes = false, string? DocumentDatumCursor = null, string[]? ModelDatumPlaneIds = null, string[]? ModelDatumPlaneRevisionIds = null, string? DrawingViewSourceIdentityHandle = null, string[]? ModelProfileElementIds = null, bool IncludeDocumentSketches = false, string? DocumentSketchCursor = null, string[]? ModelSketchIds = null)
 {
     public string[]? ModelFeatureDeletionIds { get; init; }
+    public bool IncludeGeometrySources { get; init; }
     public string[]? SketchConstraintParameterIds { get; init; }
     public QueryBounds407? QueryBounds { get; init; }
     public QueryText407? QueryText { get; init; }

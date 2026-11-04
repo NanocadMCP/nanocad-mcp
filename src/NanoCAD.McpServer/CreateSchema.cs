@@ -71,6 +71,12 @@ internal static class CreateSchema
             fields.Add(("associations",DimensionAssociationSchema385.Bindings(kind),false));
             entities.Add(Entity("Dimension", fields.ToArray()));
         }
+        entities.Add(Entity("Dimension",
+            ("kind", new JsonObject { ["const"] = "projected_aligned" }, true),
+            ("view_handle", new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" }, true),
+            ("line_index", new JsonObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = int.MaxValue,
+                ["description"] = "Current visible Line index from get_drawing_views for this view." }, true),
+            ("dimline_point", Point(), true)));
         JsonObject Points(int min) => new() { ["type"]="array", ["minItems"]=min, ["items"]=Point() };
         JsonObject DimensionPoint()=>new(){["type"]="array",["minItems"]=2,["maxItems"]=2,["items"]=Number(-1e6,1e6),["description"]="WCS XY millimeters, Z=0; coordinates within +/-1000000."};
         foreach(string kind in new[]{"angular_3point","angular_2line","ordinate"})

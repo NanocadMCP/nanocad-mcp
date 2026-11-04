@@ -13,6 +13,13 @@ internal static class NativeModelHistory421
     [UnmanagedFunctionPointer(CallingConvention.Cdecl,CharSet=CharSet.Unicode)]
     private delegate int TargetedRebuild([MarshalAs(UnmanagedType.LPWStr)]string document,
         [MarshalAs(UnmanagedType.LPWStr)]string body,out int accepted);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal delegate int SetHoleExtent(string document, string body, string feature, int through);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal delegate int ReadProjectedDimensionAnchors(string document, string view, int marker,
+        [MarshalAs(UnmanagedType.LPArray, SizeConst = 6)] double[] endpoints,
+        [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] double[] parameters,
+        [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] long[] data);
     private sealed record Api(IntPtr Library,TargetedRebuild Rebuild);
     private static readonly object Sync=new();
     private static Api? loaded;
@@ -45,6 +52,19 @@ internal static class NativeModelHistory421
         }
     }
     internal static void EnsureAvailable()=>_ = Load();
+    internal static SetHoleExtent LoadHoleExtent()
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_SetHoleExtent", out var address))
+            throw Unavailable("The native model-history adapter does not expose the hole extent setter.");
+        return Marshal.GetDelegateForFunctionPointer<SetHoleExtent>(address);
+    }
+    internal static ReadProjectedDimensionAnchors LoadProjectedDimensionAnchors()
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ReadProjectedDimensionAnchors", out var address))
+            throw Unavailable("The native model-history adapter does not expose the projected dimension anchors.");
+        return Marshal.GetDelegateForFunctionPointer<ReadProjectedDimensionAnchors>(address);
+    }
+
     internal static bool Rebuild(Mc3dSolid body)
     {
         if(body==null||body.ID.IsNull||body.ID.QueryObjectType()!=typeof(Mc3dSolid))

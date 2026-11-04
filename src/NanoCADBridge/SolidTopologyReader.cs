@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using NanoCAD.Contracts;
 using Teigha.DatabaseServices;
 using Teigha.Geometry;
@@ -17,7 +18,8 @@ namespace NanoCADBridge;
 internal static class SolidTopologyReader
 {
     private sealed record FaceBounds(double[] min,double[] max);
-    private sealed record FaceItem(string native_id,string surface_runtime_type,double? area,string? area_unavailable_reason,FaceBounds bounds,bool forward,string bounds_kind);
+    private sealed record FaceItem(string native_id,string surface_runtime_type,double? area,string? area_unavailable_reason,FaceBounds bounds,bool forward,string bounds_kind,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? analytic_surface);
     private sealed record EdgeItem(string native_id,string curve_runtime_type,double[]? start_vertex,double[]? end_vertex,bool forward,ModelEdgeReader.CircleGeometry? circle);
     public static object Read(Arguments args,DocumentState state,Transaction tx,ObjectId model,string instance,CancellationToken cancellation)
     {
@@ -28,7 +30,7 @@ internal static class SolidTopologyReader
         if(tx.GetObject(id,OpenMode.ForRead) is not Solid3d solid || solid.GetType()!=typeof(Solid3d) || solid.OwnerId!=model)
             throw new DomainException("OUT_OF_SCOPE","Topology requires a top-level native Model Space Solid3d.");
         if(solid.IsNull)throw new DomainException("DEGENERATE_GEOMETRY","Solid is empty.");
-        return Capture(solid,new EntityRef(instance,state.Id,solid.Handle.ToString()),cancellation);
+        return Capture(solid,new EntityRef(instance,state.Id,solid.Handle.ToString()),cancellation,identifySurfaces:true);
     }
     internal static object AttachNativeFaces(object topology,ObjectId id,DocumentState state,string instance,CancellationToken cancellation,bool faces,bool edges)
     {
@@ -39,7 +41,7 @@ internal static class SolidTopologyReader
         if(edges)merged["native_model_edges"]=JsonSerializer.SerializeToNode(ModelEdgeReader.Capture(id,state,instance,cancellation),Wire.Json);
         return merged;
     }
-    internal static object Capture(Solid3d solid,EntityRef source,CancellationToken cancellation,Action? checkCancel=null)
+    internal static object Capture(Solid3d solid,EntityRef source,CancellationToken cancellation,Action? checkCancel=null,bool identifySurfaces=false)
     {
         void Budget(){checkCancel?.Invoke();cancellation.ThrowIfCancellationRequested();}
         Budget();
@@ -116,7 +118,8 @@ internal static class SolidTopologyReader
                 // Native face area and BrepEntity.BoundBlock are not implemented.
                 // Never create/dispose CopyFace BODY/SURFACE temporaries to read.
                 double? area=null;
-                var observed=new FaceItem(key,surface.GetType().FullName!,area,area==null?"Native face area is unavailable; topology inspection does not copy database faces.":null,bounds,face.IsOrientToSurface,boundsKind);
+                string? analyticSurface=identifySurfaces?IdentifySurface(surface,planar):null;
+                var observed=new FaceItem(key,surface.GetType().FullName!,area,area==null?"Native face area is unavailable; topology inspection does not copy database faces.":null,bounds,face.IsOrientToSurface,boundsKind,analyticSurface);
                 inventoryBudget.Add(observed);faces.Add(observed);Budget();
             }
 
@@ -125,11 +128,24 @@ internal static class SolidTopologyReader
         var orderedFaces=faces.OrderBy(x=>x.native_id,StringComparer.Ordinal).ToArray();
         var orderedEdges=edges.OrderBy(x=>x.native_id,StringComparer.Ordinal).ToArray();
         bool record=solid.RecordHistory,show=solid.ShowHistory;
-        Budget();var serialized=JsonSerializer.SerializeToUtf8Bytes(new{source,faces=orderedFaces,edges=orderedEdges,record,show},Wire.Json);
+        // Surface hints help choose measurement operands. The token also serves
+        // write adapters, which hash the original topology observations only.
+        var tokenFaces=identifySurfaces?orderedFaces.Select(face=>face with{analytic_surface=null}).ToArray():orderedFaces;
+        Budget();var serialized=JsonSerializer.SerializeToUtf8Bytes(new{source,faces=tokenFaces,edges=orderedEdges,record,show},Wire.Json);
         if(serialized.LongLength>8L*1024*1024)throw new DomainException("RESPONSE_LIMIT_EXCEEDED","Native solid topology snapshot exceeds the actual8MiB serialized byte budget.");
         var token=Convert.ToHexString(SHA256.HashData(serialized));Budget();
         return new{source_ref=source,coordinate_system="WCS",reference_scope="bridge/document/revision/snapshot only; reacquire after edits or regeneration",
             snapshot_token=token,complete=true,record_history=record,show_history=show,faces=orderedFaces,edges=orderedEdges};
+    }
+
+    private static string? IdentifySurface(Teigha.Geometry.Surface surface,bool planar)
+    {
+        if (planar) return "plane";
+        try
+        {
+            return surface is Cylinder || surface is ExternalBoundedSurface bounded && bounded.IsCylinder ? "circular_cylinder" : null;
+        }
+        catch (Teigha.Runtime.Exception) { return null; }
     }
     private static double Finite(double value)=>double.IsFinite(value)?value:throw new DomainException("OBJECT_READ_FAILED","Non-finite native topology value.");
 }

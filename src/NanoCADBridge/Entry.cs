@@ -94,15 +94,16 @@ public sealed class Entry : IExtensionApplication
                 runtime_acceptance = "operation_specific_see_capabilities_and_warnings",
                 disabled_write_capabilities = _writes?.Available == false ? new[] { "document_writes", "camera_writes" } : Array.Empty<string>(),
                 rollback_not_guaranteed_capabilities = new[] { "create_viewport", "create_associative_hatch", "block_attribute_transforms" },
-                geometry_analysis = new { types = new[] { "Line", "Circle", "Arc", "Ellipse", "Spline", "Polyline", "Solid3d" }, modes = new[] { "metrics", "intersections", "distance", "relations", "containment", "solid_containment", "solid_interference", "solid_distance", "face_distance", "wall_thickness" },
+                geometry_analysis = new { types = new[] { "Line", "Circle", "Arc", "Ellipse", "Spline", "Polyline", "Solid3d" }, modes = new[] { "metrics", "intersections", "distance", "relations", "containment", "solid_containment", "solid_interference", "solid_distance", "face_distance", "wall_thickness", "cylinder_diameter", "axis_axis_distance", "axis_plane_distance" },
                     tolerance_policy = "native_kernel", overlap_classification = true, relations_scope="WCS_XY_Z0_or_explicit_workplane_finite_Line_Circle_Arc_Polyline", containment = true, containment_scope="single_Circle_or_simple_closed_straight_Polyline_at_least_3_vertices_WCS_XY_Z0_or_explicit_workplane", containment_method="native_bounds_then_brep_face",
                     solid_measurement_scope="finite trimmed planar straight-edged faces; whole-body modes require a complete planar straight-edged boundary",
+                    axis_measurement_scope="native circular cylinder diameters and infinite cylinder axes or supporting planes; native vector tolerance; no finite face clearance",
                     wall_thickness_scope="one selected opposed planar material chord at the requested face-interior point; not global minimum thickness" },
                 export_dxf_source_state = "may_mark_modified_known_issue"
             }));
         }
         if(request.operation=="capture_window")
-            return DesktopCaptureBridge.CaptureAsync(request,_descriptor!,cancellationToken);
+            return DesktopCaptureBridge.CaptureAsync(request,_descriptor!,queue,cancellationToken);
         if (request.operation == "get_operation_result")
             return _writeQueue?.ReadOperationAsync(request, cancellationToken) ?? Task.FromResult(Result.Fail(request.requestId, new("BRIDGE_UNAVAILABLE", "Bridge is stopping.")));
         if (Wire.WriteOperations.Contains(request.operation))

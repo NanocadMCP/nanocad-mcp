@@ -56,14 +56,28 @@ internal static class ModelParameterTests
                 Result result;
                 if(committed)
                 {
-                    result=Result.Ok(request.requestId,new ModelParameterResult(op,"committed",false,new(bridge,document,"150"),Guid.NewGuid().ToString("B"),variable,"150","151",151,"Millimeters",42,"not_tested"));
+                    var verified = new ModelParameterResult(op,"committed",false,new(bridge,document,"150"),Guid.NewGuid().ToString("B"),variable,"150","151",151,"Millimeters",42,"not_tested")
+                    {
+                        model_healthy = true,
+                        downstream_values_changed = false
+                    };
+                    var legacyData = Wire.Element(verified with { model_healthy = null, downstream_values_changed = null });
+                    Require(!legacyData.TryGetProperty("model_healthy", out _) && !legacyData.TryGetProperty("downstream_values_changed", out _));
+                    result = Result.Ok(request.requestId, verified);
                     job.BeginCommit();job.RecordCommit(result);
                 }
                 else result=job.Error("WRITE_OUTCOME_UNKNOWN","Native result unavailable.","unknown");
                 job.Complete(result);
                 var (same,isReplay)=queue.Enqueue(request with{requestId=Guid.NewGuid().ToString("D")});Require(same==job && isReplay && queue.Take()==null);
                 var replayed=WriteJob.ForCaller(await same.Completion,"replay-request",true);
-                Require(replayed.request_id=="replay-request" && (committed ? replayed.data is ModelParameterResult{replayed:true} : replayed.error?.details is WriteErrorDetails{replayed:true,outcome:"unknown"}));
+                Require(replayed.request_id=="replay-request" && (committed
+                    ? replayed.data is ModelParameterResult{replayed:true,model_healthy:true,downstream_values_changed:false}
+                    : replayed.error?.details is WriteErrorDetails{replayed:true,outcome:"unknown"}));
+                if (committed)
+                {
+                    var data = Wire.Element(replayed).GetProperty("data");
+                    Require(data.GetProperty("model_healthy").GetBoolean() && !data.GetProperty("downstream_values_changed").GetBoolean());
+                }
                 var different=Input();different["value"]=152;
                 try{queue.Enqueue(request with{arguments=Wire.Element(different)});}catch(DomainException e)when(e.Error.code=="OPERATION_ID_CONFLICT"){continue;}
                 throw new Exception("Operation ID conflict was not retained.");

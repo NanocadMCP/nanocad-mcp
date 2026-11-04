@@ -68,12 +68,26 @@ public static partial class ModifyValidation
             var common=new[]{"diameter","through","depth","seat","seat_diameter","seat_depth","seat_angle_degrees","flat_bottom","bottom_angle_degrees"}.Concat(fixedPosition?new[]{"center"}:new[]{"offset1","offset2","sector"}).ToArray();
             Shape(d,at,(add?common.Concat(fixedPosition?new[]{"face_token","face_id"}:new[]{"face_token","face_id","edge_token","first_edge_id","second_edge_id"}):common).Append("replace_driver_formulas").ToArray());
             if(d.TryGetProperty("replace_driver_formulas",out _))Flag("replace_driver_formulas");
-            Num("diameter",.001);bool through=Flag("through");Num("depth",through?0:.001);Flag("flat_bottom");Num("bottom_angle_degrees",.001,179.999);
-            string seat=Text(d,"seat",at,16);if(seat is not "none" and not "counterbore" and not "countersink")throw Invalid(at,"Unknown hole seat.");
-            double sd=Num("seat_diameter");Num("seat_depth");Num("seat_angle_degrees",.001,179.999);
-            if(seat!="none"&&sd<=Num("diameter",.001))throw Invalid(at,"Seat diameter must exceed hole diameter.");
-            if(seat=="counterbore"&&Num("seat_depth")<=0)throw Invalid(at,"Counterbore depth must be positive.");
-            if(!through&&seat=="counterbore"&&Num("seat_depth")>=Num("depth"))throw Invalid(at,"Counterbore depth must be less than blind-hole depth.");
+            double diameter = Num("diameter", .001);
+            bool through = Flag("through");
+            double depth = Num("depth", through ? 0 : .001);
+            Flag("flat_bottom");
+            Num("bottom_angle_degrees", .001, 179.999);
+            string seat = Text(d, "seat", at, 16);
+            if (seat is not ("none" or "counterbore" or "countersink")) throw Invalid(at, "Unknown hole seat.");
+            if (seat != "none")
+            {
+                if (Num("seat_diameter") <= diameter) throw Invalid(at, "Seat diameter must exceed hole diameter.");
+            }
+            else if (d.TryGetProperty("seat_diameter", out _)) Num("seat_diameter");
+            if (seat == "counterbore")
+            {
+                double seatDepth = Num("seat_depth");
+                if (seatDepth <= 0) throw Invalid(at, "Counterbore depth must be positive.");
+                if (!through && seatDepth >= depth) throw Invalid(at, "Counterbore depth must be less than blind-hole depth.");
+            }
+            else if (d.TryGetProperty("seat_depth", out _)) Num("seat_depth");
+            if (seat == "countersink" || d.TryGetProperty("seat_angle_degrees", out _)) Num("seat_angle_degrees", .001, 179.999);
             if(fixedPosition){var c=Required(d,"center",at);if(c.ValueKind!=JsonValueKind.Array||c.GetArrayLength()!=3)throw Invalid(at,"center requires WCS XYZ.");foreach(var v in c.EnumerateArray())Number(v,at,-1e6,1e6);}
             else {Num("offset1",-1e6);Num("offset2",-1e6);var v=Required(d,"sector",at);if(v.ValueKind!=JsonValueKind.Number||!v.TryGetInt32(out int sector)||sector<0||sector>3)throw Invalid(at,"sector must be0..3 as defined by IppDefinition.");}
             if(add){Token("face_token");Id(d,"face_id");if(!fixedPosition){Token("edge_token");if(Id(d,"first_edge_id")==Id(d,"second_edge_id"))throw Invalid(at,"Use two distinct datum edges.");}}

@@ -4,6 +4,9 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using NanoCAD.Contracts;
 using NanoCAD.Ipc;
+using Multicad.DatabaseServices;
+using Teigha.Geometry;
+using Application = HostMgd.ApplicationServices.Application;
 
 namespace NanoCADBridge;
 
@@ -11,6 +14,49 @@ namespace NanoCADBridge;
 // desktop, while the MCP server may run in an isolated window station.
 internal static class DesktopCaptureBridge
 {
+    // The IPC listener never accepts this operation. Only capture_window queues it.
+    internal const string ViewportTargetRead = "internal_capture_viewport_target";
+    private sealed record ViewportTarget(IntPtr Window, int Width, int Height, int ViewportNumber,
+        string NativeDocument, string DocumentId, string Revision);
+
+    internal static Result ReadViewportTarget(Request request, DocumentRegistry documents)
+    {
+        var document = Application.DocumentManager.MdiActiveDocument
+            ?? throw new DomainException("NO_DOCUMENT", "No active drawing is open.");
+        if (HostReadGate.IsBusy(document))
+            throw new DomainException("HOST_BUSY", "The active drawing is busy.", true);
+
+        var state = documents.Get(document);
+        string revision = state.Revision;
+        // MAPI IMcsNativeView::getViewHWND is the window where the native drawing is rendered.
+        // Compare its client size to the active viewport's SCREENSIZE in the WGC worker.
+        var sheet = McDocumentsManager.GetActiveSheet();
+        var view = sheet.ActiveView;
+        object number = Application.GetSystemVariable("CVPORT");
+        int viewport = number switch { int n => n, short n => n, _ => 0 };
+        if (viewport <= 0 || view.Handle == IntPtr.Zero || view.DocID.IsNull ||
+            Application.GetSystemVariable("SCREENSIZE") is not Point2d size ||
+            size.X < 1 || size.Y < 1 || size.X > int.MaxValue || size.Y > int.MaxValue ||
+            size.X != Math.Truncate(size.X) || size.Y != Math.Truncate(size.Y))
+            throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "Native drawing window or viewport pixel dimensions are unavailable.");
+
+        var target = new ViewportTarget(view.Handle, (int)size.X, (int)size.Y, viewport,
+            view.DocID.ToString(), state.Id, revision);
+        if (!ReferenceEquals(Application.DocumentManager.MdiActiveDocument, document) || state.Revision != revision)
+            throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The document changed during viewport observation.", true);
+        return Result.Ok(request.requestId, target);
+    }
+
+    private static async Task<ViewportTarget> GetViewportTarget(ReadQueue queue, CancellationToken cancellation)
+    {
+        var result = await queue.SubmitAsync(new Request(Wire.Version, Guid.NewGuid().ToString("D"),
+            ViewportTargetRead, 2000, Wire.Element(new { })), cancellation);
+        if (result.error is { } error)
+            throw new DomainException(error.code, error.message, error.retryable, error.details);
+        return result.data as ViewportTarget
+            ?? throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The native viewport target was not returned.");
+    }
+
     private static IntPtr MainWindow()
     {
         using var process=Process.GetCurrentProcess();
@@ -22,11 +68,12 @@ internal static class DesktopCaptureBridge
         return handle;
     }
 
-    internal static async Task<Result> CaptureAsync(Request request,Descriptor descriptor,CancellationToken cancellation)
+    internal static async Task<Result> CaptureAsync(Request request,Descriptor descriptor,ReadQueue queue,CancellationToken cancellation)
     {
         var args=VisualCaptureBridgeArguments.Parse(request.arguments);
         if(args.BridgeId!=descriptor.bridge_instance_id)throw new DomainException("BRIDGE_UNAVAILABLE","Capture targets another bridge lifetime.");
         var window=MainWindow();
+        var viewport = args.ViewportOnly ? await GetViewportTarget(queue, cancellation) : null;
         string root=LocalSecurity.SecureDirectory(Path.Combine(Discovery.Root,"visual-captures"));
         string directory=Path.Combine(root,args.InlineImage ? Guid.NewGuid().ToString("N") : args.CaptureId);
         if(args.InlineImage)LocalSecurity.SecureDirectory(directory);
@@ -44,6 +91,10 @@ internal static class DesktopCaptureBridge
         foreach(var value in new[]{"--capture",descriptor.process_id.ToString(CultureInfo.InvariantCulture),
             descriptor.process_start_utc_ticks.ToString(CultureInfo.InvariantCulture),window.ToInt64().ToString(CultureInfo.InvariantCulture),
             framePath,"--max-edge",args.MaxEdge.ToString(CultureInfo.InvariantCulture)})start.ArgumentList.Add(value);
+        if (viewport != null)
+            foreach (var value in new[] { "--viewport", viewport.Window.ToInt64().ToString(CultureInfo.InvariantCulture),
+                viewport.Width.ToString(CultureInfo.InvariantCulture), viewport.Height.ToString(CultureInfo.InvariantCulture) })
+                start.ArgumentList.Add(value);
         using var deadline=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
         deadline.CancelAfter(TimeSpan.FromSeconds(8));
         string output;
@@ -58,6 +109,8 @@ internal static class DesktopCaptureBridge
             {
                 await child.WaitForExitAsync(deadline.Token);
                 output=await stdout;_ = await stderr;
+                if (child.ExitCode == 4 && viewport != null)
+                    throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The active viewport could not be matched to the captured window. Request the whole window for this view.");
                 if(child.ExitCode!=0||output.Length>8192)
                     throw new DomainException("CAPTURE_FAILED","Windows did not provide a usable window image.");
             }
@@ -73,12 +126,22 @@ internal static class DesktopCaptureBridge
         var frame=parsed.RootElement;
         if(!frame.GetProperty("captured").GetBoolean()||frame.GetProperty("pid").GetInt32()!=descriptor.process_id)
             throw new DomainException("CAPTURE_FAILED","Desktop worker identity or result differs.");
+        if (viewport != null)
+        {
+            if (!frame.TryGetProperty("viewport_only", out var applied) || applied.ValueKind != JsonValueKind.True ||
+                frame.GetProperty("source_width").GetInt32() != viewport.Width ||
+                frame.GetProperty("source_height").GetInt32() != viewport.Height)
+                throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The visual worker did not confirm the native viewport crop.");
+            if (await GetViewportTarget(queue, cancellation) != viewport)
+                throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The active native viewport changed during capture.", true);
+        }
         var info=new FileInfo(framePath);
         if(!info.Exists||info.Length>600*1024||(info.Attributes&FileAttributes.ReparsePoint)!=0)
             throw new DomainException("CAPTURE_IMAGE_LIMIT","Desktop PNG exceeds600KiB; request a smaller max_edge.");
         if(MainWindow()!=window)throw new DomainException("CAPTURE_WINDOW_UNAVAILABLE","The nanoCAD main window changed during capture.");
         return Result.Ok(request.requestId,new{
             capture_id=args.CaptureId,process_id=descriptor.process_id,
+            viewport_only=viewport!=null, capture_document_id=viewport?.DocumentId, capture_revision=viewport?.Revision,
             png_base64=args.InlineImage ? Convert.ToBase64String(await File.ReadAllBytesAsync(framePath,cancellation)) : null,
             width=frame.GetProperty("width").GetInt32(),height=frame.GetProperty("height").GetInt32(),
             source_width=frame.GetProperty("source_width").GetInt32(),source_height=frame.GetProperty("source_height").GetInt32(),
