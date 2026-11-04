@@ -1,6 +1,17 @@
-# nanoCAD MCP 447
+# nanoCAD MCP release notes
 
 [Documentation](docs/en/index.md)
+
+## Development build 448
+
+Server 0.251.0 verifies the named pipe owner's Windows user SID directly, so
+the Administrators group can be the elevated token's default owner. The
+per-user pipe permissions and peer process, session and elevation checks
+remain in force. Bridge 0.207.0 and IPC protocol 0.144 are carried forward.
+The default tool catalog uses compact operation indexes for entity and
+structure edits. Exact variants remain available through focused guidance.
+
+## Package 447
 
 Tag `447` identifies the source for a local maintenance package. The published
 Windows downloads are available on the [release 446 page](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/446).

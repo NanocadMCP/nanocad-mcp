@@ -28,6 +28,12 @@ Check in this order:
 
 See [installation](installation.md) for exact paths and registration syntax. Do not remove discovery files, change IPC permissions or disable security checks as a connection fix.
 
+### ACCESS_DENIED when both applications run elevated
+
+In packages 446 and 447, a connection can fail even when both processes run as the same Windows user at the same elevation. This occurs when Windows assigns the Administrators group as the elevated token's default owner, a policy that may apply on Windows Server or Remote Desktop hosts.
+
+If your deployment allows it, save your drawings and reopen nanoCAD and the assistant in the same desktop session without administrator privileges. The source server version 0.251.0 checks the pipe owner's individual Windows user SID directly. It still verifies the peer process, session, user and elevation before sending a request.
+
 ## Connected, but the wrong drawing or instance is selected
 
 Ask the assistant to list the available nanoCAD instances and open documents, then identify the drawing by its actual path and content. With several nanoCAD processes, it must select a specific bridge instance. `AMBIGUOUS_INSTANCE` asks for that choice; it does not mean that the installation failed.

@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using NanoCAD.McpServer;
 
@@ -20,6 +21,49 @@ internal static class ServerStartupTests
                 File.WriteAllText(Path.Combine(root, "server-startup-failure.json"), message);
             }
             finally { if (!process.HasExited) { process.Kill(true); await process.WaitForExitAsync(); } }
+        });
+        await test("default MCP tools/list reply stays within 160000 UTF-8 bytes", async () =>
+        {
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var process = TestEnvironment.StartServer(Path.Combine(root, "startup-compact"), compactCatalog: true);
+            var stderr = process.StandardError.ReadToEndAsync();
+            try
+            {
+                async Task Send(string message)
+                {
+                    await process.StandardInput.WriteLineAsync(message.AsMemory(), deadline.Token);
+                    await process.StandardInput.FlushAsync(deadline.Token);
+                }
+                async Task<string> Reply(int id)
+                {
+                    var line = await process.StandardOutput.ReadLineAsync(deadline.Token)
+                        ?? throw new Exception("Server closed stdout before replying.");
+                    using var message = JsonDocument.Parse(line);
+                    if (message.RootElement.GetProperty("id").GetInt32() != id || !message.RootElement.TryGetProperty("result", out _))
+                        throw new Exception("Unexpected MCP reply.");
+                    return line;
+                }
+                await Send("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"catalog-size-test","version":"1"}}}""");
+                await Reply(1);
+                await Send("""{"jsonrpc":"2.0","method":"notifications/initialized"}""");
+                await Send("""{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""");
+                var reply = await Reply(2);
+                using var catalog = JsonDocument.Parse(reply);
+                var tools = catalog.RootElement.GetProperty("result").GetProperty("tools");
+                if (!tools.EnumerateArray().Select(tool => tool.GetProperty("name").GetString()).Order()
+                    .SequenceEqual(ToolCatalog.Tools.Select(tool => tool.Name).Order()))
+                    throw new Exception("The default tools/list response is incomplete.");
+                int bytes = Encoding.UTF8.GetByteCount(reply);
+                if (bytes > 160_000)
+                    throw new Exception($"Default tools/list response is {bytes} UTF-8 bytes and exceeds 160,000 bytes.");
+                Console.WriteLine($"Default MCP tools/list reply: {bytes} UTF-8 bytes.");
+            }
+            finally
+            {
+                process.StandardInput.Close();
+                if (!process.HasExited) { process.Kill(true); await process.WaitForExitAsync(); }
+                await stderr;
+            }
         });
         foreach (string protocol in new[] { "2025-11-25", "2026-07-28" })
             await test("server initialize guidance matches actual core capabilities " + protocol, async () =>

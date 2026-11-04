@@ -1,4 +1,5 @@
 using System.IO.Pipes;
+using System.Security.Principal;
 using NanoCAD.Contracts;
 
 namespace NanoCAD.Ipc;
@@ -11,7 +12,7 @@ public sealed class BridgeClient
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(request.timeoutMs);
         using var pipe = new NamedPipeClientStream(".", descriptor.pipe_name, PipeDirection.InOut,
-            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            PipeOptions.Asynchronous, TokenImpersonationLevel.Identification);
         bool write = Wire.WriteOperations.Contains(request.operation), attemptedSend = false;
         string operationId = request.arguments.TryGetProperty("operation_id", out var operation) && operation.ValueKind == System.Text.Json.JsonValueKind.String ? operation.GetString()! : "";
         DomainException Unknown(string cause) => new("WRITE_OUTCOME_UNKNOWN",
@@ -20,6 +21,11 @@ public sealed class BridgeClient
         try
         {
             await pipe.ConnectAsync(2000, deadline.Token).ConfigureAwait(false);
+            // The bridge assigns the user's SID explicitly. An elevated token's
+            // default owner can be the Administrators group, which is a different SID.
+            if (pipe.GetAccessControl().GetOwner(typeof(SecurityIdentifier)) is not SecurityIdentifier owner ||
+                owner.Value != LocalSecurity.UserSid)
+                throw new UnauthorizedAccessException("Pipe owner does not match the Windows user.");
             LocalSecurity.VerifyPeer(pipe.SafePipeHandle, false, descriptor.process_id, descriptor.process_start_utc_ticks);
             attemptedSend = true;
             await Framing.WriteAsync(pipe, request, Wire.MaxRequestBytes, deadline.Token).ConfigureAwait(false);

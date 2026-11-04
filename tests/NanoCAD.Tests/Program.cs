@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO.Pipes;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
@@ -17,7 +19,7 @@ try { runner = new ManagedTestRunner(args); }
 catch (ArgumentException error)
 {
     Console.Error.WriteLine(error.Message);
-    Console.Error.WriteLine("Usage: NanoCAD.Tests [--suite all|managed] [--filter substring] [--rerun-failed results.json] [--junit report.xml] [--json report.json] [--require-standard-windows-user SID]");
+    Console.Error.WriteLine("Usage: NanoCAD.Tests [--suite all|managed] [--filter substring] [--rerun-failed results.json] [--junit report.xml] [--json report.json] [--require-standard-windows-user SID] [--require-elevated-windows-owner administrators]");
     return 2;
 }
 string testRoot = runner.Root;
@@ -312,6 +314,29 @@ using (var listener = new BridgeListener(descriptor, async (request, token) =>
         Check(response.success, "pipe roundtrip");
         await Throws<DomainException>(() => new BridgeClient().CallAsync(descriptor with { process_start_utc_ticks = 1 }, RequestOf("get_status"), default));
     });
+    using (var identity = WindowsIdentity.GetCurrent())
+        if (identity.Owner is { } defaultOwner && identity.User is { } user && defaultOwner != user)
+            await Test("Windows secured pipe rejects the token default owner before sending a request", async () =>
+            {
+                string name = descriptor.pipe_name + "-" + Guid.NewGuid().ToString("N");
+                var security = new PipeSecurity();
+                security.SetOwner(defaultOwner);
+                security.SetAccessRuleProtection(true, false);
+                security.AddAccessRule(new PipeAccessRule(user, PipeAccessRights.FullControl, AccessControlType.Allow));
+                using var foreignOwner = NamedPipeServerStreamAcl.Create(name, PipeDirection.InOut, 1,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 0, security);
+                using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                var connected = foreignOwner.WaitForConnectionAsync(deadline.Token);
+                try
+                {
+                    await new BridgeClient().CallAsync(descriptor with { pipe_name = name }, RequestOf("get_status"), deadline.Token);
+                    throw new Exception("A pipe owned by the default owner was accepted.");
+                }
+                catch (DomainException e) when (e.Error.code == "ACCESS_DENIED") { }
+                await connected;
+                Check(await foreignOwner.ReadAsync(new byte[1].AsMemory(), deadline.Token) == 0,
+                    "Request bytes reached a pipe whose owner was not the user.");
+            });
     await Test("IPC cancellation propagates after disconnect", async () =>
     {
         using var cancel = new CancellationTokenSource();

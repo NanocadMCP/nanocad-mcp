@@ -36,6 +36,10 @@ jobs:
       - name: Run every managed test without nanoCAD
         shell: pwsh
         run: ./.github/scripts/run-managed-tests.ps1
+      - name: Test IPC with an elevated Windows token
+        shell: pwsh
+        run: |
+          & (Join-Path $env:DOTNET_ROOT 'dotnet.exe') tests/NanoCAD.Tests/bin/Release/net10.0-windows/NanoCAD.Tests.dll --suite managed --require-elevated-windows-owner administrators --filter 'Windows secured pipe' --filter 'IPC ' --filter 'stdio/pipe' --junit artifacts/elevated-ipc.xml --json artifacts/elevated-ipc.json
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v6
@@ -44,4 +48,6 @@ jobs:
           path: |
             artifacts/managed-tests.xml
             artifacts/managed-tests.json
+            artifacts/elevated-ipc.xml
+            artifacts/elevated-ipc.json
           if-no-files-found: warn

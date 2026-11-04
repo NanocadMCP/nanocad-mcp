@@ -32,6 +32,7 @@ internal sealed class ManagedTestRunner
                 case "--junit": junit = Path.GetFullPath(value); break;
                 case "--json": json = Path.GetFullPath(value); break;
                 case "--require-standard-windows-user": RequireStandardWindowsUser(value); break;
+                case "--require-elevated-windows-owner" when value == "administrators": RequireElevatedWindowsOwner(); break;
                 case "--suite" when value is "all" or "managed": managedOnly = value == "managed"; break;
                 case "--rerun-failed":
                     using (var previous = JsonDocument.Parse(File.ReadAllText(value)))
@@ -55,6 +56,16 @@ internal sealed class ManagedTestRunner
             identity.Groups == null || identity.Groups.Contains(administrators))
             throw new ArgumentException("The CI test process requires the requested standard Windows user with its user SID as token owner.");
         Console.WriteLine("Verified standard Windows test token and user SID owner.");
+    }
+
+    private static void RequireElevatedWindowsOwner()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var administrators = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+        if (identity.Owner != administrators || identity.User == administrators ||
+            !new WindowsPrincipal(identity).IsInRole(administrators))
+            throw new ArgumentException("Elevated IPC tests require an enabled Administrators group as the token owner, distinct from the user's SID.");
+        Console.WriteLine("Verified elevated Windows test token with Administrators as the default owner.");
     }
 
     public Task Run(string name, Func<Task> test) => Execute(name, test, false);
@@ -137,7 +148,7 @@ internal static class TestEnvironment
 {
     public static string ServerAssembly => typeof(NanoCAD.McpServer.ToolService).Assembly.Location;
 
-    public static Process StartServer(string home)
+    public static Process StartServer(string home, bool compactCatalog = false)
     {
         var info = new ProcessStartInfo(DotnetHost)
         {
@@ -149,6 +160,8 @@ internal static class TestEnvironment
         };
         info.ArgumentList.Add(ServerAssembly);
         info.Environment["NANOCAD_MCP_HOME"] = home;
+        if (compactCatalog)
+            info.Environment.Remove("NANOCAD_MCP_RESPONSE_MODE");
         return Process.Start(info) ?? throw new InvalidOperationException("MCP test server did not start.");
     }
 
