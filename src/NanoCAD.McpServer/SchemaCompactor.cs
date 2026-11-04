@@ -35,8 +35,8 @@ internal static class SchemaCompactor
         return JsonSerializer.SerializeToElement(Expand(root, new HashSet<string>(StringComparer.Ordinal)));
     }
 
-    // Keep every callable field and validation keyword inline. Only direct
-    // variant operating prose moves to focused guidance backed by the full input.
+    // Keep every callable field and validation keyword inline. Variant and field
+    // operating prose lives in focused guidance backed by the full input.
     public static JsonElement PublishInput(string operation, JsonElement input)
     {
         string? field = operation == "create_entities" ? "entities"
@@ -49,10 +49,15 @@ internal static class SchemaCompactor
             ?? throw new InvalidOperationException("Missing published variant branches.");
         if (items.ContainsKey("description"))
             throw new InvalidOperationException("Variant discovery would overwrite existing guidance.");
+        void MoveProse(JsonObject schema)
+        {
+            schema.Remove("description");
+            foreach (var child in Children(schema)) MoveProse(child);
+        }
         foreach (var branch in branches)
-            (branch?.AsObject() ?? throw new InvalidOperationException("Invalid published branch.")).Remove("description");
+            MoveProse(branch?.AsObject() ?? throw new InvalidOperationException("Invalid published branch."));
         string discriminator = operation == "create_entities" ? "kind or type" : "operation";
-        items["description"] = "All input fields and validation remain inline. Before writing a variant, read " +
+        items["description"] = "All input fields and validation remain inline. Field meanings and operating limits are in focused help. Before writing a variant, read " +
             $"get_guidance(topic=operation, operation={operation}, variant=exact {discriminator} value) " +
             "for its full operating limits and complete input contract. No trial writes.";
         return JsonSerializer.SerializeToElement(root);

@@ -12,25 +12,18 @@ using NanoCAD.Ipc;
 using NanoCAD.McpServer;
 using Result = NanoCAD.Contracts.Result;
 
-Environment.SetEnvironmentVariable("NANOCAD_MCP_RESPONSE_MODE","structured");
-var filters = new List<string>();
-for (int argument = 0; argument < args.Length; argument += 2)
+Environment.SetEnvironmentVariable("NANOCAD_MCP_RESPONSE_MODE", "structured");
+ManagedTestRunner runner;
+try { runner = new ManagedTestRunner(args); }
+catch (ArgumentException error)
 {
-    if (args[argument] != "--filter" || argument + 1 >= args.Length || string.IsNullOrWhiteSpace(args[argument + 1]))
-    { Console.Error.WriteLine("Usage: NanoCAD.Tests [--filter <test-name substring>] ..."); return 2; }
-    filters.Add(args[argument + 1]);
+    Console.Error.WriteLine(error.Message);
+    Console.Error.WriteLine("Usage: NanoCAD.Tests [--suite all|managed] [--filter substring] [--rerun-failed results.json] [--junit report.xml]");
+    return 2;
 }
-var testRoot = Path.GetFullPath(Path.Combine("artifacts", "tests", Guid.NewGuid().ToString("N")));
-Directory.CreateDirectory(testRoot);
-Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", testRoot);
-var outcomes = new List<object>();
-int failures = 0, skipped = 0;
-async Task Test(string name, Func<Task> test)
-{
-    if (filters.Count > 0 && !filters.Any(filter => name.Contains(filter, StringComparison.OrdinalIgnoreCase))) { skipped++; return; }
-    try { await test(); Console.WriteLine("PASS " + name); outcomes.Add(new { name, passed = true }); }
-    catch (Exception e) { failures++; Console.WriteLine("FAIL " + name + ": " + e); outcomes.Add(new { name, passed = false, error = e.ToString() }); }
-}
+string testRoot = runner.Root;
+Task Test(string name, Func<Task> test) => runner.Run(name, test);
+Task TestHostMetadata(string name, Func<Task> test) => runner.RunHostMetadata(name, test);
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
 void Domain(string code, Action action)
 {
@@ -56,6 +49,7 @@ Request RequestOf(string op = "get_document", object? arguments = null, int time
 var documentId = Guid.NewGuid().ToString("D");
 var instanceId = Guid.NewGuid().ToString("D");
 EntitySummary Summary(string h) => new(new(instanceId, documentId, h), "Line", "test.Line", new("0", "10"), "model", "supported");
+await AuditServerRoutingTests.Run(Test);
 await BasicEditingBlockTests.Run(Test);
 await SettingsEditingBlockTests.Run(Test);
 await BasicEditing334Tests.Run(Test);
@@ -95,12 +89,17 @@ await Test("MText decoding preserves whitespace and fails explicitly on unknown 
         .Single(item => item.GetProperty("name").GetString() == "mtext_formatting").GetProperty("expected");
     string? decoded = MTextContent.PlainText(expected.GetProperty("contents").GetString()!);
     Check(decoded == expected.GetProperty("plain_text").GetString(), "independent ezdxf fixture oracle");
-    File.WriteAllText(Path.Combine(testRoot, "mtext-decoding.json"), JsonSerializer.Serialize(new {
-        scope = "Pure C# decoder; no CAD runtime", passed = true, contents = expected.GetProperty("contents").GetString(), plain_text = decoded }));
+    File.WriteAllText(Path.Combine(testRoot, "mtext-decoding.json"), JsonSerializer.Serialize(new
+    {
+        scope = "Pure C# decoder; no CAD runtime",
+        passed = true,
+        contents = expected.GetProperty("contents").GetString(),
+        plain_text = decoded
+    }));
     return Task.CompletedTask;
 });
 
-await Test("compiled bridge excludes unsupported getters and the dirtying explicit lock", () =>
+await TestHostMetadata("compiled bridge excludes unsupported getters and the dirtying explicit lock", () =>
 {
     // Inspect compiled references without loading any CAD assembly into the test process.
     using var stream = File.OpenRead(Path.GetFullPath("src/NanoCADBridge/bin/Release/net6.0-windows/NanoCADBridge.dll"));
@@ -150,7 +149,7 @@ await Test("strict validation and duplicate normalized handles", () =>
     Domain("INVALID_ARGUMENT", () => Validation.Parse("inspect_objects", Wire.Element(new { document_id = documentId, handles = new[] { "01", "1" } })));
     foreach (var input in new object[] { new { document_id = documentId, page_size = "2" }, new { document_id = documentId, page_size = 1.2 },
         new { document_id = documentId, page_size = 2147483648L }, new { document_id = documentId, types = Array.Empty<string>() },
-        new { document_id = documentId, space = "paper" }, new { document_id = documentId, expected_revision = "18446744073709551616" },
+        new { document_id = documentId, space = "invalid" }, new { document_id = documentId, expected_revision = "18446744073709551616" },
         new { document_id = documentId, run_command = "LINE" } }) Domain("INVALID_ARGUMENT", () => Validation.Parse("query_objects", Wire.Element(input)));
     using var duplicate = JsonDocument.Parse("{\"document_id\":\"" + documentId + "\",\"page_size\":1,\"page_size\":2}");
     Domain("INVALID_ARGUMENT", () => Validation.Parse("query_objects", duplicate.RootElement));
@@ -226,7 +225,8 @@ await Test("UI queue capacity, cancellation and no late execution", async () =>
             done.SetResult();
         }
         catch (Exception e) { done.SetException(e); }
-    }) { IsBackground = true }.Start();
+    })
+    { IsBackground = true }.Start();
     await done.Task.WaitAsync(TimeSpan.FromSeconds(5));
 });
 await Test("no-bridge diagnostics and read-only tool annotations", async () =>
@@ -236,7 +236,8 @@ await Test("no-bridge diagnostics and read-only tool annotations", async () =>
     Check(status.IsError == false && !status.StructuredContent!.Value.GetProperty("data").GetProperty("available").GetBoolean(), "no-bridge status");
     var document = await service.CallAsync("get_document", null, default);
     Check(document.IsError == true && document.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString() == "BRIDGE_UNAVAILABLE", "no-bridge document error");
-    Check(ToolCatalog.Tools.Count == 22 && ToolCatalog.Tools.Count(t => t.Annotations!.ReadOnlyHint == true) == 16, "read tool count");
+    Check(ToolCatalog.Tools.Select(tool => tool.Name).Distinct(StringComparer.Ordinal).Count() == ToolCatalog.Tools.Count &&
+        ToolCatalog.Tools.All(tool => tool.Annotations?.ReadOnlyHint == !Wire.WriteOperations.Contains(tool.Name["nanocad.".Length..])), "tool identity/read-only annotations");
     Check(ToolCatalog.Tools.Select(t => t.Name).Order().SequenceEqual(ToolCatalog.OperationNames.Append("get_guidance").Select(op => "nanocad." + op).Order()), "catalog matches approved wire allowlist");
     Check(ToolCatalog.Tools.Where(t => t.Annotations!.ReadOnlyHint == true).Select(t => t.Name).Order().SequenceEqual(Wire.ReadOperations.Append("capture_view").Append("get_guidance").Select(op => "nanocad." + op).Order()), "read annotations match native and server-local read allowlist");
     Check(ToolCatalog.Tools.Single(t => t.Name == "nanocad.create_entities").Annotations!.ReadOnlyHint == false, "creation must be annotated as a write");
@@ -259,7 +260,7 @@ using (var listener = new BridgeListener(descriptor, async (request, token) =>
             args.Operations[0] is CreateTextStyleEdit ? StyleWriteTests.ProtocolData(args) :
             args.Operations[0] is CreateDimensionStyleEdit ? DimensionStyleWriteTests.ProtocolData(args) :
             args.Operations[0] is CreateLinetypeEdit ? LinetypeWriteTests.ProtocolData(args) :
-            args.Operations[0] is CreateViewportEdit ? ViewportCreateTests.ProtocolData(args) : args.Operations[0] is CreateLayoutEdit ? LayoutCreateTests.ProtocolData(args) : args.Operations[0] is SetViewportViewEdit ? ViewportWriteTests.ProtocolData(args) : StructureWriteTests.ProtocolData(args), new(instanceId,documentId,"4",DateTime.UtcNow.ToString("O")));
+            args.Operations[0] is CreateViewportEdit ? ViewportCreateTests.ProtocolData(args) : args.Operations[0] is CreateLayoutEdit ? LayoutCreateTests.ProtocolData(args) : args.Operations[0] is SetViewportViewEdit ? ViewportWriteTests.ProtocolData(args) : StructureWriteTests.ProtocolData(args), new(instanceId, documentId, "4", DateTime.UtcNow.ToString("O")));
     }
     if (request.operation is "get_structure" or "inspect_block")
         return Result.Ok(request.requestId, request.operation == "get_structure" && request.arguments.GetProperty("section").GetString() == "text_styles"
@@ -327,219 +328,228 @@ using (var listener = new BridgeListener(descriptor, async (request, token) =>
         Check(!response.success && response.error!.code == "INVALID_ARGUMENT", "write/command accepted");
     });
     foreach (var protocolVersion in new[] { "2025-11-25", "2026-07-28" })
-    await Test($"MCP {protocolVersion} discovery and tool calls through stdio/pipe", async () =>
-    {
-        string dotnet = Path.GetFullPath(".tools/dotnet/dotnet.exe");
-        string server = Path.GetFullPath("src/NanoCAD.McpServer/bin/Release/net10.0-windows/NanoCAD.McpServer.dll");
-        var transport = new StdioClientTransport(new StdioClientTransportOptions
+        await Test($"MCP {protocolVersion} discovery and tool calls through stdio/pipe", async () =>
         {
-            // SDK 2.2.0 wraps Windows commands in cmd.exe. A bare executable in its own cwd
-            // avoids cmd.exe stripping quotes around an executable path containing spaces.
-            Name = "nanocad-test", Command = "dotnet.exe", WorkingDirectory = Path.GetDirectoryName(dotnet), Arguments = [server],
-            EnvironmentVariables = new Dictionary<string, string?> { ["NANOCAD_MCP_HOME"] = testRoot }
-        });
-        using var connectDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        await using var client = await McpClient.CreateAsync(transport, new McpClientOptions { ProtocolVersion = protocolVersion }, cancellationToken: connectDeadline.Token);
-        Check(client.NegotiatedProtocolVersion == protocolVersion, "protocol negotiation");
-        var tools = await client.ListToolsAsync();
-        Check(tools.Count == 22, "stdio tool count");
-        var response = await client.CallToolAsync("nanocad.get_status", new Dictionary<string, object?>());
-        Check(response.IsError == false && response.StructuredContent!.Value.GetProperty("data").GetProperty("available").GetBoolean(), "full MCP to IPC result");
-        var invalid = await client.CallToolAsync("nanocad.inspect_objects", new Dictionary<string, object?> { ["document_id"] = documentId, ["handles"] = new[] { "0" } });
-        Check(invalid.IsError == true, "invalid handle must fail as tool error");
-        File.WriteAllText(Path.Combine(testRoot, "tools-list.json"), JsonSerializer.Serialize(ToolCatalog.Tools, new JsonSerializerOptions { WriteIndented = true }));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-status-{protocolVersion}.json"), response.StructuredContent!.Value.GetRawText());
-        var createInput = new Dictionary<string, object?>
-        {
-            ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["expected_revision"] = "1",
-            ["operation_id"] = Guid.NewGuid().ToString("D"), ["units"] = "Millimeters",
-            ["entities"] = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 20, 0 } } }
-        };
-        var created = await client.CallToolAsync("nanocad.create_entities", createInput);
-        Check(created.IsError == false && created.StructuredContent!.Value.GetProperty("data").GetProperty("created")[0].GetProperty("handle").GetString() == "CA", "create through MCP stdio/pipe");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create-input-{protocolVersion}.json"), JsonSerializer.Serialize(createInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create-result-{protocolVersion}.json"), created.StructuredContent!.Value.GetRawText());
-        createInput.Remove("operation_id");
-        var invalidCreate = await client.CallToolAsync("nanocad.create_entities", createInput);
-        Check(invalidCreate.IsError == true && invalidCreate.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString() == "INVALID_ARGUMENT", "create without operation_id must fail");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create-error-{protocolVersion}.json"), invalidCreate.StructuredContent!.Value.GetRawText());
-        var modifyInput = new Dictionary<string, object?>
-        {
-            ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["expected_revision"] = "2",
-            ["operation_id"] = Guid.NewGuid().ToString("D"), ["units"] = "Millimeters",
-            ["operations"] = new object[] {
+            string dotnet = TestEnvironment.DotnetHost;
+            string server = TestEnvironment.ServerAssembly;
+            var transport = new StdioClientTransport(new StdioClientTransportOptions
+            {
+                // SDK 2.2.0 wraps Windows commands in cmd.exe. A bare executable in its own cwd
+                // avoids cmd.exe stripping quotes around an executable path containing spaces.
+                Name = "nanocad-test",
+                Command = "dotnet.exe",
+                WorkingDirectory = Path.GetDirectoryName(dotnet),
+                Arguments = [server],
+                EnvironmentVariables = new Dictionary<string, string?> { ["NANOCAD_MCP_HOME"] = testRoot }
+            });
+            using var connectDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            await using var client = await McpClient.CreateAsync(transport, new McpClientOptions { ProtocolVersion = protocolVersion }, cancellationToken: connectDeadline.Token);
+            Check(client.NegotiatedProtocolVersion == protocolVersion, "protocol negotiation");
+            var tools = await client.ListToolsAsync();
+            Check(tools.Select(tool => tool.Name).Order().SequenceEqual(ToolCatalog.Tools.Select(tool => tool.Name).Order()), "stdio published tool names differ from the catalog");
+            var response = await client.CallToolAsync("nanocad.get_status", new Dictionary<string, object?>());
+            Check(response.IsError == false && response.StructuredContent!.Value.GetProperty("data").GetProperty("available").GetBoolean(), "full MCP to IPC result");
+            var invalid = await client.CallToolAsync("nanocad.inspect_objects", new Dictionary<string, object?> { ["document_id"] = documentId, ["handles"] = new[] { "0" } });
+            Check(invalid.IsError == true, "invalid handle must fail as tool error");
+            File.WriteAllText(Path.Combine(testRoot, "tools-list.json"), JsonSerializer.Serialize(ToolCatalog.Tools, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-status-{protocolVersion}.json"), response.StructuredContent!.Value.GetRawText());
+            var createInput = new Dictionary<string, object?>
+            {
+                ["bridge_instance_id"] = instanceId,
+                ["document_id"] = documentId,
+                ["expected_revision"] = "1",
+                ["operation_id"] = Guid.NewGuid().ToString("D"),
+                ["units"] = "Millimeters",
+                ["entities"] = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 20, 0 } } }
+            };
+            var created = await client.CallToolAsync("nanocad.create_entities", createInput);
+            Check(created.IsError == false && created.StructuredContent!.Value.GetProperty("data").GetProperty("created")[0].GetProperty("handle").GetString() == "CA", "create through MCP stdio/pipe");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create-input-{protocolVersion}.json"), JsonSerializer.Serialize(createInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create-result-{protocolVersion}.json"), created.StructuredContent!.Value.GetRawText());
+            createInput.Remove("operation_id");
+            var invalidCreate = await client.CallToolAsync("nanocad.create_entities", createInput);
+            Check(invalidCreate.IsError == true && invalidCreate.StructuredContent!.Value.GetProperty("error").GetProperty("code").GetString() == "INVALID_ARGUMENT", "create without operation_id must fail");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create-error-{protocolVersion}.json"), invalidCreate.StructuredContent!.Value.GetRawText());
+            var modifyInput = new Dictionary<string, object?>
+            {
+                ["bridge_instance_id"] = instanceId,
+                ["document_id"] = documentId,
+                ["expected_revision"] = "2",
+                ["operation_id"] = Guid.NewGuid().ToString("D"),
+                ["units"] = "Millimeters",
+                ["operations"] = new object[] {
                 new { operation = "move", handles = new[] { "CA" }, displacement = new[] { 10, 0 } },
                 new { operation = "copy", handles = new[] { "CA" }, displacement = new[] { 0, 20 } } }
-        };
-        var modified = await client.CallToolAsync("nanocad.modify_entities", modifyInput);
-        Check(modified.IsError == false && modified.StructuredContent!.Value.GetProperty("data").GetProperty("copies")[0].GetProperty("created").GetProperty("handle").GetString() == "CB", "modify through full MCP/IPC");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-modify-input-{protocolVersion}.json"), JsonSerializer.Serialize(modifyInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-modify-result-{protocolVersion}.json"), modified.StructuredContent!.Value.GetRawText());
-        modifyInput.Remove("operation_id");
-        var invalidModify = await client.CallToolAsync("nanocad.modify_entities", modifyInput);
-        Check(invalidModify.IsError == true, "modify without operation_id accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-modify-error-{protocolVersion}.json"), invalidModify.StructuredContent!.Value.GetRawText());
-        var structureWriteInput = StructureWriteTests.ProtocolInput(instanceId,documentId);
-        var structureWrite = await client.CallToolAsync("nanocad.modify_structure", structureWriteInput);
-        Check(structureWrite.IsError == false && structureWrite.StructuredContent!.Value.GetProperty("data").GetProperty("changes").GetArrayLength() == 3, "typed structural write MCP roundtrip");
-        File.WriteAllText(Path.Combine(testRoot,$"mcp-modify_structure-input-{protocolVersion}.json"),JsonSerializer.Serialize(structureWriteInput));
-        File.WriteAllText(Path.Combine(testRoot,$"mcp-modify_structure-result-{protocolVersion}.json"),structureWrite.StructuredContent!.Value.GetRawText());
-        structureWriteInput["save_after"]=true;
-        var rejectedStructureWrite=await client.CallToolAsync("nanocad.modify_structure",structureWriteInput);
-        Check(rejectedStructureWrite.IsError==true,"structural hidden save accepted");
-        File.WriteAllText(Path.Combine(testRoot,$"mcp-modify_structure-error-{protocolVersion}.json"),rejectedStructureWrite.StructuredContent!.Value.GetRawText());
-        foreach(bool insert in new[] {false,true})
-        {
-            string blockOp=insert?"insert_block":"define_block";
-            var blockInput=BlockWriteTests.ProtocolInput(instanceId,documentId,insert);
-            var blockResult=await client.CallToolAsync("nanocad.modify_structure",blockInput);
-            var change=blockResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
-            Check(blockResult.IsError==false && change.GetProperty("children").GetArrayLength()==(insert?2:7) &&
-                change.GetProperty("children")[insert?0:5].GetProperty("tag").GetString()=="NAME", "block children MCP/IPC roundtrip");
-            File.WriteAllText(Path.Combine(testRoot,$"mcp-{blockOp}-input-{protocolVersion}.json"),JsonSerializer.Serialize(blockInput));
-            File.WriteAllText(Path.Combine(testRoot,$"mcp-{blockOp}-result-{protocolVersion}.json"),blockResult.StructuredContent!.Value.GetRawText());
-            blockInput["load_file"]=@"C:\unrequested.dwg";
-            var rejectedBlock=await client.CallToolAsync("nanocad.modify_structure",blockInput);
-            Check(rejectedBlock.IsError==true,"hidden block file access accepted");
-            File.WriteAllText(Path.Combine(testRoot,$"mcp-{blockOp}-error-{protocolVersion}.json"),rejectedBlock.StructuredContent!.Value.GetRawText());
-        }
-        {
-        var layoutInput = LayoutCreateTests.ProtocolInput(instanceId, documentId);
-        var layoutResult = await client.CallToolAsync("nanocad.modify_structure", layoutInput);
-        var layoutChange = layoutResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
-        Check(layoutResult.IsError == false && layoutChange.GetProperty("kind").GetString() == "layout" && layoutChange.GetProperty("created").GetBoolean(), "layout creation MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_layout-input-{protocolVersion}.json"), JsonSerializer.Serialize(layoutInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_layout-result-{protocolVersion}.json"), layoutResult.StructuredContent!.Value.GetRawText());
-        layoutInput["activate_layout"] = true;
-        var invalidLayout = await client.CallToolAsync("nanocad.modify_structure", layoutInput);
-        Check(invalidLayout.IsError == true, "hidden layout context change accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_layout-error-{protocolVersion}.json"), invalidLayout.StructuredContent!.Value.GetRawText());
-        }
-        {
-        var input = ViewportCreateTests.ProtocolInput(instanceId, documentId);
-        var result = await client.CallToolAsync("nanocad.modify_structure", input);
-        var change = result.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
-        Check(result.IsError == false && change.GetProperty("kind").GetString() == "viewport" && change.GetProperty("created").GetBoolean(), "viewport creation MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_viewport-input-{protocolVersion}.json"), JsonSerializer.Serialize(input));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_viewport-result-{protocolVersion}.json"), result.StructuredContent!.Value.GetRawText());
-        input["activate_layout"] = true;
-        var rejected = await client.CallToolAsync("nanocad.modify_structure", input);
-        Check(rejected.IsError == true, "hidden viewport activation accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_viewport-error-{protocolVersion}.json"), rejected.StructuredContent!.Value.GetRawText());
-        }
-        var viewportInput = ViewportWriteTests.ProtocolInput(instanceId, documentId);
-        var viewportResult = await client.CallToolAsync("nanocad.modify_structure", viewportInput);
-        var viewportChange = viewportResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
-        Check(viewportResult.IsError == false && viewportChange.GetProperty("kind").GetString() == "viewport" && !viewportChange.GetProperty("created").GetBoolean(), "viewport edit MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-set_viewport_view-input-{protocolVersion}.json"), JsonSerializer.Serialize(viewportInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-set_viewport_view-result-{protocolVersion}.json"), viewportResult.StructuredContent!.Value.GetRawText());
-        viewportInput["activate_layout"] = true;
-        var invalidViewport = await client.CallToolAsync("nanocad.modify_structure", viewportInput);
-        Check(invalidViewport.IsError == true, "hidden viewport context change accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-set_viewport_view-error-{protocolVersion}.json"), invalidViewport.StructuredContent!.Value.GetRawText());
-        var linetypeWriteInput = LinetypeWriteTests.ProtocolInput(instanceId, documentId);
-        var linetypeWriteResult = await client.CallToolAsync("nanocad.modify_structure", linetypeWriteInput);
-        Check(linetypeWriteResult.IsError == false && linetypeWriteResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0].GetProperty("kind").GetString() == "linetype", "linetype MCP roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_linetype-input-{protocolVersion}.json"), JsonSerializer.Serialize(linetypeWriteInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_linetype-result-{protocolVersion}.json"), linetypeWriteResult.StructuredContent!.Value.GetRawText());
-        linetypeWriteInput["load_file"] = "unrequested.lin";
-        var rejectedLinetype = await client.CallToolAsync("nanocad.modify_structure", linetypeWriteInput);
-        Check(rejectedLinetype.IsError == true, "hidden linetype file loading accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_linetype-error-{protocolVersion}.json"), rejectedLinetype.StructuredContent!.Value.GetRawText());
-        var dimensionWriteInput = DimensionStyleWriteTests.ProtocolInput(instanceId, documentId);
-        var dimensionWriteResult = await client.CallToolAsync("nanocad.modify_structure", dimensionWriteInput);
-        Check(dimensionWriteResult.IsError == false && dimensionWriteResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0].GetProperty("kind").GetString() == "dimension_style", "dimension creation MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_dimension_style-input-{protocolVersion}.json"), JsonSerializer.Serialize(dimensionWriteInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_dimension_style-result-{protocolVersion}.json"), dimensionWriteResult.StructuredContent!.Value.GetRawText());
-        dimensionWriteInput["set_current"] = true;
-        var invalidDimensionWrite = await client.CallToolAsync("nanocad.modify_structure", dimensionWriteInput);
-        Check(invalidDimensionWrite.IsError == true, "hidden current dimension style edit accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_dimension_style-error-{protocolVersion}.json"), invalidDimensionWrite.StructuredContent!.Value.GetRawText());
-        var styleInput = StyleWriteTests.ProtocolInput(instanceId, documentId);
-        var styleResult = await client.CallToolAsync("nanocad.modify_structure", styleInput);
-        Check(styleResult.IsError == false && styleResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0].GetProperty("kind").GetString() == "text_style", "style creation MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_text_style-input-{protocolVersion}.json"), JsonSerializer.Serialize(styleInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_text_style-result-{protocolVersion}.json"), styleResult.StructuredContent!.Value.GetRawText());
-        styleInput["font_file"] = "unrequested.ttf";
-        var invalidStyle = await client.CallToolAsync("nanocad.modify_structure", styleInput);
-        Check(invalidStyle.IsError == true, "style hidden font path accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-create_text_style-error-{protocolVersion}.json"), invalidStyle.StructuredContent!.Value.GetRawText());
-        var styleReadInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = "text_styles" };
-        var styleReadResult = await client.CallToolAsync("nanocad.get_structure", styleReadInput);
-        var styleProperties = styleReadResult.StructuredContent!.Value.GetProperty("data").GetProperty("items")[0].GetProperty("properties");
-        Check(styleReadResult.IsError == false && styleProperties.GetProperty("base_eligibility").GetProperty("eligible").GetBoolean() && styleProperties.GetProperty("annotative_native_value").GetInt32() == 2, "style metadata MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-text_styles-input-{protocolVersion}.json"), JsonSerializer.Serialize(styleReadInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-text_styles-result-{protocolVersion}.json"), styleReadResult.StructuredContent!.Value.GetRawText());
-        styleReadInput["set_current"] = true;
-        var invalidStyleRead = await client.CallToolAsync("nanocad.get_structure", styleReadInput);
-        Check(invalidStyleRead.IsError == true, "style read hidden current-style mutation accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-text_styles-error-{protocolVersion}.json"), invalidStyleRead.StructuredContent!.Value.GetRawText());
-        var documentList = await client.CallToolAsync("nanocad.get_documents", new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId });
-        foreach (string layoutSection in new[] { "layouts", "viewports" })
-        {
-            var layoutInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = layoutSection };
-            var layoutResult = await client.CallToolAsync("nanocad.get_structure", layoutInput);
-            Check(layoutResult.IsError == false, "layout metadata MCP/IPC roundtrip");
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-{layoutSection}-input-{protocolVersion}.json"), JsonSerializer.Serialize(layoutInput));
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-{layoutSection}-result-{protocolVersion}.json"), layoutResult.StructuredContent!.Value.GetRawText());
-            layoutInput["activate"] = true;
-            var invalidLayout = await client.CallToolAsync("nanocad.get_structure", layoutInput);
-            Check(invalidLayout.IsError == true, "hidden layout activation accepted");
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-{layoutSection}-error-{protocolVersion}.json"), invalidLayout.StructuredContent!.Value.GetRawText());
-        }
-        var linetypeInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = "linetypes" };
-        var linetypeResult = await client.CallToolAsync("nanocad.get_structure", linetypeInput);
-        var lineProperties = linetypeResult.StructuredContent!.Value.GetProperty("data").GetProperty("items")[0].GetProperty("properties");
-        Check(!linetypeResult.IsError.GetValueOrDefault() && lineProperties.GetProperty("elements")[1].GetProperty("text").GetString() == "GAS", "linetype detailed metadata MCP roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-linetypes-input-{protocolVersion}.json"), JsonSerializer.Serialize(linetypeInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-linetypes-result-{protocolVersion}.json"), linetypeResult.StructuredContent!.Value.GetRawText());
-        linetypeInput["load_file"] = "unrequested.lin";
-        var invalidLinetype = await client.CallToolAsync("nanocad.get_structure", linetypeInput);
-        Check(invalidLinetype.IsError == true, "linetype read hidden file load accepted");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-linetypes-error-{protocolVersion}.json"), invalidLinetype.StructuredContent!.Value.GetRawText());
-        var dimensionInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = "dimension_styles" };
-        var dimensionResult = await client.CallToolAsync("nanocad.get_structure", dimensionInput);
-        var dimensionProperties = dimensionResult.StructuredContent!.Value.GetProperty("data").GetProperty("items")[0].GetProperty("properties");
-        Check(dimensionResult.IsError == false && dimensionProperties.GetProperty("variables").GetProperty("dimgap").GetDouble() == -0.625 &&
-            dimensionProperties.GetProperty("references").GetProperty("text_style").GetProperty("ref").GetProperty("document_id").GetString() == documentId,
-            "dimension metadata MCP/IPC roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-dimension_styles-input-{protocolVersion}.json"), JsonSerializer.Serialize(dimensionInput));
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-dimension_styles-result-{protocolVersion}.json"), dimensionResult.StructuredContent!.Value.GetRawText());
-        dimensionInput["set_current"] = true;
-        var invalidDimension = await client.CallToolAsync("nanocad.get_structure", dimensionInput);
-        Check(invalidDimension.IsError == true, "dimension read must reject implicit current-style mutation");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-dimension_styles-error-{protocolVersion}.json"), invalidDimension.StructuredContent!.Value.GetRawText());
-        Check(documentList.IsError == false && documentList.StructuredContent!.Value.GetProperty("data").GetProperty("documents").GetArrayLength() == 1, "document list MCP roundtrip");
-        File.WriteAllText(Path.Combine(testRoot, $"mcp-get_documents-result-{protocolVersion}.json"), documentList.StructuredContent!.Value.GetRawText());
-        foreach (string action in new[] { "open", "activate", "save", "export_dxf", "activate_layout" })
-        {
-            var documentInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["operation_id"] = Guid.NewGuid().ToString("D"), ["action"] = action };
-            if (action != "open") { documentInput["document_id"] = documentId; documentInput["expected_revision"] = "1"; }
-            if (action is not ("activate" or "activate_layout")) documentInput["path"] = action == "save" ? @"C:\copy.dwg" : @"C:\copy.dxf";
-            if (action == "activate_layout") documentInput["layout_handle"] = "1E";
-            var documentAction = await client.CallToolAsync("nanocad.manage_document", documentInput);
-            Check(documentAction.IsError == false && documentAction.StructuredContent!.Value.GetProperty("data").GetProperty("action").GetString() == action, "document action MCP roundtrip");
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-manage-{action}-input-{protocolVersion}.json"), JsonSerializer.Serialize(documentInput));
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-manage-{action}-result-{protocolVersion}.json"), documentAction.StructuredContent!.Value.GetRawText());
-            documentInput["close_after"] = true;
-            var invalidDocument = await client.CallToolAsync("nanocad.manage_document", documentInput);
-            Check(invalidDocument.IsError == true, "document unexpected close field accepted");
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-manage-{action}-error-{protocolVersion}.json"), invalidDocument.StructuredContent!.Value.GetRawText());
-        }
-        foreach (string operation in new[] { "get_structure", "inspect_block" })
-        {
-            var structuralInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId };
-            structuralInput.Add(operation == "get_structure" ? "section" : "handle", operation == "get_structure" ? "layers" : "AB");
-            var structural = await client.CallToolAsync("nanocad." + operation, structuralInput);
-            Check(structural.IsError == false && structural.StructuredContent!.Value.GetProperty("data").GetProperty("complete").GetBoolean(), "structural MCP roundtrip");
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-{operation}-input-{protocolVersion}.json"), JsonSerializer.Serialize(structuralInput));
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-{operation}-result-{protocolVersion}.json"), structural.StructuredContent!.Value.GetRawText());
-            structuralInput.Add("command", "_OPEN");
-            var rejected = await client.CallToolAsync("nanocad." + operation, structuralInput);
-            Check(rejected.IsError == true, "unknown structural field accepted");
-            File.WriteAllText(Path.Combine(testRoot, $"mcp-{operation}-error-{protocolVersion}.json"), rejected.StructuredContent!.Value.GetRawText());
-        }
-    });
+            };
+            var modified = await client.CallToolAsync("nanocad.modify_entities", modifyInput);
+            Check(modified.IsError == false && modified.StructuredContent!.Value.GetProperty("data").GetProperty("copies")[0].GetProperty("created").GetProperty("handle").GetString() == "CB", "modify through full MCP/IPC");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-modify-input-{protocolVersion}.json"), JsonSerializer.Serialize(modifyInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-modify-result-{protocolVersion}.json"), modified.StructuredContent!.Value.GetRawText());
+            modifyInput.Remove("operation_id");
+            var invalidModify = await client.CallToolAsync("nanocad.modify_entities", modifyInput);
+            Check(invalidModify.IsError == true, "modify without operation_id accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-modify-error-{protocolVersion}.json"), invalidModify.StructuredContent!.Value.GetRawText());
+            var structureWriteInput = StructureWriteTests.ProtocolInput(instanceId, documentId);
+            var structureWrite = await client.CallToolAsync("nanocad.modify_structure", structureWriteInput);
+            Check(structureWrite.IsError == false && structureWrite.StructuredContent!.Value.GetProperty("data").GetProperty("changes").GetArrayLength() == 3, "typed structural write MCP roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-modify_structure-input-{protocolVersion}.json"), JsonSerializer.Serialize(structureWriteInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-modify_structure-result-{protocolVersion}.json"), structureWrite.StructuredContent!.Value.GetRawText());
+            structureWriteInput["save_after"] = true;
+            var rejectedStructureWrite = await client.CallToolAsync("nanocad.modify_structure", structureWriteInput);
+            Check(rejectedStructureWrite.IsError == true, "structural hidden save accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-modify_structure-error-{protocolVersion}.json"), rejectedStructureWrite.StructuredContent!.Value.GetRawText());
+            foreach (bool insert in new[] { false, true })
+            {
+                string blockOp = insert ? "insert_block" : "define_block";
+                var blockInput = BlockWriteTests.ProtocolInput(instanceId, documentId, insert);
+                var blockResult = await client.CallToolAsync("nanocad.modify_structure", blockInput);
+                var change = blockResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
+                Check(blockResult.IsError == false && change.GetProperty("children").GetArrayLength() == (insert ? 2 : 7) &&
+                    change.GetProperty("children")[insert ? 0 : 5].GetProperty("tag").GetString() == "NAME", "block children MCP/IPC roundtrip");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{blockOp}-input-{protocolVersion}.json"), JsonSerializer.Serialize(blockInput));
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{blockOp}-result-{protocolVersion}.json"), blockResult.StructuredContent!.Value.GetRawText());
+                blockInput["load_file"] = @"C:\unrequested.dwg";
+                var rejectedBlock = await client.CallToolAsync("nanocad.modify_structure", blockInput);
+                Check(rejectedBlock.IsError == true, "hidden block file access accepted");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{blockOp}-error-{protocolVersion}.json"), rejectedBlock.StructuredContent!.Value.GetRawText());
+            }
+            {
+                var layoutInput = LayoutCreateTests.ProtocolInput(instanceId, documentId);
+                var layoutResult = await client.CallToolAsync("nanocad.modify_structure", layoutInput);
+                var layoutChange = layoutResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
+                Check(layoutResult.IsError == false && layoutChange.GetProperty("kind").GetString() == "layout" && layoutChange.GetProperty("created").GetBoolean(), "layout creation MCP/IPC roundtrip");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-create_layout-input-{protocolVersion}.json"), JsonSerializer.Serialize(layoutInput));
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-create_layout-result-{protocolVersion}.json"), layoutResult.StructuredContent!.Value.GetRawText());
+                layoutInput["activate_layout"] = true;
+                var invalidLayout = await client.CallToolAsync("nanocad.modify_structure", layoutInput);
+                Check(invalidLayout.IsError == true, "hidden layout context change accepted");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-create_layout-error-{protocolVersion}.json"), invalidLayout.StructuredContent!.Value.GetRawText());
+            }
+            {
+                var input = ViewportCreateTests.ProtocolInput(instanceId, documentId);
+                var result = await client.CallToolAsync("nanocad.modify_structure", input);
+                var change = result.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
+                Check(result.IsError == false && change.GetProperty("kind").GetString() == "viewport" && change.GetProperty("created").GetBoolean(), "viewport creation MCP/IPC roundtrip");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-create_viewport-input-{protocolVersion}.json"), JsonSerializer.Serialize(input));
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-create_viewport-result-{protocolVersion}.json"), result.StructuredContent!.Value.GetRawText());
+                input["activate_layout"] = true;
+                var rejected = await client.CallToolAsync("nanocad.modify_structure", input);
+                Check(rejected.IsError == true, "hidden viewport activation accepted");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-create_viewport-error-{protocolVersion}.json"), rejected.StructuredContent!.Value.GetRawText());
+            }
+            var viewportInput = ViewportWriteTests.ProtocolInput(instanceId, documentId);
+            var viewportResult = await client.CallToolAsync("nanocad.modify_structure", viewportInput);
+            var viewportChange = viewportResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0];
+            Check(viewportResult.IsError == false && viewportChange.GetProperty("kind").GetString() == "viewport" && !viewportChange.GetProperty("created").GetBoolean(), "viewport edit MCP/IPC roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-set_viewport_view-input-{protocolVersion}.json"), JsonSerializer.Serialize(viewportInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-set_viewport_view-result-{protocolVersion}.json"), viewportResult.StructuredContent!.Value.GetRawText());
+            viewportInput["activate_layout"] = true;
+            var invalidViewport = await client.CallToolAsync("nanocad.modify_structure", viewportInput);
+            Check(invalidViewport.IsError == true, "hidden viewport context change accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-set_viewport_view-error-{protocolVersion}.json"), invalidViewport.StructuredContent!.Value.GetRawText());
+            var linetypeWriteInput = LinetypeWriteTests.ProtocolInput(instanceId, documentId);
+            var linetypeWriteResult = await client.CallToolAsync("nanocad.modify_structure", linetypeWriteInput);
+            Check(linetypeWriteResult.IsError == false && linetypeWriteResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0].GetProperty("kind").GetString() == "linetype", "linetype MCP roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_linetype-input-{protocolVersion}.json"), JsonSerializer.Serialize(linetypeWriteInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_linetype-result-{protocolVersion}.json"), linetypeWriteResult.StructuredContent!.Value.GetRawText());
+            linetypeWriteInput["load_file"] = "unrequested.lin";
+            var rejectedLinetype = await client.CallToolAsync("nanocad.modify_structure", linetypeWriteInput);
+            Check(rejectedLinetype.IsError == true, "hidden linetype file loading accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_linetype-error-{protocolVersion}.json"), rejectedLinetype.StructuredContent!.Value.GetRawText());
+            var dimensionWriteInput = DimensionStyleWriteTests.ProtocolInput(instanceId, documentId);
+            var dimensionWriteResult = await client.CallToolAsync("nanocad.modify_structure", dimensionWriteInput);
+            Check(dimensionWriteResult.IsError == false && dimensionWriteResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0].GetProperty("kind").GetString() == "dimension_style", "dimension creation MCP/IPC roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_dimension_style-input-{protocolVersion}.json"), JsonSerializer.Serialize(dimensionWriteInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_dimension_style-result-{protocolVersion}.json"), dimensionWriteResult.StructuredContent!.Value.GetRawText());
+            dimensionWriteInput["set_current"] = true;
+            var invalidDimensionWrite = await client.CallToolAsync("nanocad.modify_structure", dimensionWriteInput);
+            Check(invalidDimensionWrite.IsError == true, "hidden current dimension style edit accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_dimension_style-error-{protocolVersion}.json"), invalidDimensionWrite.StructuredContent!.Value.GetRawText());
+            var styleInput = StyleWriteTests.ProtocolInput(instanceId, documentId);
+            var styleResult = await client.CallToolAsync("nanocad.modify_structure", styleInput);
+            Check(styleResult.IsError == false && styleResult.StructuredContent!.Value.GetProperty("data").GetProperty("changes")[0].GetProperty("kind").GetString() == "text_style", "style creation MCP/IPC roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_text_style-input-{protocolVersion}.json"), JsonSerializer.Serialize(styleInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_text_style-result-{protocolVersion}.json"), styleResult.StructuredContent!.Value.GetRawText());
+            styleInput["font_file"] = "unrequested.ttf";
+            var invalidStyle = await client.CallToolAsync("nanocad.modify_structure", styleInput);
+            Check(invalidStyle.IsError == true, "style hidden font path accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-create_text_style-error-{protocolVersion}.json"), invalidStyle.StructuredContent!.Value.GetRawText());
+            var styleReadInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = "text_styles" };
+            var styleReadResult = await client.CallToolAsync("nanocad.get_structure", styleReadInput);
+            var styleProperties = styleReadResult.StructuredContent!.Value.GetProperty("data").GetProperty("items")[0].GetProperty("properties");
+            Check(styleReadResult.IsError == false && styleProperties.GetProperty("base_eligibility").GetProperty("eligible").GetBoolean() && styleProperties.GetProperty("annotative_native_value").GetInt32() == 2, "style metadata MCP/IPC roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-text_styles-input-{protocolVersion}.json"), JsonSerializer.Serialize(styleReadInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-text_styles-result-{protocolVersion}.json"), styleReadResult.StructuredContent!.Value.GetRawText());
+            styleReadInput["set_current"] = true;
+            var invalidStyleRead = await client.CallToolAsync("nanocad.get_structure", styleReadInput);
+            Check(invalidStyleRead.IsError == true, "style read hidden current-style mutation accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-text_styles-error-{protocolVersion}.json"), invalidStyleRead.StructuredContent!.Value.GetRawText());
+            var documentList = await client.CallToolAsync("nanocad.get_documents", new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId });
+            foreach (string layoutSection in new[] { "layouts", "viewports" })
+            {
+                var layoutInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = layoutSection };
+                var layoutResult = await client.CallToolAsync("nanocad.get_structure", layoutInput);
+                Check(layoutResult.IsError == false, "layout metadata MCP/IPC roundtrip");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{layoutSection}-input-{protocolVersion}.json"), JsonSerializer.Serialize(layoutInput));
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{layoutSection}-result-{protocolVersion}.json"), layoutResult.StructuredContent!.Value.GetRawText());
+                layoutInput["activate"] = true;
+                var invalidLayout = await client.CallToolAsync("nanocad.get_structure", layoutInput);
+                Check(invalidLayout.IsError == true, "hidden layout activation accepted");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{layoutSection}-error-{protocolVersion}.json"), invalidLayout.StructuredContent!.Value.GetRawText());
+            }
+            var linetypeInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = "linetypes" };
+            var linetypeResult = await client.CallToolAsync("nanocad.get_structure", linetypeInput);
+            var lineProperties = linetypeResult.StructuredContent!.Value.GetProperty("data").GetProperty("items")[0].GetProperty("properties");
+            Check(!linetypeResult.IsError.GetValueOrDefault() && lineProperties.GetProperty("elements")[1].GetProperty("text").GetString() == "GAS", "linetype detailed metadata MCP roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-linetypes-input-{protocolVersion}.json"), JsonSerializer.Serialize(linetypeInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-linetypes-result-{protocolVersion}.json"), linetypeResult.StructuredContent!.Value.GetRawText());
+            linetypeInput["load_file"] = "unrequested.lin";
+            var invalidLinetype = await client.CallToolAsync("nanocad.get_structure", linetypeInput);
+            Check(invalidLinetype.IsError == true, "linetype read hidden file load accepted");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-linetypes-error-{protocolVersion}.json"), invalidLinetype.StructuredContent!.Value.GetRawText());
+            var dimensionInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId, ["section"] = "dimension_styles" };
+            var dimensionResult = await client.CallToolAsync("nanocad.get_structure", dimensionInput);
+            var dimensionProperties = dimensionResult.StructuredContent!.Value.GetProperty("data").GetProperty("items")[0].GetProperty("properties");
+            Check(dimensionResult.IsError == false && dimensionProperties.GetProperty("variables").GetProperty("dimgap").GetDouble() == -0.625 &&
+                dimensionProperties.GetProperty("references").GetProperty("text_style").GetProperty("ref").GetProperty("document_id").GetString() == documentId,
+                "dimension metadata MCP/IPC roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-dimension_styles-input-{protocolVersion}.json"), JsonSerializer.Serialize(dimensionInput));
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-dimension_styles-result-{protocolVersion}.json"), dimensionResult.StructuredContent!.Value.GetRawText());
+            dimensionInput["set_current"] = true;
+            var invalidDimension = await client.CallToolAsync("nanocad.get_structure", dimensionInput);
+            Check(invalidDimension.IsError == true, "dimension read must reject implicit current-style mutation");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-dimension_styles-error-{protocolVersion}.json"), invalidDimension.StructuredContent!.Value.GetRawText());
+            Check(documentList.IsError == false && documentList.StructuredContent!.Value.GetProperty("data").GetProperty("documents").GetArrayLength() == 1, "document list MCP roundtrip");
+            File.WriteAllText(Path.Combine(testRoot, $"mcp-get_documents-result-{protocolVersion}.json"), documentList.StructuredContent!.Value.GetRawText());
+            foreach (string action in new[] { "open", "activate", "save", "export_dxf", "activate_layout" })
+            {
+                var documentInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["operation_id"] = Guid.NewGuid().ToString("D"), ["action"] = action };
+                if (action != "open") { documentInput["document_id"] = documentId; documentInput["expected_revision"] = "1"; }
+                if (action is not ("activate" or "activate_layout")) documentInput["path"] = action == "save" ? @"C:\copy.dwg" : @"C:\copy.dxf";
+                if (action == "activate_layout") documentInput["layout_handle"] = "1E";
+                var documentAction = await client.CallToolAsync("nanocad.manage_document", documentInput);
+                Check(documentAction.IsError == false && documentAction.StructuredContent!.Value.GetProperty("data").GetProperty("action").GetString() == action, "document action MCP roundtrip");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-manage-{action}-input-{protocolVersion}.json"), JsonSerializer.Serialize(documentInput));
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-manage-{action}-result-{protocolVersion}.json"), documentAction.StructuredContent!.Value.GetRawText());
+                documentInput["close_after"] = true;
+                var invalidDocument = await client.CallToolAsync("nanocad.manage_document", documentInput);
+                Check(invalidDocument.IsError == true, "document unexpected close field accepted");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-manage-{action}-error-{protocolVersion}.json"), invalidDocument.StructuredContent!.Value.GetRawText());
+            }
+            foreach (string operation in new[] { "get_structure", "inspect_block" })
+            {
+                var structuralInput = new Dictionary<string, object?> { ["bridge_instance_id"] = instanceId, ["document_id"] = documentId };
+                structuralInput.Add(operation == "get_structure" ? "section" : "handle", operation == "get_structure" ? "layers" : "AB");
+                var structural = await client.CallToolAsync("nanocad." + operation, structuralInput);
+                Check(structural.IsError == false && structural.StructuredContent!.Value.GetProperty("data").GetProperty("complete").GetBoolean(), "structural MCP roundtrip");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{operation}-input-{protocolVersion}.json"), JsonSerializer.Serialize(structuralInput));
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{operation}-result-{protocolVersion}.json"), structural.StructuredContent!.Value.GetRawText());
+                structuralInput.Add("command", "_OPEN");
+                var rejected = await client.CallToolAsync("nanocad." + operation, structuralInput);
+                Check(rejected.IsError == true, "unknown structural field accepted");
+                File.WriteAllText(Path.Combine(testRoot, $"mcp-{operation}-error-{protocolVersion}.json"), rejected.StructuredContent!.Value.GetRawText());
+            }
+        });
 }
 await Phase2Tests.Run(Test);
 await LongOperationTests.Run(Test);
@@ -605,7 +615,7 @@ await BlockWriteTests.Run(Test);
 await StyleWriteTests.Run(Test);
 await FontCoverageTests.Run(Test);
 await ModelManufacturingTests.Run(Test);
-await StyleReadTests.Run(Test);
+await StyleReadTests.Run(Test, TestHostMetadata);
 await DimensionStyleReadTests.Run(Test);
 await DimensionStyleWriteTests.Run(Test);
 await LinetypeReadTests.Run(Test);
@@ -684,7 +694,7 @@ await DrawingViewCreateTests.Run(Test);
 await ModelScaleTests.Run(Test);
 await SolidSliceTests.Run(Test);
 await SectionViewTests.Run(Test);
-await DrawingViewBreakTests.Run(Test);
+await DrawingViewBreakTests.Run(Test, TestHostMetadata);
 await SolidCreateTests.Run(Test);
 await ExtrusionTests.Run(Test);
 await RevolveSweepTests.Run(Test);
@@ -699,10 +709,10 @@ await ModelEdgeFeatureTests.Run(Test);
 await SolidBooleanTests.Run(Test);
 await ViewportMviewTests.Run(Test);
 await BasicModelingTests.Run(Test);
-await LayoutReadAdapterTests.Run(Test);
+await LayoutReadAdapterTests.Run(TestHostMetadata);
 await LinetypeWriteTests.Run(Test);
-await LinetypeReadAdapterTests.Run(Test);
-await DimensionReadAdapterTests.Run(Test);
+await LinetypeReadAdapterTests.Run(TestHostMetadata);
+await DimensionReadAdapterTests.Run(Test, TestHostMetadata);
 
 await Test("descriptor removed on shutdown", () =>
 {
@@ -710,12 +720,7 @@ await Test("descriptor removed on shutdown", () =>
     return Task.CompletedTask;
 });
 
-if (outcomes.Count == 0) { failures++; Console.Error.WriteLine("No tests matched the requested filter."); }
-File.WriteAllText(Path.Combine(testRoot, "results.json"), JsonSerializer.Serialize(new { utc = DateTime.UtcNow.ToString("O"), failures,
-    partial_run = filters.Count > 0, filters, skipped,
-    scope = "No CAD runtime: contract, queue, Windows IPC, discovery, MCP stdio", outcomes }, new JsonSerializerOptions { WriteIndented = true }));
-Console.WriteLine($"{Math.Max(0, outcomes.Count - failures)}/{outcomes.Count} passed. Evidence: {testRoot}");
-return failures == 0 ? 0 : 1;
+return runner.Complete();
 
 sealed class FragmentedStream(byte[] bytes) : MemoryStream(bytes)
 {

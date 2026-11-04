@@ -18,7 +18,7 @@ internal static class DimensionReadAdapterTests
         public void Reset() => throw new NotSupportedException();
         public void Dispose() => Disposed = true;
     }
-    public static async Task Run(Func<string, Func<Task>, Task> test)
+    public static async Task Run(Func<string, Func<Task>, Task> test, Func<string, Func<Task>, Task>? hostTest = null)
     {
         await test("dimension XData presence does not allocate or inspect payload elements", () =>
         {
@@ -43,7 +43,7 @@ internal static class DimensionReadAdapterTests
             }
             return Task.CompletedTask;
         });
-        await test("compiled dimension reader reaches all reviewed getters and only a ForRead dependency open", () =>
+        await (hostTest ?? test)("compiled dimension reader reaches all reviewed getters and only a ForRead dependency open", () =>
         {
             Audit();
             return Task.CompletedTask;
@@ -54,9 +54,12 @@ internal static class DimensionReadAdapterTests
         using var file = File.OpenRead("src/NanoCADBridge/bin/Release/net6.0-windows/NanoCADBridge.dll");
         using var pe = new PEReader(file); var metadata = pe.GetMetadataReader();
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static).Select(f => (OpCode)f.GetValue(null)!).ToDictionary(c => (ushort)c.Value);
-        string TypeName(EntityHandle h) => h.Kind switch {
+        string TypeName(EntityHandle h) => h.Kind switch
+        {
             HandleKind.TypeDefinition => metadata.GetString(metadata.GetTypeDefinition((TypeDefinitionHandle)h).Name),
-            HandleKind.TypeReference => metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)h).Name), _ => h.Kind.ToString() };
+            HandleKind.TypeReference => metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)h).Name),
+            _ => h.Kind.ToString()
+        };
         string Root(TypeDefinitionHandle h)
         {
             var type = metadata.GetTypeDefinition(h);
@@ -92,15 +95,25 @@ internal static class DimensionReadAdapterTests
                         if (target.Method == "GetObject") { opens++; Check(target.Type == "Transaction" && previous == OpCodes.Ldc_I4_0, "dependency must open ForRead(0)"); }
                     }
                 }
-                int size = opcode.OperandType switch {
-                    OperandType.InlineNone => 0, OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
-                    OperandType.InlineVar => 2, OperandType.InlineI8 or OperandType.InlineR => 8,
-                    OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset), _ => 4 };
+                int size = opcode.OperandType switch
+                {
+                    OperandType.InlineNone => 0,
+                    OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
+                    OperandType.InlineVar => 2,
+                    OperandType.InlineI8 or OperandType.InlineR => 8,
+                    OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                    _ => 4
+                };
                 offset += size; Check(offset <= il.Length, "invalid IL boundary"); previous = opcode;
             }
         }
-        Check(readerMethods > 0 && opens == 1 && callers.SetEquals(new[] { "StructureReader", "CadDimensionStyleWriter" }), "unexpected reader integration");
-        using var catalog = JsonDocument.Parse(File.ReadAllText("docs/research/dimension-style-read-catalog.json"));
+        // Defaults, lifecycle and rename preflight read detached/current styles
+        // through the same reader; their mutation code is outside this audit.
+        Check(readerMethods > 0 && opens == 1 && callers.SetEquals(new[] {
+            "StructureReader", "CadDimensionStyleWriter", "CadDimensionStyleDefaults364",
+            "CadStructureLifecycleWriter", "CadUsedDimensionStyleRename"
+        }), "unexpected reader integration: " + string.Join(", ", callers));
+        using var catalog = JsonDocument.Parse(File.ReadAllText("tests/fixtures/dimension-style-read-catalog.json"));
         foreach (var field in catalog.RootElement.GetProperty("fields").EnumerateArray())
             Check(calls.Contains("DimStyleTableRecord.get_" + field.GetProperty("sdk_property").GetString()), "missing SDK getter " + field);
         foreach (var field in catalog.RootElement.GetProperty("excluded_getters").EnumerateObject())
@@ -108,7 +121,15 @@ internal static class DimensionReadAdapterTests
         Check(!calls.Contains("ResultBuffer.op_Equality") && !calls.Contains("Color.op_Equality"), "null check invoked native wrapper equality");
         Check(calls.Contains("DimensionMetadataEnumeration.HasAny") && calls.Contains("DimensionStyleMetadata.Validate") && calls.Contains("IDisposable.Dispose"), "missing bounded conversion/disposal");
         File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!, "dimension-read-adapter-audit.json"),
-            JsonSerializer.Serialize(new { reader_methods = readerMethods, caller_roots = callers, for_read_open_sites = opens, calls,
-                selected_getters = 73, native_executed = false, scope = "PE/IL only; does not prove transitive native behavior or exception safety of SDK internals." }, Wire.Json));
+            JsonSerializer.Serialize(new
+            {
+                reader_methods = readerMethods,
+                caller_roots = callers,
+                for_read_open_sites = opens,
+                calls,
+                selected_getters = 73,
+                native_executed = false,
+                scope = "PE/IL only; does not prove transitive native behavior or exception safety of SDK internals."
+            }, Wire.Json));
     }
 }

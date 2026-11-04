@@ -22,6 +22,10 @@ The assistant launches `NanoCAD.McpServer.exe` as a local process and exchanges 
 
 The public tool list groups many operations into a small set of tools. For operation details, use the running server's `nanocad.get_guidance` tool with a topic of `operation` or `schema`. Obtain the current schemas before writing an integration. Handles, native identities and revision tokens are observations of a particular drawing state; do not treat them as permanent identifiers across arbitrary edits or drawings.
 
+Runtime component versions are declared together in `src/NanoCAD.Contracts/ComponentVersions.cs`. The server, bridge and wire protocol have independent versions; changing one does not require advancing the others. Run `python scripts/check-component-versions.py` to check that the public runtime constants still reference this single source.
+
+The in-process bridge targets `net6.0-windows` to match the nanoCAD 26 managed host. The vendor SDK's `samples/Mgd/HelloHost/HelloHost.csproj` and `samples/Mgd/HelloMultiCAD/HelloMultiCAD.csproj` use the same target; the installed `bin/hostmgd.runtimeconfig.json` and `bin/hostdbmgd.runtimeconfig.json` declare .NET 6. This host compatibility requirement is why the bridge and its shared .NET 6 dependencies suppress the SDK end-of-support build warning. That suppression does not extend .NET 6 support. Retargeting only the plugin to a newer runtime is not a supported host upgrade; reassess the target with a compatible vendor host and SDK. The separate MCP server and managed test runner target .NET 10.
+
 ## Prerequisites
 
 For a full build on Windows x64, install:
@@ -56,10 +60,18 @@ Work on MCP contracts and guidance can start without the nanoCAD SDK or a runnin
 
 ```powershell
 .\.tools\dotnet\dotnet.exe build .\src\NanoCAD.McpServer\NanoCAD.McpServer.csproj -c Release
-.\.tools\dotnet\dotnet.exe run --project .\tests\NanoCAD.Tests\NanoCAD.Tests.csproj -c Release -- --filter 'published input schemas expose geometry without references'
+.\.tools\dotnet\dotnet.exe run --project .\tests\NanoCAD.Tests\NanoCAD.Tests.csproj -c Release -- --suite managed --junit artifacts/managed-tests.xml
 ```
 
-The test project is an executable test runner, so use `dotnet run` rather than assuming `dotnet test` will discover its checks. `--filter` selects test-name substrings and may be repeated. The full suite includes checks that expect additional build products or repository resources. Inspect those prerequisites before running it in a reduced source checkout. A passing schema test verifies the published contract, not native CAD execution.
+The test project is an executable test runner, so use `dotnet run` rather than assuming `dotnet test` will discover its checks. `--suite managed` runs every SDK-independent check, including Windows IPC and real MCP stdio, and reports six host/compiled-bridge metadata checks as explicit skips. The default `--suite all` also requires an existing locally built bridge and its reviewed host metadata; it still executes no CAD operations. `--filter` selects test-name substrings and may be repeated. `--rerun-failed <results.json>` selects exact failed names from a previous report. Every run writes its complete JSON results under `artifacts/tests`; `--junit` additionally writes a CI-readable XML report. An unmatched selection fails rather than reporting an empty successful run.
+
+The managed GitHub Actions job restores and builds only the test project's contracts, IPC and server dependency graph. It does not build the bridge or require the vendor SDK. NuGet auditing remains enabled in CI; an explicitly offline local check can disable it for that invocation only and must disclose that limitation.
+
+The repository's `.editorconfig` defines whitespace for new and edited code. `scripts/check-format.ps1` checks changed C# files relative to the PR/push base; `-Fix` applies the same whitespace formatting locally. It uses folder workspaces so checking bridge source does not require loading vendor assemblies. Existing untouched files establish the baseline rather than triggering an unrelated repository-wide reformat.
+
+`NanoCADBridge.Acceptance.targets` contains the bridge's explicitly enabled acceptance probes and fixtures. Default builds include none of them. Existing MSBuild flags such as `-p:StateImportProbe=true` retain their meaning; keep these diagnostic builds separate from distributable outputs.
+
+The managed test project links five internal bridge helper source files so it can exercise the same algorithms without loading nanoCAD assemblies. One helper also uses Windows GDI. This deliberate source sharing keeps those internal types in the production bridge assembly and adds no runtime DLL to the installation. Extracting them into a separate assembly would require an explicit deployment and visibility change; it is not a prerequisite for SDK-independent managed checks.
 
 For native integration changes, test the engineering result in a deliberately selected drawing, including dependent geometry and a real MCP image. A saved drawing, a correct API response and an image answer different verification questions. Use a copy when the task is to test or experiment. Avoid replaying writes whose final outcome is unknown; first establish the actual drawing state.
 

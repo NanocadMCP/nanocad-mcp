@@ -33,37 +33,44 @@ internal static class DimensionStyleReadTests
     {
         await test("dimension draft maps all 73 selected SDK fields to exact DTO types", () =>
         {
-            using var catalog = JsonDocument.Parse(File.ReadAllText("docs/research/dimension-style-read-catalog.json"));
+            using var catalog = JsonDocument.Parse(File.ReadAllText("tests/fixtures/dimension-style-read-catalog.json"));
             int count = 0, variables = 0;
             foreach (var field in catalog.RootElement.GetProperty("fields").EnumerateArray())
             {
                 Type type = typeof(DimensionStyleProperties);
                 foreach (string segment in field.GetProperty("path").GetString()!.Split('.'))
                     type = type.GetProperty(segment)?.PropertyType ?? throw new Exception("Missing " + segment);
-                Type expected = field.GetProperty("native_type").GetString() switch {
-                    "Int32" or "Char" => typeof(int), "Double" => typeof(double), "Boolean" => typeof(bool), "String" => typeof(string),
-                    "Teigha.DatabaseServices.ObjectId" => typeof(DimensionDependency), "Teigha.Colors.Color" => typeof(DimensionColor),
-                    "Teigha.DatabaseServices.LineWeight" => typeof(DimensionLineweight), _ => throw new Exception("Unmapped SDK type") };
+                Type expected = field.GetProperty("native_type").GetString() switch
+                {
+                    "Int32" or "Char" => typeof(int),
+                    "Double" => typeof(double),
+                    "Boolean" => typeof(bool),
+                    "String" => typeof(string),
+                    "Teigha.DatabaseServices.ObjectId" => typeof(DimensionDependency),
+                    "Teigha.Colors.Color" => typeof(DimensionColor),
+                    "Teigha.DatabaseServices.LineWeight" => typeof(DimensionLineweight),
+                    _ => throw new Exception("Unmapped SDK type")
+                };
                 Check(type == expected, field.ToString()); count++;
                 if (field.GetProperty("category").GetString() == "variable") variables++;
             }
             Check(count == 73 && variables == 56 && typeof(DimensionVariables).GetProperties().Length == 56, "complete reviewed variable surface");
-            
+
             return Task.CompletedTask;
         });
         await test("dimension draft preserves signed values and rejects every nonfinite numeric field", () =>
         {
             var baseline = Example(); Check(Validate(baseline) == baseline, "no normalization");
             foreach (Type type in new[] { typeof(DimensionStyleProperties), typeof(DimensionVariables) })
-            foreach (var property in type.GetProperties().Where(p => p.PropertyType == typeof(double)))
-            {
-                foreach (double number in new[] { 0.0, -1.25, double.Epsilon, double.MaxValue, double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+                foreach (var property in type.GetProperties().Where(p => p.PropertyType == typeof(double)))
                 {
-                    var value = Example(); property.SetValue(type == typeof(DimensionVariables) ? value.variables : value, number);
-                    if (double.IsFinite(number)) Validate(value);
-                    else Domain("OBJECT_READ_FAILED", () => Validate(value));
+                    foreach (double number in new[] { 0.0, -1.25, double.Epsilon, double.MaxValue, double.NaN, double.PositiveInfinity, double.NegativeInfinity })
+                    {
+                        var value = Example(); property.SetValue(type == typeof(DimensionVariables) ? value.variables : value, number);
+                        if (double.IsFinite(number)) Validate(value);
+                        else Domain("OBJECT_READ_FAILED", () => Validate(value));
+                    }
                 }
-            }
             Validate(baseline with { variables = baseline.variables with { dimadec = int.MinValue, dimzin = int.MaxValue } });
             return Task.CompletedTask;
         });
@@ -98,7 +105,7 @@ internal static class DimensionStyleReadTests
         });
         await test("dimension enum labels retain unknown values, named colors and negative lineweights", () =>
         {
-            using var catalog = JsonDocument.Parse(File.ReadAllText("docs/research/dimension-style-read-catalog.json"));
+            using var catalog = JsonDocument.Parse(File.ReadAllText("tests/fixtures/dimension-style-read-catalog.json"));
             var enums = catalog.RootElement.GetProperty("enums").EnumerateArray().ToDictionary(e => e.GetProperty("name").GetString()!);
             var weights = enums["LineWeight"].GetProperty("constants").EnumerateArray().Select(e => e.GetProperty("value").GetInt32()).ToArray();
             Check(weights.Order().SequenceEqual(DimensionStyleMetadata.ExplicitLineweights.Concat(new[] { -1, -2, -3 }).Order()), "installed lineweight enumeration");
@@ -140,8 +147,15 @@ internal static class DimensionStyleReadTests
                 var value = Example(); examples.Add(Validate(value with { references = value.references with { arrow = new("block", "unavailable", null, null, reason) } }));
             }
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!, "dimension-style-read-draft.json"),
-                JsonSerializer.Serialize(new { properties = DimensionStyleReadSchema.Properties(), examples,
-                    exposed_in_mcp = true, native_executed = false, selected_sdk_fields = 73, typed_variables = 56 }, Wire.Json));
+                JsonSerializer.Serialize(new
+                {
+                    properties = DimensionStyleReadSchema.Properties(),
+                    examples,
+                    exposed_in_mcp = true,
+                    native_executed = false,
+                    selected_sdk_fields = 73,
+                    typed_variables = 56
+                }, Wire.Json));
             return Task.CompletedTask;
         });
     }

@@ -5,8 +5,8 @@ namespace NanoCAD.Contracts;
 
 public static class Wire
 {
-    public const string Version = "0.144";
-    public const string ProductVersion = "0.207.0";
+    public const string Version = ComponentVersions.Protocol;
+    public const string ProductVersion = ComponentVersions.Bridge;
     public const int MaxRequestBytes = 256 * 1024;
     public const int MaxResponseBytes = 1024 * 1024;
     // A result is also embedded as JSON text in MCP. Reserve room for escaping/wrappers.
@@ -16,7 +16,7 @@ public static class Wire
     public static readonly string[] ReadOperations = { "get_status", "get_operation_result", "get_document", "get_selection", "query_objects", "inspect_objects", "get_structure", "inspect_block", "get_documents", "analyze_geometry", "inspect_model_history", "get_model_variables", "inspect_sketch_constraints", "get_drawing_views", "inspect_solid_topology", "inspect_constraints", "inspect_point_cloud", "analyze_point_cloud" };
     public static readonly string[] WriteOperations = { "create_entities", "modify_entities", "manage_document", "modify_structure", "set_model_parameter", "set_view" };
     public static readonly string[] Operations = ReadOperations.Concat(WriteOperations).ToArray();
-    public static string? ValidateBridge(string operation, JsonElement input) => operation=="capture_window"
+    public static string? ValidateBridge(string operation, JsonElement input) => operation == "capture_window"
         ? VisualCaptureBridgeArguments.Parse(input).BridgeId
         : WriteOperations.Contains(operation)
             ? WriteValidation.Parse(operation, input).BridgeId : Validation.Parse(operation, input).BridgeId;
@@ -28,7 +28,7 @@ public sealed record DomainError(string code, string message, bool retryable = f
 public sealed record Result(string contract_version, string request_id, bool success, ReadContext? context,
     object? data, DomainError? error, string[] warnings)
 {
-    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public WriteReceipt432? receipt { get; init; }
     public static Result Ok(string id, object data, ReadContext? context = null, params string[] warnings) =>
         new(Wire.Version, id, true, context, data, null, warnings);
@@ -55,10 +55,10 @@ public sealed record Descriptor(string protocol_version, string bridge_instance_
 public sealed record Arguments(string? BridgeId, string? DocumentId, string? ExpectedRevision,
     int PageSize, string? Cursor, string[]? Types, string[]? Layers, string[]? Handles,
     string? Section = null, string? BlockHandle = null, int MaxDepth = 4, int MaxNodes = int.MaxValue, string? ModelObjectId = null, bool IncludeView = false,
-    string[]? SketchGeometryIds = null, bool IncludeVariables=false, SketchPlaneSpec? Workplane=null,
-    string? GeometryViewHandle=null,bool IncludeNativeModelFaces=false,string ReadSpace="model",bool IncludeNativeModelEdges=false,
-    int GeometryStartIndex=0,int GeometryPageSize=100,
-    bool IncludeDocumentProfiles=false,string? DocumentProfileCursor=null,string[]? ModelProfileIds=null,string[]? ModelProfileRegionIds=null,string[]? ModelExtrusionExtentIds=null,bool IncludeDocumentDatumPlanes=false,string? DocumentDatumCursor=null,string[]? ModelDatumPlaneIds=null,string[]? ModelDatumPlaneRevisionIds=null,string? DrawingViewSourceIdentityHandle=null,string[]? ModelProfileElementIds=null,bool IncludeDocumentSketches=false,string? DocumentSketchCursor=null,string[]? ModelSketchIds=null)
+    string[]? SketchGeometryIds = null, bool IncludeVariables = false, SketchPlaneSpec? Workplane = null,
+    string? GeometryViewHandle = null, bool IncludeNativeModelFaces = false, string ReadSpace = "model", bool IncludeNativeModelEdges = false,
+    int GeometryStartIndex = 0, int GeometryPageSize = 100,
+    bool IncludeDocumentProfiles = false, string? DocumentProfileCursor = null, string[]? ModelProfileIds = null, string[]? ModelProfileRegionIds = null, string[]? ModelExtrusionExtentIds = null, bool IncludeDocumentDatumPlanes = false, string? DocumentDatumCursor = null, string[]? ModelDatumPlaneIds = null, string[]? ModelDatumPlaneRevisionIds = null, string? DrawingViewSourceIdentityHandle = null, string[]? ModelProfileElementIds = null, bool IncludeDocumentSketches = false, string? DocumentSketchCursor = null, string[]? ModelSketchIds = null)
 {
     public string[]? ModelFeatureDeletionIds { get; init; }
     public string[]? SketchConstraintParameterIds { get; init; }
@@ -154,7 +154,7 @@ public static class Validation
         if (operation == "inspect_objects" && handles == null) throw new DomainException("INVALID_ARGUMENT", "handles is required.");
         if (handles != null && handles.Distinct().Count() != handles.Length) throw new DomainException("INVALID_ARGUMENT", "Duplicate normalized handles are not allowed.");
         bool includeView = false;
-        if (input.TryGetProperty("include_view",out var view))
+        if (input.TryGetProperty("include_view", out var view))
         {
             if (view.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                 throw new DomainException("INVALID_ARGUMENT", "include_view must be a boolean.");
@@ -169,10 +169,12 @@ public static class Validation
         }
         return new(bridgeId, documentId, revision, pageSize, ReadString("cursor", 2048),
             types?.Distinct().OrderBy(t => t, StringComparer.Ordinal).ToArray(),
-            layers?.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToArray(), handles, IncludeView: includeView,ReadSpace:space??"model")
+            layers?.Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToArray(), handles, IncludeView: includeView, ReadSpace: space ?? "model")
         {
-            QueryBounds = TargetedRead407.Bounds(input), QueryText = TargetedRead407.TextFilter(input),
-            QueryBlock = TargetedRead407.BlockFilter(input), DetailSections = TargetedRead407.Sections(input),
+            QueryBounds = TargetedRead407.Bounds(input),
+            QueryText = TargetedRead407.TextFilter(input),
+            QueryBlock = TargetedRead407.BlockFilter(input),
+            DetailSections = TargetedRead407.Sections(input),
             EraseAssessment = eraseAssessment
         };
     }

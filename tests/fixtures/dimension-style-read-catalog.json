@@ -1,0 +1,682 @@
+{
+  "scope": "SDK-independent selected dimension-style field and enum expectations; no vendor assemblies or executable SDK code.",
+  "reviewed_source_sha256": "61B8051BA8E41638172C017A2404D350CB506EA0D7760B3BB7CC3E9A04B8073C",
+  "fields": [
+    {
+      "sdk_property": "Dimadec",
+      "native_type": "Int32",
+      "path": "variables.dimadec",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimalt",
+      "native_type": "Boolean",
+      "path": "variables.dimalt",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimaltd",
+      "native_type": "Int32",
+      "path": "variables.dimaltd",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimaltf",
+      "native_type": "Double",
+      "path": "variables.dimaltf",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimaltrnd",
+      "native_type": "Double",
+      "path": "variables.dimaltrnd",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimalttd",
+      "native_type": "Int32",
+      "path": "variables.dimalttd",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimalttz",
+      "native_type": "Int32",
+      "path": "variables.dimalttz",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimaltu",
+      "native_type": "Int32",
+      "path": "variables.dimaltu",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimaltz",
+      "native_type": "Int32",
+      "path": "variables.dimaltz",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimapost",
+      "native_type": "String",
+      "path": "variables.dimapost",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimarcsym",
+      "native_type": "Int32",
+      "path": "variables.dimarcsym",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimasz",
+      "native_type": "Double",
+      "path": "arrow_size",
+      "category": "legacy_scalar"
+    },
+    {
+      "sdk_property": "Dimatfit",
+      "native_type": "Int32",
+      "path": "variables.dimatfit",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimaunit",
+      "native_type": "Int32",
+      "path": "variables.dimaunit",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimazin",
+      "native_type": "Int32",
+      "path": "variables.dimazin",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimblk",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.arrow",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimblk1",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.first_arrow",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimblk2",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.second_arrow",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimcen",
+      "native_type": "Double",
+      "path": "variables.dimcen",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimclrd",
+      "native_type": "Teigha.Colors.Color",
+      "path": "colors.dimension",
+      "category": "color"
+    },
+    {
+      "sdk_property": "Dimclre",
+      "native_type": "Teigha.Colors.Color",
+      "path": "colors.extension",
+      "category": "color"
+    },
+    {
+      "sdk_property": "Dimclrt",
+      "native_type": "Teigha.Colors.Color",
+      "path": "colors.text",
+      "category": "color"
+    },
+    {
+      "sdk_property": "Dimdec",
+      "native_type": "Int32",
+      "path": "variables.dimdec",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimdle",
+      "native_type": "Double",
+      "path": "variables.dimdle",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimdli",
+      "native_type": "Double",
+      "path": "variables.dimdli",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimdsep",
+      "native_type": "Char",
+      "path": "variables.dimdsep",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimexe",
+      "native_type": "Double",
+      "path": "variables.dimexe",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimexo",
+      "native_type": "Double",
+      "path": "variables.dimexo",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimfrac",
+      "native_type": "Int32",
+      "path": "variables.dimfrac",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimfxlen",
+      "native_type": "Double",
+      "path": "variables.dimfxlen",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "DimfxlenOn",
+      "native_type": "Boolean",
+      "path": "variables.dimfxlenon",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimgap",
+      "native_type": "Double",
+      "path": "variables.dimgap",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimjogang",
+      "native_type": "Double",
+      "path": "variables.dimjogang",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimjust",
+      "native_type": "Int32",
+      "path": "variables.dimjust",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimldrblk",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.leader_arrow",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimlfac",
+      "native_type": "Double",
+      "path": "variables.dimlfac",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimlim",
+      "native_type": "Boolean",
+      "path": "variables.dimlim",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimltex1",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.extension1_linetype",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimltex2",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.extension2_linetype",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimltype",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.dimension_linetype",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimlunit",
+      "native_type": "Int32",
+      "path": "variables.dimlunit",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimlwd",
+      "native_type": "Teigha.DatabaseServices.LineWeight",
+      "path": "lineweights.dimension",
+      "category": "lineweight"
+    },
+    {
+      "sdk_property": "Dimlwe",
+      "native_type": "Teigha.DatabaseServices.LineWeight",
+      "path": "lineweights.extension",
+      "category": "lineweight"
+    },
+    {
+      "sdk_property": "Dimpost",
+      "native_type": "String",
+      "path": "variables.dimpost",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimrnd",
+      "native_type": "Double",
+      "path": "variables.dimrnd",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimsah",
+      "native_type": "Boolean",
+      "path": "variables.dimsah",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimscale",
+      "native_type": "Double",
+      "path": "dimension_scale",
+      "category": "legacy_scalar"
+    },
+    {
+      "sdk_property": "Dimsd1",
+      "native_type": "Boolean",
+      "path": "variables.dimsd1",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimsd2",
+      "native_type": "Boolean",
+      "path": "variables.dimsd2",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimse1",
+      "native_type": "Boolean",
+      "path": "variables.dimse1",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimse2",
+      "native_type": "Boolean",
+      "path": "variables.dimse2",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimsoxd",
+      "native_type": "Boolean",
+      "path": "variables.dimsoxd",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtad",
+      "native_type": "Int32",
+      "path": "variables.dimtad",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtdec",
+      "native_type": "Int32",
+      "path": "variables.dimtdec",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtfac",
+      "native_type": "Double",
+      "path": "variables.dimtfac",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtfill",
+      "native_type": "Int32",
+      "path": "variables.dimtfill",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtfillclr",
+      "native_type": "Teigha.Colors.Color",
+      "path": "colors.text_fill",
+      "category": "color"
+    },
+    {
+      "sdk_property": "Dimtih",
+      "native_type": "Boolean",
+      "path": "variables.dimtih",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtix",
+      "native_type": "Boolean",
+      "path": "variables.dimtix",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtm",
+      "native_type": "Double",
+      "path": "variables.dimtm",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtmove",
+      "native_type": "Int32",
+      "path": "variables.dimtmove",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtofl",
+      "native_type": "Boolean",
+      "path": "variables.dimtofl",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtoh",
+      "native_type": "Boolean",
+      "path": "variables.dimtoh",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtol",
+      "native_type": "Boolean",
+      "path": "variables.dimtol",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtolj",
+      "native_type": "Int32",
+      "path": "variables.dimtolj",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtp",
+      "native_type": "Double",
+      "path": "variables.dimtp",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtsz",
+      "native_type": "Double",
+      "path": "variables.dimtsz",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtvp",
+      "native_type": "Double",
+      "path": "variables.dimtvp",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimtxsty",
+      "native_type": "Teigha.DatabaseServices.ObjectId",
+      "path": "references.text_style",
+      "category": "reference"
+    },
+    {
+      "sdk_property": "Dimtxt",
+      "native_type": "Double",
+      "path": "text_height",
+      "category": "legacy_scalar"
+    },
+    {
+      "sdk_property": "Dimtzin",
+      "native_type": "Int32",
+      "path": "variables.dimtzin",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimupt",
+      "native_type": "Boolean",
+      "path": "variables.dimupt",
+      "category": "variable"
+    },
+    {
+      "sdk_property": "Dimzin",
+      "native_type": "Int32",
+      "path": "variables.dimzin",
+      "category": "variable"
+    }
+  ],
+  "enums": [
+    {
+      "name": "LineWeight",
+      "namespace": "Teigha.DatabaseServices",
+      "constants": [
+        {
+          "name": "ByBlock",
+          "constant_type": "Int32",
+          "value": -2
+        },
+        {
+          "name": "ByLayer",
+          "constant_type": "Int32",
+          "value": -1
+        },
+        {
+          "name": "ByLineWeightDefault",
+          "constant_type": "Int32",
+          "value": -3
+        },
+        {
+          "name": "LineWeight000",
+          "constant_type": "Int32",
+          "value": 0
+        },
+        {
+          "name": "LineWeight005",
+          "constant_type": "Int32",
+          "value": 5
+        },
+        {
+          "name": "LineWeight009",
+          "constant_type": "Int32",
+          "value": 9
+        },
+        {
+          "name": "LineWeight013",
+          "constant_type": "Int32",
+          "value": 13
+        },
+        {
+          "name": "LineWeight015",
+          "constant_type": "Int32",
+          "value": 15
+        },
+        {
+          "name": "LineWeight018",
+          "constant_type": "Int32",
+          "value": 18
+        },
+        {
+          "name": "LineWeight020",
+          "constant_type": "Int32",
+          "value": 20
+        },
+        {
+          "name": "LineWeight025",
+          "constant_type": "Int32",
+          "value": 25
+        },
+        {
+          "name": "LineWeight030",
+          "constant_type": "Int32",
+          "value": 30
+        },
+        {
+          "name": "LineWeight035",
+          "constant_type": "Int32",
+          "value": 35
+        },
+        {
+          "name": "LineWeight040",
+          "constant_type": "Int32",
+          "value": 40
+        },
+        {
+          "name": "LineWeight050",
+          "constant_type": "Int32",
+          "value": 50
+        },
+        {
+          "name": "LineWeight053",
+          "constant_type": "Int32",
+          "value": 53
+        },
+        {
+          "name": "LineWeight060",
+          "constant_type": "Int32",
+          "value": 60
+        },
+        {
+          "name": "LineWeight070",
+          "constant_type": "Int32",
+          "value": 70
+        },
+        {
+          "name": "LineWeight080",
+          "constant_type": "Int32",
+          "value": 80
+        },
+        {
+          "name": "LineWeight090",
+          "constant_type": "Int32",
+          "value": 90
+        },
+        {
+          "name": "LineWeight100",
+          "constant_type": "Int32",
+          "value": 100
+        },
+        {
+          "name": "LineWeight106",
+          "constant_type": "Int32",
+          "value": 106
+        },
+        {
+          "name": "LineWeight120",
+          "constant_type": "Int32",
+          "value": 120
+        },
+        {
+          "name": "LineWeight140",
+          "constant_type": "Int32",
+          "value": 140
+        },
+        {
+          "name": "LineWeight158",
+          "constant_type": "Int32",
+          "value": 158
+        },
+        {
+          "name": "LineWeight200",
+          "constant_type": "Int32",
+          "value": 200
+        },
+        {
+          "name": "LineWeight211",
+          "constant_type": "Int32",
+          "value": 211
+        }
+      ]
+    },
+    {
+      "name": "ColorMethod",
+      "namespace": "Teigha.Colors",
+      "constants": [
+        {
+          "name": "ByLayer",
+          "constant_type": "Int32",
+          "value": 192
+        },
+        {
+          "name": "ByBlock",
+          "constant_type": "Int32",
+          "value": 193
+        },
+        {
+          "name": "ByColor",
+          "constant_type": "Int32",
+          "value": 194
+        },
+        {
+          "name": "ByAci",
+          "constant_type": "Int32",
+          "value": 195
+        },
+        {
+          "name": "ByPen",
+          "constant_type": "Int32",
+          "value": 196
+        },
+        {
+          "name": "Foreground",
+          "constant_type": "Int32",
+          "value": 197
+        },
+        {
+          "name": "LayerOff",
+          "constant_type": "Int32",
+          "value": 198
+        },
+        {
+          "name": "LayerFrozen",
+          "constant_type": "Int32",
+          "value": 199
+        },
+        {
+          "name": "None",
+          "constant_type": "Int32",
+          "value": 200
+        }
+      ]
+    },
+    {
+      "name": "AnnotativeStates",
+      "namespace": "Teigha.DatabaseServices",
+      "constants": [
+        {
+          "name": "True",
+          "constant_type": "Int32",
+          "value": 0
+        },
+        {
+          "name": "False",
+          "constant_type": "Int32",
+          "value": 1
+        },
+        {
+          "name": "NotApplicable",
+          "constant_type": "Int32",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "name": "DimArrowFlag",
+      "namespace": "Teigha.DatabaseServices",
+      "constants": [
+        {
+          "name": "FirstArrow",
+          "constant_type": "Int32",
+          "value": 0
+        },
+        {
+          "name": "SecondArrow",
+          "constant_type": "Int32",
+          "value": 1
+        }
+      ]
+    }
+  ],
+  "excluded_getters": {
+    "IsModifiedForRecompute": "Operational recomputation state, not a persistent style field.",
+    "Dimblks": "Derived arrow-name getter calls OdDmUtil.arrowName; raw ObjectId references are captured instead.",
+    "Dimblk1s": "Derived arrow-name getter calls OdDmUtil.arrowName; raw ObjectId references are captured instead.",
+    "Dimblk2s": "Derived arrow-name getter calls OdDmUtil.arrowName; raw ObjectId references are captured instead.",
+    "Dimldrblks": "Derived arrow-name getter calls OdDmUtil.arrowName; raw ObjectId references are captured instead."
+  }
+}

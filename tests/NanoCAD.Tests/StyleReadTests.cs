@@ -39,7 +39,7 @@ internal static class StyleReadTests
         public bool MoveNext() => ++_index < _values.Length;
         public void Reset() => throw new NotSupportedException();
     }
-    public static async Task Run(Func<string, Func<Task>, Task> test)
+    public static async Task Run(Func<string, Func<Task>, Task> test, Func<string, Func<Task>, Task>? hostTest = null)
     {
         await test("style metadata retains fixture properties and explains unsupported base modes", () =>
         {
@@ -51,16 +51,29 @@ internal static class StyleReadTests
                 var xdata = value.GetProperty("acad_xdata");
                 var metadata = xdata.ValueKind == JsonValueKind.Null ? TextFontMetadata.From(null)
                     : TextFontMetadata.From(new("ACAD", xdata[0][1].GetString()!, xdata[1][1].GetInt32()));
-                var facts = Facts() with { Name = entry.Name, FontFile = value.GetProperty("font_file").GetString()!,
-                    BigFontFile = value.GetProperty("big_font_file").GetString()!, Height = value.GetProperty("height").GetDouble(),
-                    WidthFactor = value.GetProperty("width_factor").GetDouble(), ObliqueAngle = value.GetProperty("oblique_radians").GetDouble(),
-                    GenerationFlags = value.GetProperty("generation_flags").GetInt32(), IsVertical = value.GetProperty("table_flags").GetInt32() == 4,
-                    Font = new(font[0].GetString(), font[2].GetBoolean(), font[1].GetBoolean(), 0, 0), FontMetadata = metadata };
+                var facts = Facts() with
+                {
+                    Name = entry.Name,
+                    FontFile = value.GetProperty("font_file").GetString()!,
+                    BigFontFile = value.GetProperty("big_font_file").GetString()!,
+                    Height = value.GetProperty("height").GetDouble(),
+                    WidthFactor = value.GetProperty("width_factor").GetDouble(),
+                    ObliqueAngle = value.GetProperty("oblique_radians").GetDouble(),
+                    GenerationFlags = value.GetProperty("generation_flags").GetInt32(),
+                    IsVertical = value.GetProperty("table_flags").GetInt32() == 4,
+                    Font = new(font[0].GetString(), font[2].GetBoolean(), font[1].GetBoolean(), 0, 0),
+                    FontMetadata = metadata
+                };
                 // Character set/pitch/annotative/extension/fields values are
                 // synthetic here; this is not an assertion about native getters.
                 var properties = TextStyleMetadata.Describe(facts);
-                string[] expected = entry.Name switch { "P4S_VERTICAL" => new[] { "vertical" }, "P4S_BACKWARD" => new[] { "generation_flags" },
-                    "P4S_OBLIQUE" => new[] { "oblique" }, _ => Array.Empty<string>() };
+                string[] expected = entry.Name switch
+                {
+                    "P4S_VERTICAL" => new[] { "vertical" },
+                    "P4S_BACKWARD" => new[] { "generation_flags" },
+                    "P4S_OBLIQUE" => new[] { "oblique" },
+                    _ => Array.Empty<string>()
+                };
                 Check(properties.base_eligibility.reasons.SequenceEqual(expected) && properties.base_eligibility.eligible == (expected.Length == 0), "fixture eligibility " + entry.Name);
                 Check(properties.height == facts.Height && properties.width_factor == facts.WidthFactor && properties.oblique_angle == facts.ObliqueAngle &&
                     properties.font_file == facts.FontFile && properties.font_metadata == facts.FontMetadata, "unmodified style values");
@@ -68,8 +81,14 @@ internal static class StyleReadTests
             }
             output.Add(new { name = "UnknownMetadata", properties = TextStyleMetadata.Describe(Facts() with { AnnotativeNativeValue = 99, FontMetadata = TextFontMetadata.Unsupported() }) });
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!, "style-read-draft-schemas.json"),
-                JsonSerializer.Serialize(new { properties = StyleReadSchema.TextStyleProperties(), examples = output, exposed_in_mcp = true,
-                    native_acceptance = false, synthetic_fields = new[] { "font_descriptor.character_set", "font_descriptor.pitch_and_family", "annotative_native_value", "has_extension_dictionary", "has_fields" } }, Wire.Json));
+                JsonSerializer.Serialize(new
+                {
+                    properties = StyleReadSchema.TextStyleProperties(),
+                    examples = output,
+                    exposed_in_mcp = true,
+                    native_acceptance = false,
+                    synthetic_fields = new[] { "font_descriptor.character_set", "font_descriptor.pitch_and_family", "annotative_native_value", "has_extension_dictionary", "has_fields" }
+                }, Wire.Json));
             return Task.CompletedTask;
         });
         await test("style eligibility rejects every restricted feature without discarding readable metadata", () =>
@@ -144,7 +163,7 @@ internal static class StyleReadTests
             }
             return Task.CompletedTask;
         });
-        await test("native style metadata is shared only by structural reads/style writes and contains no mutations", () =>
+        await (hostTest ?? test)("native style metadata is shared by reviewed read/preflight routes and contains no mutations", () =>
         {
             AuditPreparedReader();
             return Task.CompletedTask;
@@ -156,9 +175,12 @@ internal static class StyleReadTests
         using var file = File.OpenRead("src/NanoCADBridge/bin/Release/net6.0-windows/NanoCADBridge.dll");
         using var pe = new PEReader(file); var metadata = pe.GetMetadataReader();
         var opcodes = typeof(OpCodes).GetFields(BindingFlags.Public | BindingFlags.Static).Select(field => (OpCode)field.GetValue(null)!).ToDictionary(code => (ushort)code.Value);
-        string TypeName(EntityHandle handle) => handle.Kind switch {
+        string TypeName(EntityHandle handle) => handle.Kind switch
+        {
             HandleKind.TypeDefinition => metadata.GetString(metadata.GetTypeDefinition((TypeDefinitionHandle)handle).Name),
-            HandleKind.TypeReference => metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)handle).Name), _ => handle.Kind.ToString() };
+            HandleKind.TypeReference => metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)handle).Name),
+            _ => handle.Kind.ToString()
+        };
         bool ReaderType(TypeDefinitionHandle handle)
         {
             var type = metadata.GetTypeDefinition(handle);
@@ -195,21 +217,35 @@ internal static class StyleReadTests
                         Check(!target.Method.StartsWith("set_", StringComparison.Ordinal) && target.Method is not ("Clone" or "CopyFrom" or "GetObject" or "Add" or "Commit" or "LockDocument" or "StartTransaction" or "SendStringToExecute"), "unexpected write/context call in metadata reader: " + target);
                     }
                 }
-                int size = opcode.OperandType switch {
+                int size = opcode.OperandType switch
+                {
                     OperandType.InlineNone => 0,
                     OperandType.ShortInlineBrTarget or OperandType.ShortInlineI or OperandType.ShortInlineVar => 1,
                     OperandType.InlineVar => 2,
                     OperandType.InlineI8 or OperandType.InlineR => 8,
-                    OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset), _ => 4 };
+                    OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, offset),
+                    _ => 4
+                };
                 offset += size; Check(offset <= il.Length, "invalid IL operand boundary");
             }
         }
-        Check(readerMethods > 0 && outsideReferences >= 2 && callers.SetEquals(new[] { "StructureReader", "CadStyleWriter" }), "unexpected or missing product style metadata callers");
+        // Formatting and lifecycle preflight reuse the same read-only snapshot;
+        // this audits those integrations without treating the callers as readers.
+        Check(readerMethods > 0 && outsideReferences >= 2 && callers.SetEquals(new[] {
+            "StructureReader", "CadStyleWriter", "CadMTextFormatEditor", "CadTextFormat442", "CadStructureLifecycleWriter"
+        }), "unexpected or missing product style metadata callers: " + string.Join(", ", callers));
         Check(!calls.Contains("ResultBuffer.op_Equality"), "null test must not invoke an additional native wrapper operator");
         foreach (string getter in new[] { "TextStyleTableRecord.get_Font", "DBObject.get_XData", "DBObject.get_Annotative" })
             Check(calls.Contains(getter), "missing compiled SDK getter " + getter);
         File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!, "style-read-adapter-audit.json"),
-            JsonSerializer.Serialize(new { reader_methods = readerMethods, outside_references = outsideReferences, caller_roots = callers, calls, native_execution = false,
-                scope = "Compiled IL call inspection only; no CAD assemblies loaded into test process. Does not prove transitive getter side effects." }, Wire.Json));
+            JsonSerializer.Serialize(new
+            {
+                reader_methods = readerMethods,
+                outside_references = outsideReferences,
+                caller_roots = callers,
+                calls,
+                native_execution = false,
+                scope = "Compiled IL call inspection only; no CAD assemblies loaded into test process. Does not prove transitive getter side effects."
+            }, Wire.Json));
     }
 }

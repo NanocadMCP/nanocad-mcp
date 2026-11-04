@@ -1,4 +1,5 @@
 * text=auto
+*.cs text eol=lf
 *.md text eol=lf
 *.json text eol=lf
 *.yml text eol=lf
@@ -6,3 +7,6 @@
 *.png binary
 *.zip binary
 *.exe binary
+# Preserve original bytes in private historical snapshots.
+/docs/history/audit-maintenance-20261103/AGENTS.md -text -whitespace
+/docs/history/audit-maintenance-20261103/user-deployment-plan.md -text -whitespace

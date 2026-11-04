@@ -36,13 +36,13 @@ LOCALIZATION_REFERENCE = re.compile(
 )
 LOCALIZATION_PATH = re.compile(r"^(?:docs/r[u](?:/|$)|README[.]r[u][.]md$)", re.I)
 PUBLIC_ROOT_TEXT = {
-    "LICENSE", ".gitignore", ".gitattributes", "Directory.Build.props",
+    "LICENSE", ".gitignore", ".gitattributes", ".editorconfig", "Directory.Build.props",
     "global.json", "NuGet.Config", "NanoCAD.Mcp.sln",
 }
 PUBLIC_BUILD_SCRIPTS = {
     "bootstrap.ps1", "build.ps1", "build-native-parameters412.ps1",
     "build-native-model-history421.ps1", "build-visual-worker-pilot.ps1",
-    "check-public-docs.py",
+    "check-public-docs.py", "check-component-versions.py", "check-format.ps1",
 }
 PUBLIC_TEXT_SUFFIXES = {
     ".cs", ".csproj", ".cpp", ".h", ".ps1", ".cmd", ".bat", ".py", ".md",
@@ -69,8 +69,9 @@ def slug(text: str) -> str:
 
 
 class Checker:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, scope: str = "export") -> None:
         self.root = root.resolve()
+        self.scope = scope
         self.errors: list[dict[str, object]] = []
         self.texts: dict[Path, str] = {}
         self.anchors: dict[Path, set[str]] = {}
@@ -106,7 +107,7 @@ class Checker:
         """Mirror the public-export scope while supporting source and runtime roots."""
         files = set(docs)
         files.update(self.root / name for name in PUBLIC_ROOT_TEXT if (self.root / name).is_file())
-        checkout = (self.root / ".git").exists()
+        checkout = self.scope == "checkout"
         for directory in ("src", "tests", "deployment", "licenses", ".github", "config/examples"):
             for path in (self.root / directory).rglob("*"):
                 suffixes = EXPORTED_SOURCE_SUFFIXES if directory in {"src", "tests"} and not checkout else PUBLIC_TEXT_SUFFIXES
@@ -115,6 +116,7 @@ class Checker:
                 ):
                     files.add(path)
         scripts = self.root / "scripts"
+        files.update((self.root / "config").glob("*.example"))
         if checkout:
             files.update(path for path in scripts.rglob("*") if path.is_file()
                          and path.suffix.lower() in PUBLIC_TEXT_SUFFIXES
@@ -323,8 +325,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1], help="Repository or staged-publication root")
     parser.add_argument("--json", type=Path, help="Write the complete JSON report to this path")
+    parser.add_argument("--scope", choices=("export", "checkout"), default="export",
+                        help="Export checks the public allowlist in a private workspace; checkout checks all shipped text in a public checkout")
     args = parser.parse_args()
-    report = Checker(args.root).run()
+    report = Checker(args.root, args.scope).run()
     if args.json:
         args.json.parent.mkdir(parents=True, exist_ok=True)
         args.json.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

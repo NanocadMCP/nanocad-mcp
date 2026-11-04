@@ -1,0 +1,43 @@
+name: Managed build and tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  managed:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check component versions
+        run: python scripts/check-component-versions.py
+      - name: Restore managed dependency graph
+        run: dotnet restore tests/NanoCAD.Tests/NanoCAD.Tests.csproj
+      - name: Build contracts, IPC, server and managed tests
+        run: dotnet build tests/NanoCAD.Tests/NanoCAD.Tests.csproj -c Release --no-restore
+      - name: Check formatting in changed C# files
+        shell: pwsh
+        env:
+          FORMAT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: ./scripts/check-format.ps1
+      - name: Run every managed test without nanoCAD
+        run: dotnet run --project tests/NanoCAD.Tests/NanoCAD.Tests.csproj -c Release --no-build -- --suite managed --junit artifacts/managed-tests.xml
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-test-results
+          path: |
+            artifacts/managed-tests.xml
+            artifacts/tests/**/results.json
+          if-no-files-found: warn

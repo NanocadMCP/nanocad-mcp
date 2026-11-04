@@ -16,8 +16,12 @@ internal static class Phase2Tests
     private static Request Request(string? id = null, object[]? entities = null, string revision = "1", int timeout = 10000) =>
         new(Wire.Version, Guid.NewGuid().ToString("D"), "create_entities", timeout, Wire.Element(new
         {
-            bridge_instance_id = Bridge, document_id = Document, expected_revision = revision,
-            operation_id = id ?? Guid.NewGuid().ToString("D"), units = "Millimeters", entities = entities ?? new[] { Line() }
+            bridge_instance_id = Bridge,
+            document_id = Document,
+            expected_revision = revision,
+            operation_id = id ?? Guid.NewGuid().ToString("D"),
+            units = "Millimeters",
+            entities = entities ?? new[] { Line() }
         }));
     private static Result Success(WriteJob job) => Result.Ok(job.OriginalRequestId,
         new CreatedEntities(job.OperationId, "committed", false, new[] { new EntityRef(Bridge, Document, "AB") }, "single_command"),
@@ -52,7 +56,7 @@ internal static class Phase2Tests
                 new { type = "Polyline", vertices = new[] { new { point = new[] { 0, 0 }, bulge = 0 }, new { point = new[] { 1, 1 }, bulge = 1 } } }
             }) Domain("INVALID_GEOMETRY", () => CreateValidation.Parse(Request(entities: new[] { invalid }).arguments));
             Domain("INVALID_ARGUMENT", () => CreateValidation.Parse(Request(entities: Array.Empty<object>()).arguments));
-            Domain("INVALID_ARGUMENT", () => CreateValidation.Parse(Request(entities: Enumerable.Repeat(Line(), 101).ToArray()).arguments));
+            Check(CreateValidation.Parse(Request(entities: Enumerable.Repeat(Line(), 101).ToArray()).arguments).Entities.Length == 101, "Former count ceiling must not reject a request within the byte budget");
             Domain("INVALID_ARGUMENT", () => CreateValidation.Parse(Request(entities: new object[] { new { type = "Text", text = "%<field>%", position = new[] { 0, 0 }, height = 1 } }).arguments));
             foreach (string raw in new[] {
                 original.arguments.GetRawText().Replace("\"Millimeters\"", "\"Meters\""),

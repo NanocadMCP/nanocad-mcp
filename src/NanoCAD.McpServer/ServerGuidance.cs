@@ -2,7 +2,7 @@ namespace NanoCAD.McpServer;
 
 public static class ServerGuidance
 {
-    public const string Version = "0.249.0";
+    public const string Version = NanoCAD.Contracts.ComponentVersions.Server;
     // Product instructions are embedded, versioned and independent of repository AGENTS.md.
     public static string Instructions { get; } = ReadInstructions();
 

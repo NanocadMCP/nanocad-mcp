@@ -1,0 +1,7 @@
+# Alternative to scripts/register-mcp.ps1; merge only this section into Codex config.
+[mcp_servers.nanocad]
+command = 'C:\NanoCAD MCP\.tools\dotnet\dotnet.exe'
+args = ['C:\NanoCAD MCP\artifacts\server\NanoCAD.McpServer.dll']
+startup_timeout_sec = 10
+tool_timeout_sec = 30
+enabled_tools = ['nanocad.get_status', 'nanocad.get_document', 'nanocad.get_selection', 'nanocad.query_objects', 'nanocad.inspect_objects']

@@ -18,7 +18,6 @@ public static class SplineVerification
     }
     public static void Verify(SplineGeometry s)
     {
-        SerializedCapacity357.Check(s);
         int count = s.control_points.Length;
         CheckScope(s.degree, count, s.has_fit_data, s.periodic, s.closed);
         if (s.knots.Length != count + s.degree + 1 || !s.control_points.All(Point) || !s.knots.All(Finite) ||
@@ -31,7 +30,10 @@ public static class SplineVerification
         if (s.weights.Any(w => !Finite(w) || w <= 0 || !s.rational && w != 1)) throw Invalid();
         if (s.knots.Take(s.degree + 1).All(k => k == s.start_parameter) && !Same(s.start_point, s.control_points[0])) throw Invalid();
         if (s.knots.Skip(count).All(k => k == s.end_parameter) && !Same(s.end_point, s.control_points[^1])) throw Invalid();
-        if (s.closed && (!Same(s.start_point, s.end_point)||!s.knots.Take(s.degree+1).All(k=>k==s.start_parameter)||!s.knots.Skip(count).All(k=>k==s.end_parameter))) throw Invalid();
+        if (s.closed && (!Same(s.start_point, s.end_point) || !s.knots.Take(s.degree + 1).All(k => k == s.start_parameter) || !s.knots.Skip(count).All(k => k == s.end_parameter))) throw Invalid();
+        // Validate native floating-point observations before JSON serialization,
+        // which cannot represent NaN or infinity as a domain error.
+        SerializedCapacity357.Check(s);
     }
     public static double LengthFromDistances(double first, double last)
     {
@@ -39,14 +41,14 @@ public static class SplineVerification
         if (!double.IsFinite(first) || !double.IsFinite(last) || !double.IsFinite(length) || first < 0 || length <= 0) throw Invalid();
         return length;
     }
-    public static void RequirePairScope(SplineGeometry spline,string mode="distance")
+    public static void RequirePairScope(SplineGeometry spline, string mode = "distance")
     {
-        if(spline.closed)
+        if (spline.closed)
         {
-            if(mode is not ("intersections" or "relations") && !(mode=="distance"&&LinearSplineMetrics.TryCalculate(spline)!=null))throw new DomainException("UNSUPPORTED_SPLINE","Closed spline distance requires exact clamped degree1 segments; smooth closed distance remains excluded.");
-            if(!LiesInWcsXy(spline))throw new DomainException("PLANAR_GEOMETRY_REQUIRED","Closed spline paired analysis requires every control point in WCS XY/Z=0.");
+            if (mode is not ("intersections" or "relations") && !(mode == "distance" && LinearSplineMetrics.TryCalculate(spline) != null)) throw new DomainException("UNSUPPORTED_SPLINE", "Closed spline distance requires exact clamped degree1 segments; smooth closed distance remains excluded.");
+            if (!LiesInWcsXy(spline)) throw new DomainException("PLANAR_GEOMETRY_REQUIRED", "Closed spline paired analysis requires every control point in WCS XY/Z=0.");
         }
-        else if(spline.periodic)throw new DomainException("UNSUPPORTED_SPLINE","Open periodic spline paired analysis is not supported.");
+        else if (spline.periodic) throw new DomainException("UNSUPPORTED_SPLINE", "Open periodic spline paired analysis is not supported.");
     }
     public static bool LiesInWcsXy(SplineGeometry spline) => spline.control_points.All(p => p[2] == 0);
 }

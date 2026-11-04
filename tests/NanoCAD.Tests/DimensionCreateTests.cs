@@ -5,8 +5,14 @@ using NanoCAD.McpServer;
 internal static class DimensionCreateTests
 {
     private static CreateArguments Parse(params object[] entities) => CreateValidation.Parse(Wire.Element(new
-    { bridge_instance_id = "10000000-0000-0000-0000-000000000001", document_id = "10000000-0000-0000-0000-000000000002",
-        operation_id = "10000000-0000-0000-0000-000000000003", expected_revision = "0", units = "Millimeters", entities }));
+    {
+        bridge_instance_id = "10000000-0000-0000-0000-000000000001",
+        document_id = "10000000-0000-0000-0000-000000000002",
+        operation_id = "10000000-0000-0000-0000-000000000003",
+        expected_revision = "0",
+        units = "Millimeters",
+        entities
+    }));
     private static object Linear(string kind = "aligned", double endX = 30, string style = "Standard") => new
     { type = "Dimension", kind, dimension_style = style, xline1 = new[] { 0d, 0 }, xline2 = new[] { endX, 40 }, dimline_point = new[] { 5d, 50 } };
     public static async Task Run(Func<string, Func<Task>, Task> test)
@@ -31,9 +37,11 @@ internal static class DimensionCreateTests
             var blockVariants = BlockWriteSchema.Define().GetProperty("properties").GetProperty("entities").GetProperty("items").GetProperty("oneOf");
             if (blockVariants.EnumerateArray().Any(v => v.GetProperty("properties").GetProperty("type").GetProperty("const").GetString() == "Dimension"))
                 throw new Exception("New dimensions leaked into block-definition input schema.");
-            Reject(() => Parse(Enumerable.Repeat(Linear(), 17).ToArray()));
+            if (Parse(Enumerable.Repeat(Linear(), 17).ToArray()).Entities.Length != 17)
+                throw new Exception("Dimension batch was truncated to an obsolete count limit.");
+            Reject(() => Parse(Enumerable.Repeat(Linear(), 16).Append(new { type = "Dimension", kind = "aligned" }).ToArray()));
             Reject(() => Parse(Linear(), new { type = "Dimension", kind = "aligned" }));
-            Reject(() => Parse(new { type = "Dimension", kind = "rotated", dimension_style = "Standard", xline1 = new[] { 0,0 }, xline2 = new[] { 0,10 }, dimline_point = new[] { 10,10 }, rotation = 0 }));
+            Reject(() => Parse(new { type = "Dimension", kind = "rotated", dimension_style = "Standard", xline1 = new[] { 0, 0 }, xline2 = new[] { 0, 10 }, dimline_point = new[] { 10, 10 }, rotation = 0 }));
             return Task.CompletedTask;
         });
     }

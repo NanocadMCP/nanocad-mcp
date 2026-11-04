@@ -36,15 +36,20 @@ internal static class StyleWriteTests
             Check(StyleWriteValidation.ResolveProperties(baseline.Properties, 2.5, 0.8) == new EffectiveTextStyleProperties(2.5, 0.8), "inherit both");
             Check(StyleWriteValidation.ResolveProperties(new(0, null), 2.5, 0.8) == new EffectiveTextStyleProperties(0, 0.8), "explicit variable height");
             Check(StyleWriteValidation.ResolveProperties(new(null, 2), 2.5, 0.8) == new EffectiveTextStyleProperties(2.5, 2), "inherit fixed height");
-            foreach (string name in new[] { "0", "Defpoints", "Text 中文" })
+            foreach (string name in new[] { "0", "Defpoints", "Text ä¸­æ–‡" })
             { var value = Input(); value["name"] = name; Check(Parse(value).Name == name, "style table name semantics"); }
             var wide = Input(); wide["base_style_handle"] = "ffffffffffffffff";
             Check(Parse(wide).BaseStyleHandle == "FFFFFFFFFFFFFFFF", "full uint64 handle");
             var fixedStyle = Input(); fixedStyle["properties"] = new JsonObject { ["height"] = 2.5, ["width_factor"] = 0.8 };
             var variable = Input(); variable["properties"] = new JsonObject { ["height"] = 0 };
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!, "style-write-draft-schemas.json"),
-                JsonSerializer.Serialize(new { create = StyleWriteSchema.CreateTextStyle(), inputs = new[] { Input(), fixedStyle, variable, wide },
-                    exposed_in_mcp = true, native_acceptance = false }, Wire.Json));
+                JsonSerializer.Serialize(new
+                {
+                    create = StyleWriteSchema.CreateTextStyle(),
+                    inputs = new[] { Input(), fixedStyle, variable, wide },
+                    exposed_in_mcp = true,
+                    native_acceptance = false
+                }, Wire.Json));
             return Task.CompletedTask;
         });
         await test("style draft rejects ambiguous shapes, font paths and malformed names", () =>
@@ -102,7 +107,7 @@ internal static class StyleWriteTests
             var template = Parse(Input());
             var styles = Enumerable.Range(0, 16).Select(i => (StructureEdit)(template with { Name = "Style" + i })).ToArray();
             Check(StyleWriteValidation.ValidateBatch(styles) == 16, "16 styles");
-            Domain("INVALID_ARGUMENT", () => StyleWriteValidation.ValidateBatch(styles.Append(template)));
+            Check(StyleWriteValidation.ValidateBatch(styles.Append(template)) == 17, "Former style count ceiling retained");
             Domain("INVALID_OPERATION_ORDER", () => StyleWriteValidation.ValidateBatch(new[] { template, template with { Name = template.Name.ToLowerInvariant() } }));
             Domain("INVALID_ARGUMENT", () => StyleWriteValidation.ValidateBatch(Array.Empty<StructureEdit>()));
             var changes = new LayerChanges(1, null, null, null, null, null, null);
@@ -111,10 +116,10 @@ internal static class StyleWriteTests
                 Enumerable.Range(0, 16).Select(j => new BlockAttributeSpec("A" + j, "", new(0, j), 2, "Standard", 0)).ToArray()))
                 .Concat(styles).Concat(Enumerable.Range(0, 28).Select(i => new CreateLayerEdit("L" + i, changes))).ToArray();
             Check(full.Length == 48 && StyleWriteValidation.ValidateBatch(full) == 512, "combined 512 object boundary");
-            Domain("INVALID_ARGUMENT", () => StyleWriteValidation.ValidateBatch(full.Append(new CreateLayerEdit("Extra", changes))));
+            Check(StyleWriteValidation.ValidateBatch(full.Append(new CreateLayerEdit("Extra", changes))) == 513, "Former object count ceiling retained");
             var fifty = Enumerable.Range(0, 50).Select(i => (StructureEdit)new CreateLayerEdit("L" + i, changes)).ToArray();
             Check(StyleWriteValidation.ValidateBatch(fifty) == 50, "50 operations");
-            Domain("INVALID_ARGUMENT", () => StyleWriteValidation.ValidateBatch(fifty.Append(template)));
+            Check(StyleWriteValidation.ValidateBatch(fifty.Append(template)) == 51, "Former operation count ceiling retained");
             Check(StyleWriteValidation.ValidateBatch(new StructureEdit[] { template, new CreateLayerEdit(template.Name, changes) }) == 2, "separate symbol table namespaces");
             return Task.CompletedTask;
         });
@@ -122,7 +127,7 @@ internal static class StyleWriteTests
         {
             Check(StyleFontMetadata.Read(null) == null && StyleFontMetadata.Read(Array.Empty<FontMetadataValue>()) == null, "empty metadata");
             foreach (int bits in new[] { 33554466, 0, -1, int.MinValue, int.MaxValue })
-                Check(StyleFontMetadata.Read(Font("Font 中文", bits)) == new FontMetadataSignature("ACAD", "Font 中文", bits), "metadata preservation");
+                Check(StyleFontMetadata.Read(Font("Font ä¸­æ–‡", bits)) == new FontMetadataSignature("ACAD", "Font ä¸­æ–‡", bits), "metadata preservation");
             using var oracle = JsonDocument.Parse(File.ReadAllText("tests/fixtures/phase4-style-write.expected.json"));
             // DXF group codes and the raw signed integer are checked independently
             // of the native FontDescriptor, which still needs a host acceptance run.
@@ -158,7 +163,7 @@ internal static class StyleWriteTests
             var parsed = StructureWriteValidation.Parse(Wire.Element(root));
             Check(parsed.Operations.Single() == Parse(Input()), "typed public style route retained in linetype read candidate");
             root["operations"] = Enumerable.Range(0, 17).Select(i => { var value = Input(); value["name"] = "Style" + i; return value; }).ToArray();
-            Check(StructureWriteValidation.Parse(Wire.Element(root)).Operations.Length==17,"no arbitrary style count ceiling");
+            Check(StructureWriteValidation.Parse(Wire.Element(root)).Operations.Length == 17, "no arbitrary style count ceiling");
             root["operations"] = new[] { Input(), Input() };
             Domain("INVALID_OPERATION_ORDER", () => StructureWriteValidation.Parse(Wire.Element(root)));
             return Task.CompletedTask;
@@ -226,7 +231,7 @@ internal static class StyleWriteTests
                 if (mode == "font") root["operations"]![0]!["font_file"] = "unrequested.ttf";
                 if (mode == "height") root["operations"]![0]!["properties"] = new JsonObject { ["height"] = -1 };
                 if (mode == "handle") root["operations"]![0]!["base_style_handle"] = "0";
-                if (mode == "duplicate_names") root["operations"] = new JsonArray(Enumerable.Range(0,2).Select(i => (JsonNode?)Input()).ToArray());
+                if (mode == "duplicate_names") root["operations"] = new JsonArray(Enumerable.Range(0, 2).Select(i => (JsonNode?)Input()).ToArray());
                 var input = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(root.ToJsonString())!;
                 var result = await new ToolService().CallAsync("modify_structure", input, default);
                 Check(result.IsError == true && calls == 0, "invalid style reached the bridge: " + mode);

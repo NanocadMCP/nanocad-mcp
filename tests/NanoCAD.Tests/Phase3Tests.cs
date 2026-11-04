@@ -81,11 +81,11 @@ internal static class Phase3Tests
         await test("modify bounded batch and independent copy budget", () =>
         {
             Domain("INVALID_ARGUMENT", () => ModifyValidation.Parse(Request(Array.Empty<object>()).arguments));
-            Domain("INVALID_ARGUMENT", () => ModifyValidation.Parse(Request(Enumerable.Repeat(Move(), 101).ToArray()).arguments));
+            Check(ModifyValidation.Parse(Request(Enumerable.Repeat(Move(), 101).ToArray()).arguments).Operations.Length == 101, "Former operation count ceiling retained");
             var hundred = Enumerable.Range(1, 100).Select(i => i.ToString("X")).ToArray();
-            Domain("INVALID_ARGUMENT", () => ModifyValidation.Parse(Request(new[] { Move(hundred), Move(new[] { "100" }) }).arguments));
-            Domain("INVALID_ARGUMENT", () => ModifyValidation.Parse(Request(Enumerable.Repeat(Move(hundred), 11).ToArray()).arguments));
-            Domain("INVALID_ARGUMENT", () => ModifyValidation.Parse(Request(new[] { Copy(hundred), Copy() }).arguments));
+            Check(ModifyValidation.Parse(Request(new[] { Move(hundred), Move(new[] { "100" }) }).arguments).Operations.Length == 2, "Byte-bounded batch above former count ceiling rejected");
+            Check(ModifyValidation.Parse(Request(Enumerable.Repeat(Move(hundred), 11).ToArray()).arguments).Operations.Length == 11, "Byte-bounded batch above former count ceiling rejected");
+            Check(ModifyValidation.Parse(Request(new[] { Copy(hundred), Copy() }).arguments).Operations.Length == 2, "Byte-bounded batch above former count ceiling rejected");
             Check(ModifyValidation.Parse(Request(new[] { Copy(hundred) }).arguments).Operations.Length == 1, "boundary copy budget rejected");
             return Task.CompletedTask;
         });
@@ -94,8 +94,14 @@ internal static class Phase3Tests
             using var queue = new WriteQueue(Environment.CurrentManagedThreadId);
             var modify = Request(); var parsed = ModifyValidation.Parse(modify.arguments);
             var create = new Request(Wire.Version, Guid.NewGuid().ToString("D"), "create_entities", 10000, Wire.Element(new
-            { bridge_instance_id = Bridge, document_id = Document, operation_id = parsed.OperationId, expected_revision = "1", units = "Millimeters",
-                entities = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 1, 0 } } } }));
+            {
+                bridge_instance_id = Bridge,
+                document_id = Document,
+                operation_id = parsed.OperationId,
+                expected_revision = "1",
+                units = "Millimeters",
+                entities = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 1, 0 } } }
+            }));
             queue.Enqueue(modify);
             Domain("OPERATION_ID_CONFLICT", () => queue.Enqueue(create));
             var second = Request(); queue.Enqueue(second);

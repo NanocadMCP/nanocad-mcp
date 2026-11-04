@@ -9,6 +9,8 @@
 /artifacts/
 **/bin/
 **/obj/
+**/__pycache__/
+**/.pytest_cache/
 
 # Local tools, settings, diagnostics and user data.
 /output/
@@ -16,6 +18,7 @@
 /tmp/
 /.idea/
 /.vscode/
+/github/nanocad-mcp/
 /config/local/
 *.user
 *.suo

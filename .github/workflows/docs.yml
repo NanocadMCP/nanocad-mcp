@@ -16,4 +16,4 @@ jobs:
         with:
           python-version: '3.12'
       - name: Check public documentation
-        run: python scripts/check-public-docs.py
+        run: python scripts/check-public-docs.py --scope checkout
