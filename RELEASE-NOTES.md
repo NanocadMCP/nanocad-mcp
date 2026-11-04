@@ -2,6 +2,9 @@
 
 [Documentation](docs/en/index.md)
 
+Tag `447` identifies the source for a local maintenance package. The published
+Windows downloads are available on the [release 446 page](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/446).
+
 ## Package contents
 
 | Component | Version |
