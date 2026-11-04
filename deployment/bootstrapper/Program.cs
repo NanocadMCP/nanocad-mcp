@@ -13,8 +13,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("nanoCAD MCP — Setup")]
 [assembly: AssemblyProduct("nanoCAD MCP")]
-[assembly: AssemblyVersion("0.448.0.0")]
-[assembly: AssemblyFileVersion("0.448.0.0")]
+[assembly: AssemblyVersion("0.449.0.0")]
+[assembly: AssemblyFileVersion("0.449.0.0")]
 
 internal static class Program
 {
@@ -44,7 +44,7 @@ internal static class Program
             }
             string directory = verify ? Path.GetFullPath(args[1]) : Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "NanoCADMcp", "SetupCache", "448-" + Guid.NewGuid().ToString("N"));
+                "NanoCADMcp", "SetupCache", "449-" + Guid.NewGuid().ToString("N"));
             if (Directory.Exists(directory) || File.Exists(directory)) throw new IOException("The preparation folder already exists; its contents will not be changed.");
             Directory.CreateDirectory(directory);
             using (Stream payload = Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip"))

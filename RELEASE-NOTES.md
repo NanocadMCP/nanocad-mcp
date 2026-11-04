@@ -2,6 +2,14 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 449
+
+Server 0.252.0 publishes top-level input fields for `manage_document` and
+`analyze_geometry` in the default MCP catalog. Clients that discover arguments
+from those fields can call both tools. The bridge still checks each action or
+mode against its exact input contract. This package uses bridge 0.207.0 and IPC
+protocol 0.144.
+
 ## Build 448
 
 Server 0.251.0 verifies the named pipe owner's Windows user SID directly, so

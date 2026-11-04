@@ -23,7 +23,7 @@ internal static class McpPresentation
             Name = tool.Name,
             Title = tool.Title,
             Description = description ?? tool.Description,
-            InputSchema = description is null ? tool.InputSchema : SchemaCompactor.PublishOperationIndex(tool.InputSchema),
+            InputSchema = description is null ? SchemaCompactor.PublishFlatInput(tool.InputSchema) : SchemaCompactor.PublishOperationIndex(tool.InputSchema),
             Annotations = tool.Annotations
             // outputSchema is optional in MCP; declaring it would require structuredContent.
             // Full schemas remain in ToolCatalog for contract checks and typed clients.

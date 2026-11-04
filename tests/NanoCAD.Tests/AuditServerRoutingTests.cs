@@ -75,6 +75,11 @@ internal static class AuditServerRoutingTests
                     var published = compact.Single(candidate => candidate.Name == tool.Name);
                     if (tool.Name is not ("nanocad.modify_entities" or "nanocad.modify_structure"))
                     {
+                        if (tool.InputSchema.TryGetProperty("oneOf", out _) && !tool.InputSchema.TryGetProperty("properties", out _))
+                        {
+                            RequireFlatUnion(tool.Name, tool.InputSchema, published.InputSchema);
+                            continue;
+                        }
                         if (!JsonElement.DeepEquals(tool.InputSchema, published.InputSchema))
                             throw new Exception("Default projection changed an unrelated tool: " + tool.Name);
                         continue;
@@ -107,6 +112,65 @@ internal static class AuditServerRoutingTests
                 return schema;
             }
         });
+        await test("server default catalog publishes root alternatives as callable top-level fields", () =>
+        {
+            using var input = JsonDocument.Parse("""
+                {"type":"object","oneOf":[
+                  {"type":"object","additionalProperties":false,"required":["id","mode","handles"],"properties":{
+                    "id":{"type":"string"},"mode":{"type":"string","enum":["a","b"]},
+                    "handles":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string"}}}},
+                  {"type":"object","description":"Second branch prose.","oneOf":[
+                    {"type":"object","additionalProperties":false,"required":["id","mode","point"],"properties":{
+                      "id":{"type":"string"},"mode":{"const":"c"},"point":{"type":"array","items":{"type":"number"}},
+                      "handles":{"type":"array","minItems":2,"maxItems":2,"uniqueItems":true,"items":{"type":"string"}}}}]}
+                ]}
+                """);
+            var method = typeof(ToolCatalog).Assembly.GetType("NanoCAD.McpServer.SchemaCompactor")!
+                .GetMethod("PublishFlatInput", BindingFlags.Public | BindingFlags.Static)!;
+            var output = (JsonElement)method.Invoke(null, [input.RootElement])!;
+            RequireFlatUnion("synthetic", input.RootElement, output);
+            var properties = output.GetProperty("properties");
+            var handles = properties.GetProperty("handles");
+            if (!properties.GetProperty("mode").GetProperty("enum").EnumerateArray().Select(value => value.GetString()).SequenceEqual(["a", "b", "c"]) ||
+                handles.TryGetProperty("minItems", out _) || handles.TryGetProperty("maxItems", out _) || !handles.GetProperty("uniqueItems").GetBoolean() ||
+                !output.GetProperty("required").EnumerateArray().Select(value => value.GetString()).SequenceEqual(["id", "mode"]) ||
+                output.GetProperty("additionalProperties").GetBoolean() || output.GetProperty("description").GetString() != "Second branch prose.")
+                throw new Exception("Flat publication did not relax differing constraints or join branch values.");
+            return Task.CompletedTask;
+        });
+
+        // Every field of every alternative stays published and acceptable; only fields
+        // required by all alternatives are required, and no root combinator remains.
+        static void RequireFlatUnion(string name, JsonElement full, JsonElement published)
+        {
+            if (published.GetProperty("type").GetString() != "object" || published.GetProperty("properties").ValueKind != JsonValueKind.Object ||
+                new[] { "oneOf", "anyOf", "allOf" }.Any(keyword => published.TryGetProperty(keyword, out _)))
+                throw new Exception("Root alternatives were not flattened into top-level fields: " + name);
+            var properties = published.GetProperty("properties");
+            var required = published.TryGetProperty("required", out var list) ? list.EnumerateArray().Select(value => value.GetString()!).ToArray() : [];
+            foreach (var (fields, needed) in Leaves(full, new Dictionary<string, JsonElement>(), []))
+            {
+                if (required.Except(needed).Any()) throw new Exception("Flat publication requires a field one alternative omits: " + name);
+                foreach (var (field, schema) in fields)
+                {
+                    if (!properties.TryGetProperty(field, out var flat)) throw new Exception($"Flat publication lost {name}.{field}.");
+                    var values = schema.TryGetProperty("const", out var single) ? new[] { single }
+                        : schema.TryGetProperty("enum", out var many) ? many.EnumerateArray().ToArray() : [];
+                    if (flat.TryGetProperty("enum", out var allowed) && values.Any(value => !allowed.EnumerateArray().Any(candidate => JsonElement.DeepEquals(candidate, value))))
+                        throw new Exception($"Flat publication rejects a branch value of {name}.{field}.");
+                }
+            }
+
+            static IEnumerable<(Dictionary<string, JsonElement> Fields, string[] Required)> Leaves(JsonElement node, Dictionary<string, JsonElement> fields, string[] required)
+            {
+                fields = new Dictionary<string, JsonElement>(fields);
+                if (node.TryGetProperty("properties", out var own)) foreach (var field in own.EnumerateObject()) fields[field.Name] = field.Value;
+                if (node.TryGetProperty("required", out var needed)) required = required.Concat(needed.EnumerateArray().Select(value => value.GetString()!)).ToArray();
+                if (!node.TryGetProperty("oneOf", out var alternatives)) { yield return (fields, required); yield break; }
+                foreach (var alternative in alternatives.EnumerateArray())
+                    foreach (var leaf in Leaves(alternative, fields, required)) yield return leaf;
+            }
+        }
         await test("server prose compaction retains properties and literal values named description", () =>
         {
             using var input = JsonDocument.Parse("""

@@ -90,6 +90,89 @@ internal static class SchemaCompactor
         return JsonSerializer.SerializeToElement(root);
     }
 
+    // Some MCP clients replace a root oneOf/anyOf without top-level properties by
+    // an empty object and then drop every argument. Publish the union of the
+    // alternatives: fields shared by all branches stay required, differing
+    // constraints are relaxed and branch values join one enum, so every request
+    // accepted before remains acceptable. The bridge still validates the exact branch.
+    public static JsonElement PublishFlatInput(JsonElement input)
+    {
+        var root = JsonNode.Parse(input.GetRawText())!.AsObject();
+        if (root["properties"] is JsonObject || (root["oneOf"] is not JsonArray && root["anyOf"] is not JsonArray)) return input;
+        var notes = new List<string>();
+        var flat = Merge(Alternatives(root, notes).ToArray());
+        flat["type"] = "object";
+        if (notes.Count > 0) flat["description"] = string.Join(" ", notes);
+        else flat.Remove("description");
+        return JsonSerializer.SerializeToElement(flat);
+    }
+
+    private static IEnumerable<JsonObject> Alternatives(JsonObject node, List<string> notes)
+    {
+        if (node["description"] is JsonValue note) notes.Add(note.GetValue<string>());
+        var alternatives = node["oneOf"] as JsonArray ?? node["anyOf"] as JsonArray;
+        if (alternatives is null) { yield return node; yield break; }
+        foreach (var alternative in alternatives.OfType<JsonObject>())
+        {
+            var branch = (JsonObject)alternative.DeepClone();
+            // Fields declared beside the alternatives apply to each of them.
+            if (node["properties"] is JsonObject shared)
+            {
+                var properties = branch["properties"] as JsonObject ?? new JsonObject();
+                foreach (var pair in shared) if (!properties.ContainsKey(pair.Key)) properties[pair.Key] = pair.Value?.DeepClone();
+                branch["properties"] = properties;
+            }
+            if (node["required"] is JsonArray sharedRequired)
+            {
+                var required = branch["required"] as JsonArray ?? new JsonArray();
+                foreach (var name in sharedRequired.Select(value => value!.GetValue<string>()))
+                    if (!required.Any(value => value!.GetValue<string>() == name)) required.Add(name);
+                branch["required"] = required;
+            }
+            foreach (var leaf in Alternatives(branch, notes)) yield return leaf;
+        }
+    }
+
+    private static JsonObject Merge(IReadOnlyList<JsonObject> schemas)
+    {
+        if (schemas.All(schema => JsonNode.DeepEquals(schema, schemas[0]))) return (JsonObject)schemas[0].DeepClone();
+        var merged = new JsonObject();
+        foreach (var pair in schemas[0])
+            if (!MergedKeywords.Contains(pair.Key) &&
+                schemas.All(schema => schema.TryGetPropertyValue(pair.Key, out var value) && JsonNode.DeepEquals(value, pair.Value)))
+                merged[pair.Key] = pair.Value?.DeepClone();
+        if (schemas.Select(schema => schema["description"]).FirstOrDefault(value => value is not null) is { } description)
+            merged["description"] = description.DeepClone();
+        if (schemas.All(schema => schema["enum"] is JsonArray || schema.ContainsKey("const")))
+        {
+            var values = new JsonArray();
+            foreach (var value in schemas.SelectMany(schema => schema["enum"] is JsonArray list ? list.ToArray() : [schema["const"]]))
+                if (!values.Any(existing => JsonNode.DeepEquals(existing, value))) values.Add(value?.DeepClone());
+            merged["enum"] = values;
+        }
+        if (schemas.All(schema => schema["items"] is JsonObject))
+            merged["items"] = Merge(schemas.Select(schema => (JsonObject)schema["items"]!).ToArray());
+        if (schemas.All(schema => schema["properties"] is JsonObject))
+        {
+            var properties = new JsonObject();
+            foreach (string name in schemas.SelectMany(schema => ((JsonObject)schema["properties"]!).Select(pair => pair.Key)).Distinct(StringComparer.Ordinal))
+                properties[name] = Merge(schemas.Select(schema => schema["properties"]![name]).OfType<JsonObject>().ToArray());
+            merged["properties"] = properties;
+            var required = schemas
+                .Select(schema => (schema["required"] as JsonArray ?? []).Select(value => value!.GetValue<string>()))
+                .Aggregate((left, right) => left.Intersect(right, StringComparer.Ordinal).ToArray());
+            if (required.Any()) merged["required"] = new JsonArray(required.Select(name => (JsonNode?)name).ToArray());
+            if (schemas.All(schema => schema["additionalProperties"] is JsonValue value && value.GetValueKind() == JsonValueKind.False))
+                merged["additionalProperties"] = false;
+        }
+        return merged;
+    }
+
+    // Merged separately above; conditional and alternative keywords are left to the bridge validator.
+    private static readonly HashSet<string> MergedKeywords =
+        ["description", "enum", "const", "items", "properties", "required", "additionalProperties",
+         "oneOf", "anyOf", "allOf", "if", "then", "else", "not", "prefixItems"];
+
     // Factor identical schema objects through local JSON Schema references.
     // Values, descriptions, required fields and validation keywords are unchanged.
     public static JsonElement Compact(JsonElement schema)
