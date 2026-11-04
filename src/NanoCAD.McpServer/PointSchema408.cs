@@ -8,18 +8,23 @@ internal static class PointSchema408
 
     private static JsonObject Triple() => new()
     {
-        ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3,
+        ["type"] = "array",
+        ["minItems"] = 3,
+        ["maxItems"] = 3,
         ["items"] = new JsonObject { ["type"] = "number" },
         ["description"] = "Finite XYZ coordinates in millimeters; WCS by default, local XYZ with workplane (local Z follows x_axis cross y_axis)."
     };
     internal static JsonObject Create() => new()
     {
-        ["type"] = "object", ["additionalProperties"] = false,
+        ["type"] = "object",
+        ["additionalProperties"] = false,
         ["properties"] = new JsonObject
         {
             ["type"] = new JsonObject { ["type"] = "string", ["const"] = "Point" },
             ["layer"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 255, ["default"] = "0" },
-            ["position"] = Triple(), ["workplane"] = WorkplaneSchema.Input(), ["position_snap"] = NativeCurveSnapSchema.Input()
+            ["position"] = Triple(),
+            ["workplane"] = WorkplaneSchema.Input(),
+            ["position_snap"] = NativeCurveSnapSchema.Input()
         },
         ["required"] = new JsonArray("type"),
         ["oneOf"] = new JsonArray(
@@ -29,14 +34,23 @@ internal static class PointSchema408
     };
     internal static JsonObject PositionEdit() => new()
     {
-        ["type"] = "object", ["additionalProperties"] = false,
+        ["type"] = "object",
+        ["additionalProperties"] = false,
         ["properties"] = new JsonObject
         {
             ["operation"] = new JsonObject { ["type"] = "string", ["const"] = "set_point_position" },
-            ["handles"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["maxItems"] = 1,
-                ["items"] = new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" } },
-            ["expected_position"] = Triple(), ["position"] = Triple(), ["workplane"] = WorkplaneSchema.Input()
+            ["handles"] = new JsonObject
+            {
+                ["type"] = "array",
+                ["minItems"] = 1,
+                ["maxItems"] = 1,
+                ["items"] = new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" }
+            },
+            ["expected_position"] = Triple(),
+            ["position"] = Triple(),
+            ["workplane"] = WorkplaneSchema.Input()
         },
-        ["required"] = new JsonArray("operation", "handles", "expected_position", "position"), ["description"] = Scope
+        ["required"] = new JsonArray("operation", "handles", "expected_position", "position"),
+        ["description"] = Scope
     };
 }

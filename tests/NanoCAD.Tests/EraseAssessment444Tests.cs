@@ -48,12 +48,21 @@ internal static class EraseAssessment444Tests
         });
         await test("block444: preparation remains a projection independent of explicit erase assessment", () =>
         {
-            var plain = ReadPreparation433.Extract("inspect_objects", Input(new { document_id = Document, handles = new[] { "A1" },
-                prepare_for = new { operation = "modify_entities", variant = "erase" } }));
+            var plain = ReadPreparation433.Extract("inspect_objects", Input(new
+            {
+                document_id = Document,
+                handles = new[] { "A1" },
+                prepare_for = new { operation = "modify_entities", variant = "erase" }
+            }));
             Check(!Validation.Parse("inspect_objects", plain.Arguments).EraseAssessment, "Preparation unexpectedly requested native dependency reads.");
-            var requested = ReadPreparation433.Extract("inspect_objects", Input(new { document_id = Document, handles = new[] { "A1", "B2" },
-                sections = Array.Empty<string>(), erase_assessment = true,
-                prepare_for = new { operation = "modify_entities", variant = "erase" } }));
+            var requested = ReadPreparation433.Extract("inspect_objects", Input(new
+            {
+                document_id = Document,
+                handles = new[] { "A1", "B2" },
+                sections = Array.Empty<string>(),
+                erase_assessment = true,
+                prepare_for = new { operation = "modify_entities", variant = "erase" }
+            }));
             Check(requested.Selection is { Operation: "modify_entities", Variant: "erase" }, "Existing preparation selection changed.");
             Check(Validation.Parse("inspect_objects", requested.Arguments).EraseAssessment, "Explicit additional inspection was stripped.");
             return Task.CompletedTask;
@@ -68,8 +77,12 @@ internal static class EraseAssessment444Tests
                 "Whole-selected-set scope missing from the published opt-in field.");
             var output = inspect.OutputSchema!.Value.GetRawText();
             Check(output.Contains("erase_assessment") && output.Contains("not_assessed") && output.Contains("rechecked_at_write"), "Output omits technical admission versus permission.");
-            var erase = ReadPreparation433.Extract("inspect_objects", Input(new { document_id = Document, handles = new[] { "A1" },
-                prepare_for = new { operation = "modify_entities", variant = "erase" } })).Selection!.Schema.GetRawText();
+            var erase = ReadPreparation433.Extract("inspect_objects", Input(new
+            {
+                document_id = Document,
+                handles = new[] { "A1" },
+                prepare_for = new { operation = "modify_entities", variant = "erase" }
+            })).Selection!.Schema.GetRawText();
             Check(erase.Contains("native") && erase.Contains("shared") && erase.Contains("erase_assessment"), "Erase protection or evidence workflow missing.");
             Check(erase.Contains("Hatch") && erase.Contains("unselected boundary"), "Hatch source protection regressed.");
             Check(ServerGuidance.Instructions.Contains("proven-unused", StringComparison.Ordinal) &&

@@ -20,14 +20,36 @@ internal static class OperationResultSchema432
         var input = Object(("bridge_instance_id", Uuid("Original live bridge_instance_id. Ledger entries do not survive a bridge restart.")),
             ("operation_id", Uuid("Original write operation_id; no payload, document activation or current revision is required.")));
         var fields = input["properties"]!.AsObject();
-        fields["wait_ms"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 6000, ["default"] = 2000,
-            ["description"] = "Reader-local wait for the existing job, in milliseconds. Does not extend or cancel native execution." };
-        fields["mode"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("result", "references", "warnings"), ["default"] = "result",
-            ["description"] = "result includes the historical response when it fits and initial pages. references/warnings page recorded observations without repeating the full response." };
-        fields["cursor"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 2048,
-            ["description"] = "Exact next_cursor for mode=references or warnings, bound to this bridge, operation and result fingerprint. Do not use with mode=result. If the recorded result changes, start the page again." };
-        fields["page_size"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = int.MaxValue, ["default"] = 100,
-            ["description"] = "Desired page length, shortened by actual response bytes. No ceiling on total recorded references or warnings." };
+        fields["wait_ms"] = new JsonObject
+        {
+            ["type"] = "integer",
+            ["minimum"] = 0,
+            ["maximum"] = 6000,
+            ["default"] = 2000,
+            ["description"] = "Reader-local wait for the existing job, in milliseconds. Does not extend or cancel native execution."
+        };
+        fields["mode"] = new JsonObject
+        {
+            ["type"] = "string",
+            ["enum"] = new JsonArray("result", "references", "warnings"),
+            ["default"] = "result",
+            ["description"] = "result includes the historical response when it fits and initial pages. references/warnings page recorded observations without repeating the full response."
+        };
+        fields["cursor"] = new JsonObject
+        {
+            ["type"] = "string",
+            ["minLength"] = 1,
+            ["maxLength"] = 2048,
+            ["description"] = "Exact next_cursor for mode=references or warnings, bound to this bridge, operation and result fingerprint. Do not use with mode=result. If the recorded result changes, start the page again."
+        };
+        fields["page_size"] = new JsonObject
+        {
+            ["type"] = "integer",
+            ["minimum"] = 1,
+            ["maximum"] = int.MaxValue,
+            ["default"] = 100,
+            ["description"] = "Desired page length, shortened by actual response bytes. No ceiling on total recorded references or warnings."
+        };
         return input;
     }
 

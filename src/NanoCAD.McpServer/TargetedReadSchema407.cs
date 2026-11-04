@@ -12,7 +12,9 @@ internal static class TargetedReadSchema407
     private static JsonObject Enum(params string[] values) => new() { ["type"] = "string", ["enum"] = new JsonArray(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()) };
     private static JsonObject Object(JsonObject properties, params string[] required) => new()
     {
-        ["type"] = "object", ["additionalProperties"] = false, ["properties"] = properties,
+        ["type"] = "object",
+        ["additionalProperties"] = false,
+        ["properties"] = properties,
         ["required"] = new JsonArray(required.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray())
     };
     private static JsonObject Point2() => new() { ["type"] = "array", ["minItems"] = 2, ["maxItems"] = 2, ["items"] = new JsonObject { ["type"] = "number" } };
@@ -21,7 +23,8 @@ internal static class TargetedReadSchema407
         var block = Object(new JsonObject
         {
             ["handle"] = new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" },
-            ["name"] = new JsonObject { ["type"] = "string", ["minLength"] = 1 }, ["case_sensitive"] = Flag()
+            ["name"] = new JsonObject { ["type"] = "string", ["minLength"] = 1 },
+            ["case_sensitive"] = Flag()
         });
         block["anyOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("handle") }, new JsonObject { ["required"] = new JsonArray("name") });
         block["description"] = "Exact definition handle and/or name; both supplied predicates must match. Named canonical definition for dynamic insertions, direct definition for ordinary insertions/MInsert arrays. Name comparison defaults case-insensitive.";
@@ -29,7 +32,9 @@ internal static class TargetedReadSchema407
         bounds["description"] = "Finite WCS XY [x,y] rectangle in drawing units, min<=max. mode defaults intersects. Ordinary objects use reported native extents; MInsert uses an explicitly conservative whole-grid spacing envelope because native extents may cover only its seed. May overselect, never exact geometric intersection. within is sufficient containment of that envelope, not exhaustive geometric containment. Infinite/unavailable extents are excluded and counted on each page; no array-cell enumeration.";
         var text = Object(new JsonObject
         {
-            ["value"] = new JsonObject { ["type"] = "string", ["minLength"] = 1 }, ["match"] = Enum("contains", "equals"), ["case_sensitive"] = Flag()
+            ["value"] = new JsonObject { ["type"] = "string", ["minLength"] = 1 },
+            ["match"] = Enum("contains", "equals"),
+            ["case_sensitive"] = Flag()
         }, "value");
         text["description"] = "Literal ordinary note content or explicit dimension override; decoded plain MTEXT/MLeader when available. No Field evaluation, Table-cell scan or nested block-attribute traversal. match defaults contains, case_sensitive defaults false.";
         var summary = Flag();
@@ -41,7 +46,9 @@ internal static class TargetedReadSchema407
         ["erase_assessment"] = EraseAssessmentSchema444.Input(),
         ["sections"] = new JsonObject
         {
-            ["type"] = "array", ["uniqueItems"] = true, ["items"] = Enum("geometry", "editing", "appearance"),
+            ["type"] = "array",
+            ["uniqueItems"] = true,
+            ["items"] = Enum("geometry", "editing", "appearance"),
             ["description"] = "Omit for full detail. [] reads identities and owner only. geometry reads shape; editing reads shape plus available native editing metadata/tokens; appearance reads stored display properties. No geometry arrays/history/fields are read for identity-only or appearance-only requests."
         }
     };
@@ -65,10 +72,15 @@ internal static class TargetedReadSchema407
     {
         var node = Object(new JsonObject
         {
-            ["ref"] = reference.DeepClone(), ["type"] = Text(), ["runtime_type"] = Text(),
+            ["ref"] = reference.DeepClone(),
+            ["type"] = Text(),
+            ["runtime_type"] = Text(),
             ["layer"] = new JsonObject { ["anyOf"] = new JsonArray(Object(new JsonObject { ["name"] = Text(), ["handle"] = new JsonObject { ["anyOf"] = new JsonArray(Text(), new JsonObject { ["type"] = "null" }) } }, "name", "handle"), new JsonObject { ["type"] = "null" }) },
-            ["space"] = Text(), ["detail_support"] = Text(), ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
-            ["owner_ref"] = reference.DeepClone(), ["geometry"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
+            ["space"] = Text(),
+            ["detail_support"] = Text(),
+            ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
+            ["owner_ref"] = reference.DeepClone(),
+            ["geometry"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
             ["properties"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
             ["warnings"] = new JsonObject { ["type"] = "array", ["items"] = Text() }
         }, "ref", "type", "runtime_type", "layer", "space", "detail_support", "coordinate_system", "owner_ref");
@@ -77,40 +89,55 @@ internal static class TargetedReadSchema407
     }
     internal static JsonObject MatchSemanticsOutput()
     {
-        var spatial=Object(new JsonObject
+        var spatial = Object(new JsonObject
         {
-            ["coordinate_system"]=new JsonObject{["type"]="string",["const"]="WCS_XY"},
-            ["predicate"]=Text(),["exact_geometry_intersection"]=new JsonObject{["type"]="boolean",["const"]=false},
-            ["unavailable_bounds_policy"]=new JsonObject{["type"]="string",["const"]="excluded"},
-            ["unavailable_bounds_count_on_page"]=new JsonObject{["type"]="integer",["minimum"]=0},
-            ["bounds_kind"]=Text(),["ordinary_bounds_kind"]=Text(),
-            ["minsert_bounds_kind"]=new JsonObject{["type"]="string",["const"]="conservative_minsert_spacing_envelope"},
-            ["minsert_bounds_scope"]=Text(),["minsert_within_semantics"]=Text()
-        },"coordinate_system","predicate","exact_geometry_intersection","unavailable_bounds_policy","unavailable_bounds_count_on_page");
-        spatial["description"]="Ordinary reported native extents plus an explicitly conservative MInsert whole-grid spacing envelope. Intersects may overselect; within requires full conservative-envelope containment and is not exhaustive geometric containment. No cell enumeration or exact bbox claim.";
-        return new JsonObject{["type"]="object",["additionalProperties"]=true,
-            ["properties"]=new JsonObject{["spatial"]=new JsonObject{["anyOf"]=new JsonArray(spatial,new JsonObject{["type"]="null"})}},
-            ["description"]="Actual combined-filter scope and per-page unavailable count; literal text/definition scope. Omitted when no additional filters were requested. bounds_kind identifies native versus conservative array envelope semantics."};
+            ["coordinate_system"] = new JsonObject { ["type"] = "string", ["const"] = "WCS_XY" },
+            ["predicate"] = Text(),
+            ["exact_geometry_intersection"] = new JsonObject { ["type"] = "boolean", ["const"] = false },
+            ["unavailable_bounds_policy"] = new JsonObject { ["type"] = "string", ["const"] = "excluded" },
+            ["unavailable_bounds_count_on_page"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 },
+            ["bounds_kind"] = Text(),
+            ["ordinary_bounds_kind"] = Text(),
+            ["minsert_bounds_kind"] = new JsonObject { ["type"] = "string", ["const"] = "conservative_minsert_spacing_envelope" },
+            ["minsert_bounds_scope"] = Text(),
+            ["minsert_within_semantics"] = Text()
+        }, "coordinate_system", "predicate", "exact_geometry_intersection", "unavailable_bounds_policy", "unavailable_bounds_count_on_page");
+        spatial["description"] = "Ordinary reported native extents plus an explicitly conservative MInsert whole-grid spacing envelope. Intersects may overselect; within requires full conservative-envelope containment and is not exhaustive geometric containment. No cell enumeration or exact bbox claim.";
+        return new JsonObject
+        {
+            ["type"] = "object",
+            ["additionalProperties"] = true,
+            ["properties"] = new JsonObject { ["spatial"] = new JsonObject { ["anyOf"] = new JsonArray(spatial, new JsonObject { ["type"] = "null" }) } },
+            ["description"] = "Actual combined-filter scope and per-page unavailable count; literal text/definition scope. Omitted when no additional filters were requested. bounds_kind identifies native versus conservative array envelope semantics."
+        };
     }
     internal static JsonObject SummaryOutput()
     {
         static JsonObject Count() => new() { ["type"] = "integer", ["minimum"] = 0 };
         static JsonObject Groups(string key) => new()
         {
-            ["type"] = "array", ["items"] = Object(new JsonObject { [key] = Text(), ["count"] = Count() }, key, "count")
+            ["type"] = "array",
+            ["items"] = Object(new JsonObject { [key] = Text(), ["count"] = Count() }, key, "count")
         };
         static JsonObject Point3() => new() { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = new JsonObject { ["type"] = "number" } };
         var bounds = Object(new JsonObject
         {
-            ["min"] = Point3(), ["max"] = Point3(), ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
+            ["min"] = Point3(),
+            ["max"] = Point3(),
+            ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
             ["kind"] = new JsonObject { ["const"] = "combined_candidate_envelope" }
         }, "min", "max", "coordinate_system", "kind");
         return Object(new JsonObject
         {
-            ["summary_only"] = new JsonObject { ["const"] = true }, ["complete"] = new JsonObject { ["const"] = true },
-            ["total_count"] = Count(), ["by_type"] = Groups("type"), ["by_layer"] = Groups("layer"),
+            ["summary_only"] = new JsonObject { ["const"] = true },
+            ["complete"] = new JsonObject { ["const"] = true },
+            ["total_count"] = Count(),
+            ["by_type"] = Groups("type"),
+            ["by_layer"] = Groups("layer"),
             ["bounds"] = new JsonObject { ["anyOf"] = new JsonArray(bounds, new JsonObject { ["type"] = "null" }) },
-            ["bounds_unavailable_count"] = Count(), ["spatial_excluded_unavailable_bounds_count"] = Count(), ["space"] = Enum("model", "paper")
+            ["bounds_unavailable_count"] = Count(),
+            ["spatial_excluded_unavailable_bounds_count"] = Count(),
+            ["space"] = Enum("model", "paper")
         }, "summary_only", "complete", "total_count", "by_type", "by_layer", "bounds", "bounds_unavailable_count", "spatial_excluded_unavailable_bounds_count", "space");
     }
 }

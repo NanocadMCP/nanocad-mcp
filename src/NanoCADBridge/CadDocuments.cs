@@ -23,13 +23,13 @@ internal sealed class CadDocuments
         if (!insideCommand && active != null && HostReadGate.IsBusy(active)) throw new DomainException("HOST_BUSY", "Finish the current command or dialog.", true);
         return active;
     }
-    private DocumentState[] States(Action? check=null)
+    private DocumentState[] States(Action? check = null)
     {
         var states = new List<DocumentState>();
-        var capacity=new SerializedCapacity357(Wire.PayloadBudget-4096,check);
+        var capacity = new SerializedCapacity357(Wire.PayloadBudget - 4096, check);
         foreach (Document document in Application.DocumentManager)
         {
-            check?.Invoke();var state=_registry.Get(document);capacity.Add(Info(state));states.Add(state);
+            check?.Invoke(); var state = _registry.Get(document); capacity.Add(Info(state)); states.Add(state);
         }
         return states.ToArray();
     }
@@ -160,7 +160,7 @@ internal sealed class CadDocuments
             var database = state.Document.Database;
             // Resolve the already-loaded native full-document route before
             // crossing the save boundary; no raw fallback after native failure.
-            var owningSave=args.Action=="save"?NativeDocumentSave358.Resolve(state,job.CheckCancellation):null;
+            var owningSave = args.Action == "save" ? NativeDocumentSave358.Resolve(state, job.CheckCancellation) : null;
             // Runs inside the existing fixed native command and its automatic
             // document lock. Save is separate from geometry transactions.
             job.BeginCommit(); started = true;
@@ -172,7 +172,7 @@ internal sealed class CadDocuments
                 using var copy = database.Wblock();
                 copy.DxfOut(path, 16, DwgVersion.AC1032);
             }
-            else if(owningSave!=null)owningSave(path);
+            else if (owningSave != null) owningSave(path);
             else database.SaveAs(path, true, DwgVersion.AC1032, database.SecurityParameters);
             var file = new FileInfo(path);
             if (!file.Exists || file.Length == 0) throw new IOException("Native save did not produce a nonempty target file.");
@@ -182,7 +182,7 @@ internal sealed class CadDocuments
             var result = Result.Ok(job.OriginalRequestId, new DocumentOperationResult(job.OperationId, "completed", false, args.Action,
                 info, path, file.Length, false), Context(state), args.Action == "export_dxf"
                     ? new[] { "EXPORT_SOURCE_MAY_BE_DIRTY: native export may mark the source document modified; its original file is not saved automatically." }
-                    : owningSave!=null?new[]{NativeDocumentSave358.VersionWarning}:Array.Empty<string>());
+                    : owningSave != null ? new[] { NativeDocumentSave358.VersionWarning } : Array.Empty<string>());
             job.RecordCommit(result);
             return result;
         }
@@ -221,7 +221,7 @@ internal sealed class CadDocuments
             {
                 state = Target(args, true);
                 var database = state.Document.Database;
-                var (name, blockId, model) = ResolveLayout(args,state);
+                var (name, blockId, model) = ResolveLayout(args, state);
                 job.CheckCancellation();
                 job.BeginCommit(); started = true;
                 // Genuine layout navigation on the existing UI dispatcher. Native
@@ -233,8 +233,12 @@ internal sealed class CadDocuments
                     // Paper activation must enter the sheet before later Paper writes.
                     job.CheckCancellation();
                     object currentViewport = Application.GetSystemVariable("CVPORT");
-                    int viewportNumber = currentViewport switch { int value => value, short value => value,
-                        _ => throw new DomainException("LAYOUT_NOT_ACTIVE", "The native current viewport number is unavailable.") };
+                    int viewportNumber = currentViewport switch
+                    {
+                        int value => value,
+                        short value => value,
+                        _ => throw new DomainException("LAYOUT_NOT_ACTIVE", "The native current viewport number is unavailable.")
+                    };
                     if (viewportNumber != 1) state.Document.Editor.SwitchToPaperSpace();
                     job.CheckCancellation();
                     object activeViewport = Application.GetSystemVariable("CVPORT");
@@ -252,7 +256,7 @@ internal sealed class CadDocuments
             }
             else
             {
-                var existing = FindOpenSource(args,job.CheckCancellation);
+                var existing = FindOpenSource(args, job.CheckCancellation);
                 if (existing != null)
                 {
                     state = existing; reused = true;

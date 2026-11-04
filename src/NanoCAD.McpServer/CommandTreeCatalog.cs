@@ -28,7 +28,9 @@ internal static class CommandTreeCatalog
                 var category = Category(name);
                 return (JsonNode?)new JsonObject
                 {
-                    ["section"] = name, ["title"] = category["title"]!.DeepClone(), ["purpose"] = category["purpose"]!.DeepClone(),
+                    ["section"] = name,
+                    ["title"] = category["title"]!.DeepClone(),
+                    ["purpose"] = category["purpose"]!.DeepClone(),
                     ["tools"] = Strings(category["routes"]!.AsArray().Select(route => route!["tool"]!.GetValue<string>()).Distinct())
                 };
             }).ToArray()),
@@ -89,9 +91,15 @@ internal static class CommandTreeCatalog
                 break;
             default: throw new InvalidOperationException("Unknown command-tree section.");
         }
-        return new JsonObject { ["section"] = section, ["title"] = title, ["purpose"] = purpose, ["routes"] = routes,
+        return new JsonObject
+        {
+            ["section"] = section,
+            ["title"] = title,
+            ["purpose"] = purpose,
+            ["routes"] = routes,
             ["help"] = section == "point_clouds" ? "get_guidance(topic=point_clouds) explains loaded sources, units, WCS/slab frames and cursor completion. Request exact tool inputs with topic=schema."
-                : "Use get_guidance(topic=operation, operation=the tool name without nanocad. prefix, variant=the needed branch) for focused operating limits and exact input fields. Tools without branches omit variant." };
+                : "Use get_guidance(topic=operation, operation=the tool name without nanocad. prefix, variant=the needed branch) for focused operating limits and exact input fields. Tools without branches omit variant."
+        };
     }
 
     private static JsonObject Route(string tool, IEnumerable<string>? variants = null)

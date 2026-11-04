@@ -13,23 +13,35 @@ internal static class GuidanceCatalog
         Description = "Read focused operating help. topic=commands lists tool categories. topic=schema returns input JSON. With an exact variant, topic=operation shows its item schema and topic=schema includes the common request fields. Override with include_envelope. Other topics include parametric, documentation, point_clouds and recovery.",
         InputSchema = JsonSerializer.SerializeToElement(new JsonObject
         {
-            ["type"] = "object", ["additionalProperties"] = false,
+            ["type"] = "object",
+            ["additionalProperties"] = false,
             ["required"] = new JsonArray("topic"),
             ["properties"] = new JsonObject
             {
                 ["topic"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("commands", "schema", "operation", "parametric", "documentation", "point_clouds", "recovery") },
                 ["section"] = new JsonObject { ["type"] = "string", ["description"] = "Optional for topic=commands only. Omit for the compact top-level index.", ["enum"] = new JsonArray(CommandTreeCatalog.SectionNames.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()) },
-                ["operation"] = new JsonObject { ["type"] = "string", ["description"] = "Required for topic=operation or schema. Tool name without nanocad. prefix.",
-                    ["enum"] = new JsonArray(ToolCatalog.OperationNames.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray()) },
+                ["operation"] = new JsonObject
+                {
+                    ["type"] = "string",
+                    ["description"] = "Required for topic=operation or schema. Tool name without nanocad. prefix.",
+                    ["enum"] = new JsonArray(ToolCatalog.OperationNames.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray())
+                },
                 ["variant"] = new JsonObject { ["type"] = "string", ["description"] = "For topic=schema or operation: exact entity type or operation name from the returned variants. Omit to read the branch index." },
                 ["include_envelope"] = new JsonObject { ["type"] = "boolean", ["description"] = "With an exact variant, true includes the common request fields and false returns a reference to them. Defaults to true for schema and false for operation." }
             },
             ["allOf"] = new JsonArray(
-                new JsonObject { ["if"] = new JsonObject { ["properties"] = new JsonObject { ["topic"] = new JsonObject { ["enum"] = new JsonArray("schema", "operation") } } },
-                    ["then"] = new JsonObject { ["required"] = new JsonArray("operation") }, ["else"] = Forbidden("operation", "variant", "include_envelope") },
+                new JsonObject
+                {
+                    ["if"] = new JsonObject { ["properties"] = new JsonObject { ["topic"] = new JsonObject { ["enum"] = new JsonArray("schema", "operation") } } },
+                    ["then"] = new JsonObject { ["required"] = new JsonArray("operation") },
+                    ["else"] = Forbidden("operation", "variant", "include_envelope")
+                },
                 new JsonObject { ["if"] = new JsonObject { ["required"] = new JsonArray("include_envelope") }, ["then"] = new JsonObject { ["required"] = new JsonArray("variant") } },
-                new JsonObject { ["if"] = new JsonObject { ["properties"] = new JsonObject { ["topic"] = new JsonObject { ["const"] = "commands" } } },
-                    ["else"] = Forbidden("section") })
+                new JsonObject
+                {
+                    ["if"] = new JsonObject { ["properties"] = new JsonObject { ["topic"] = new JsonObject { ["const"] = "commands" } } },
+                    ["else"] = Forbidden("section")
+                })
         }),
         Annotations = new() { ReadOnlyHint = true, DestructiveHint = false, IdempotentHint = true, OpenWorldHint = false }
     };
@@ -111,9 +123,12 @@ internal static class GuidanceCatalog
         {
             var envelope = (JsonObject)properties.DeepClone();
             envelope.Remove(field);
-            var index = new JsonObject {
-                ["tool"] = "nanocad." + operation, ["array_field"] = field,
-                ["request_fields"] = envelope, ["required"] = schema["required"]!.DeepClone(),
+            var index = new JsonObject
+            {
+                ["tool"] = "nanocad." + operation,
+                ["array_field"] = field,
+                ["request_fields"] = envelope,
+                ["required"] = schema["required"]!.DeepClone(),
                 ["variants"] = new JsonArray(branches.Select(b => Key(b!)).Distinct().Select(k => (JsonNode?)JsonValue.Create(k)).ToArray()),
                 ["next"] = "Read topic=operation with the exact variant for its item schema, or topic=schema for the complete input."
             };

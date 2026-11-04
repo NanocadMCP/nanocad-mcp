@@ -85,7 +85,11 @@ internal static class VisualCaptureTests
             string id = Guid.NewGuid().ToString("N"), camera = new('A', 64);
             var relay = VisualCaptureBridgeArguments.Parse(Wire.Element(new
             {
-                bridge_instance_id = bridge, capture_id = id, max_edge = 1600, bounds = bounds.ToWire(), expected_camera_token = camera
+                bridge_instance_id = bridge,
+                capture_id = id,
+                max_edge = 1600,
+                bounds = bounds.ToWire(),
+                expected_camera_token = camera
             }));
             if (relay.Bounds != bounds || relay.CameraToken != camera || !relay.RequiresViewport) throw new Exception("Bounds relay lost camera or region");
             Deny(() => VisualCaptureBridgeArguments.Parse(Wire.Element(new { bridge_instance_id = bridge, capture_id = id, max_edge = 1600, bounds = bounds.ToWire() })), "INVALID_ARGUMENT");
@@ -117,8 +121,15 @@ internal static class VisualCaptureTests
             var args = VisualCaptureSchema.Parse(Wire.Element(Input())) with { Bounds = new(-2, -3, 2, 3, 1) };
             JsonElement Reply(CaptureWorldBounds? bounds, CapturePixelRect crop, int width = 40) => Wire.Element(new
             {
-                viewport_only = true, capture_document_id = document, capture_revision = args.Revision, capture_bounds = bounds?.ToWire(),
-                crop_pixels = crop, viewport_width = 100, viewport_height = 60, source_width = width, source_height = 30
+                viewport_only = true,
+                capture_document_id = document,
+                capture_revision = args.Revision,
+                capture_bounds = bounds?.ToWire(),
+                crop_pixels = crop,
+                viewport_width = 100,
+                viewport_height = 60,
+                source_width = width,
+                source_height = 30
             });
             var region = new CapturePixelRect(10, 15, 50, 45);
             VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds, region));

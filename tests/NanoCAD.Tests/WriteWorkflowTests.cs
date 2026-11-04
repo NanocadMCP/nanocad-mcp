@@ -19,13 +19,22 @@ internal static class WriteWorkflowTests
         {
             var implicitUnits = await Bind(new Dictionary<string, object>
             {
-                ["bridge_instance_id"] = Bridge, ["document_id"] = Document, ["expected_revision"] = "42", ["operation_id"] = Operation,
-                ["validate_only"] = true, ["entities"] = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 5, 0 } } }
+                ["bridge_instance_id"] = Bridge,
+                ["document_id"] = Document,
+                ["expected_revision"] = "42",
+                ["operation_id"] = Operation,
+                ["validate_only"] = true,
+                ["entities"] = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 5, 0 } } }
             });
             var explicitUnits = await Bind(new Dictionary<string, object>
             {
-                ["bridge_instance_id"] = Bridge, ["document_id"] = Document, ["expected_revision"] = "42", ["operation_id"] = Operation,
-                ["return_state"] = true, ["units"] = "Millimeters", ["entities"] = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 5, 0 } } }
+                ["bridge_instance_id"] = Bridge,
+                ["document_id"] = Document,
+                ["expected_revision"] = "42",
+                ["operation_id"] = Operation,
+                ["return_state"] = true,
+                ["units"] = "Millimeters",
+                ["entities"] = new[] { new { type = "Line", start = new[] { 0, 0 }, end = new[] { 5, 0 } } }
             });
             var parsed = WriteValidation.Parse("create_entities", explicitUnits.Arguments);
             var preview = Wire.Element(new WritePreviewRequest("create_entities", implicitUnits.Arguments));
@@ -37,7 +46,8 @@ internal static class WriteWorkflowTests
         {
             var args = new Dictionary<string, object>
             {
-                ["expected_revision"] = Current.write_revision!, ["operation_id"] = Operation,
+                ["expected_revision"] = Current.write_revision!,
+                ["operation_id"] = Operation,
                 ["entities"] = new[] { new { type = "Point", position = new[] { 1, 2, 0 } } }
             };
             var bound = await Bind(args);
@@ -57,26 +67,29 @@ internal static class WriteWorkflowTests
         {
             var created = new EntityRef(Bridge, Document, "A2");
             var erased = new EntityRef(Bridge, Document, "A1");
-            var receipt = Result.Ok(Operation, new ModifiedEntities(Operation,"committed",false,[],[erased],[created],[],"single_command"),Current);
+            var receipt = Result.Ok(Operation, new ModifiedEntities(Operation, "committed", false, [], [erased], [created], [], "single_command"), Current);
             Task<Result> Read(string tool, object arguments, CancellationToken _)
             {
                 var input = Wire.Element(arguments);
                 Check(tool == "inspect_objects" && input.GetProperty("handles")[0].GetString() == "A2" &&
                       input.GetProperty("handles").GetArrayLength() == 1 && input.GetProperty("expected_revision").GetString() == "42", "Read only the surviving output at the write revision.");
-                return Task.FromResult(Result.Ok(Operation,new { items = new[] { new { success = true, entity = new
-                { @ref = created, type = "Line", geometry = new { native_curve = new { curve_token = new string('A',64) }, start = new[] { 0,0,0 }, end = new[] { 10,0,0 } } } } } },Current));
+                return Task.FromResult(Result.Ok(Operation, new
+                {
+                    items = new[] { new { success = true, entity = new
+                { @ref = created, type = "Line", geometry = new { native_curve = new { curve_token = new string('A',64) }, start = new[] { 0,0,0 }, end = new[] { 10,0,0 } } } } }
+                }, Current));
             }
             var current = await WriteResultState.ReadAsync("modify_entities", receipt, Read, default);
             Check(current is { status: "observed", observations: not null } && Wire.Element(current.observations).GetRawText().Contains("curve_token"), "Return the fresh editing token.");
             var stale = await WriteResultState.ReadAsync("modify_entities", receipt,
-                async (tool,input,token) => (await Read(tool,input,token)) with { context = Current with { revision = "43" } }, default);
+                async (tool, input, token) => (await Read(tool, input, token)) with { context = Current with { revision = "43" } }, default);
             Check(stale is { status: "unavailable", observations: null } && receipt.success, "Stale observation cannot change the write outcome.");
-            var pending = Result.Fail(Operation,new("WRITE_OUTCOME_PENDING","Still running."),Current);
-            Check(await WriteResultState.ReadAsync("modify_entities", pending, (_,_,_) => throw new Exception("Pending write read"), default) == null,
+            var pending = Result.Fail(Operation, new("WRITE_OUTCOME_PENDING", "Still running."), Current);
+            Check(await WriteResultState.ReadAsync("modify_entities", pending, (_, _, _) => throw new Exception("Pending write read"), default) == null,
                 "Pending must not initiate a result read.");
             var earlyReceipt = receipt with { warnings = ["COMMAND_COMPLETION_PENDING: commit is recorded."] };
             Check(await WriteResultState.ReadAsync("modify_entities", earlyReceipt,
-                (_,_,_) => throw new Exception("Native command has not ended."), default) is { reason: "COMMAND_COMPLETION_PENDING" },
+                (_, _, _) => throw new Exception("Native command has not ended."), default) is { reason: "COMMAND_COMPLETION_PENDING" },
                 "An early commit receipt must wait for command completion before a result read.");
         });
         await test("write workflow transports preview on the read route and observes only committed outputs", async () =>
@@ -92,18 +105,25 @@ internal static class WriteWorkflowTests
                         new WritePreviewResult("create_entities", "validated", false, "input_and_available_native_preflight"), Current),
                     "create_entities" => Result.Ok(request.requestId,
                         new { status = "committed", operation_id = Operation, created = new[] { output } }, Current with { revision = "43" }),
-                    "inspect_objects" => Result.Ok(request.requestId, new { items = new[] { new
+                    "inspect_objects" => Result.Ok(request.requestId, new
+                    {
+                        items = new[] { new
                     {
                         success = true, entity = new { @ref = output, type = "Point", geometry = new { position = new[] { 1, 2, 0 } } }
-                    } } }, Current with { revision = "43" }),
+                    } }
+                    }, Current with { revision = "43" }),
                     _ => throw new Exception("Unexpected IPC operation: " + request.operation)
                 });
             }, new JsonLog("write-workflow-test"));
             var tool = new ToolService();
             var args = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(Wire.Element(new
             {
-                bridge_instance_id = Bridge, document_id = Document, expected_revision = "42", operation_id = Operation,
-                entities = new[] { new { type = "Point", position = new[] { 1, 2, 0 } } }, validate_only = true
+                bridge_instance_id = Bridge,
+                document_id = Document,
+                expected_revision = "42",
+                operation_id = Operation,
+                entities = new[] { new { type = "Point", position = new[] { 1, 2, 0 } } },
+                validate_only = true
             }).GetRawText())!;
             var planned = await tool.CallAsync("create_entities", args, default);
             using (var result = JsonDocument.Parse(planned.Content.OfType<TextContentBlock>().Single().Text))

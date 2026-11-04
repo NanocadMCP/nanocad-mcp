@@ -61,7 +61,10 @@ public static class InputError
             !details.TryGetProperty("path", out var field) || field.ValueKind != JsonValueKind.String) return error;
         string path = field.GetString()!;
         string prefix = path + ": ";
-        return error with { details = new InputIssue(path, error.message.StartsWith(prefix, StringComparison.Ordinal)
-            ? error.message.Substring(prefix.Length) : error.message, null) };
+        return error with
+        {
+            details = new InputIssue(path, error.message.StartsWith(prefix, StringComparison.Ordinal)
+            ? error.message.Substring(prefix.Length) : error.message, null)
+        };
     }
 }

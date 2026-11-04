@@ -47,8 +47,10 @@ public sealed class QuerySummary
         by_layer = _layers.Select(count => new { layer = count.Key, count = count.Value }).ToArray(),
         bounds = _bounds is { } bounds ? new
         {
-            min = new[] { bounds.MinX, bounds.MinY, bounds.MinZ }, max = new[] { bounds.MaxX, bounds.MaxY, bounds.MaxZ },
-            coordinate_system = "WCS", kind = "combined_candidate_envelope"
+            min = new[] { bounds.MinX, bounds.MinY, bounds.MinZ },
+            max = new[] { bounds.MaxX, bounds.MaxY, bounds.MaxZ },
+            coordinate_system = "WCS",
+            kind = "combined_candidate_envelope"
         } : null,
         bounds_unavailable_count = _unavailable,
         spatial_excluded_unavailable_bounds_count = _spatiallyExcluded,

@@ -18,8 +18,15 @@ internal static class QuerySummaryTests
             }
             if (Parse(new { document_id = id }).SummaryOnly || Parse(new { document_id = id, summary_only = false, page_size = 1 }).PageSize != 1)
                 throw new Exception("Existing object pagination changed");
-            var args = Parse(new { document_id = id, summary_only = true, space = "paper", types = new[] { "Line" }, layers = new[] { "0" },
-                bounds = new { min = new[] { -1, -1 }, max = new[] { 1, 1 }, mode = "within" } });
+            var args = Parse(new
+            {
+                document_id = id,
+                summary_only = true,
+                space = "paper",
+                types = new[] { "Line" },
+                layers = new[] { "0" },
+                bounds = new { min = new[] { -1, -1 }, max = new[] { 1, 1 }, mode = "within" }
+            });
             if (!args.SummaryOnly || args.QueryBounds?.Mode != "within" || args.Types?.Single() != "Line" || args.Layers?.Single() != "0" || args.ReadSpace != "paper")
                 throw new Exception("Summary did not preserve ordinary filters");
             Deny(new { document_id = id, summary_only = "true" }, "summary_only");

@@ -90,22 +90,28 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
         var root = JsonNode.Parse(schema.GetRawText())!.AsObject();
         Apply(root);
         var constraints = root["allOf"] as JsonArray ?? new JsonArray();
-        constraints.Add(new JsonObject { ["not"] = new JsonObject
+        constraints.Add(new JsonObject
         {
-            ["required"] = new JsonArray("validate_only", "return_state"),
-            ["properties"] = new JsonObject
+            ["not"] = new JsonObject
             {
-                ["validate_only"] = new JsonObject { ["const"] = true },
-                ["return_state"] = new JsonObject { ["const"] = true }
+                ["required"] = new JsonArray("validate_only", "return_state"),
+                ["properties"] = new JsonObject
+                {
+                    ["validate_only"] = new JsonObject { ["const"] = true },
+                    ["return_state"] = new JsonObject { ["const"] = true }
+                }
             }
-        } });
+        });
         if (ScopedRevision(operation))
             constraints.Add(new JsonObject
             {
-                ["if"] = new JsonObject { ["properties"] = new JsonObject
+                ["if"] = new JsonObject
                 {
-                    ["expected_revision"] = new JsonObject { ["pattern"] = "^" + NumericRevision + "$" }
-                } },
+                    ["properties"] = new JsonObject
+                    {
+                        ["expected_revision"] = new JsonObject { ["pattern"] = "^" + NumericRevision + "$" }
+                    }
+                },
                 ["then"] = new JsonObject { ["required"] = new JsonArray("document_id") }
             });
         if (root["allOf"] is null) root["allOf"] = constraints;
@@ -115,10 +121,18 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
         {
             if (node["properties"] is JsonObject fields)
             {
-                fields["validate_only"] = new JsonObject { ["type"] = "boolean", ["default"] = false,
-                    ["description"] = "Run available preflight checks without writing." };
-                fields["return_state"] = new JsonObject { ["type"] = "boolean", ["default"] = false,
-                    ["description"] = "Include current observations of returned objects after a confirmed write." };
+                fields["validate_only"] = new JsonObject
+                {
+                    ["type"] = "boolean",
+                    ["default"] = false,
+                    ["description"] = "Run available preflight checks without writing."
+                };
+                fields["return_state"] = new JsonObject
+                {
+                    ["type"] = "boolean",
+                    ["default"] = false,
+                    ["description"] = "Include current observations of returned objects after a confirmed write."
+                };
                 var optional = new HashSet<string>(StringComparer.Ordinal) { "bridge_instance_id" };
                 if (UnitsDefault(operation) && fields["units"] is JsonObject units)
                 {

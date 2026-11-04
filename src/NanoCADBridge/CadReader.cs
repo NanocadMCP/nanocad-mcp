@@ -97,14 +97,14 @@ internal sealed class CadReader
                     "query_objects" or "get_selection" => ReadPage(request.operation, args, state, transaction, modelId, cancellationToken),
                     "inspect_objects" => Inspect(args, state, transaction, modelId, cancellationToken),
                     "analyze_geometry" => GeometryAnalyzer.Read(GeometryAnalysisValidation.Parse(request.arguments), state, transaction, modelId, _instance, cancellationToken),
-                    "inspect_model_history" => ModelHistoryReader.Read(args, state, transaction, modelId, _instance, cancellationToken,includeProfileEditing:true),
+                    "inspect_model_history" => ModelHistoryReader.Read(args, state, transaction, modelId, _instance, cancellationToken, includeProfileEditing: true),
                     "get_model_variables" => ModelVariablesReader.Read(args, state, transaction, modelId, _instance, cancellationToken),
                     "inspect_sketch_constraints" => SketchConstraintsReader.Read(args, state, transaction, modelId, _instance, cancellationToken),
                     "inspect_constraints" => DocumentConstraintsReader.Read(args, state, transaction, modelId, _instance, cancellationToken),
-                    "get_drawing_views" => DrawingViewsReader.Read(args,state,transaction,_instance,cancellationToken),
-                    "inspect_solid_topology" => SolidTopologyReader.Read(args,state,transaction,modelId,_instance,cancellationToken),
-                    "inspect_point_cloud" => PointCloudReader.Read(PointCloudInspectValidation.Parse(request.arguments),state,transaction,modelId,_instance,cancellationToken),
-                    "analyze_point_cloud" => PointCloudAnalysisReader.Read(PointCloudAnalysisValidation.Parse(request.arguments),state,transaction,modelId,_instance,cancellationToken),
+                    "get_drawing_views" => DrawingViewsReader.Read(args, state, transaction, _instance, cancellationToken),
+                    "inspect_solid_topology" => SolidTopologyReader.Read(args, state, transaction, modelId, _instance, cancellationToken),
+                    "inspect_point_cloud" => PointCloudReader.Read(PointCloudInspectValidation.Parse(request.arguments), state, transaction, modelId, _instance, cancellationToken),
+                    "analyze_point_cloud" => PointCloudAnalysisReader.Read(PointCloudAnalysisValidation.Parse(request.arguments), state, transaction, modelId, _instance, cancellationToken),
                     "get_structure" => _structure.Read(args, state, transaction, cancellationToken),
                     "inspect_block" => _structure.Inspect(args, state, transaction, modelId, cancellationToken),
                     _ => throw new DomainException("INVALID_ARGUMENT", "Unsupported read operation.")
@@ -113,9 +113,9 @@ internal sealed class CadReader
                 if (state.Revision != revision) throw new DomainException("STALE_DOCUMENT", "Document invalidated during the read.", true);
                 if (request.operation == "get_selection" && state.SelectionRevision != selectionRevision)
                     throw new DomainException("STALE_SELECTION", "Selection invalidated during the read.", true);
-                string[] readWarnings=[];
-                if(data is ModelSketchConstraintObservation353.HistoryOutcome observed){data=observed.Data;readWarnings=observed.Warnings;}
-                result = Result.Ok(request.requestId, data, context,readWarnings);
+                string[] readWarnings = [];
+                if (data is ModelSketchConstraintObservation353.HistoryOutcome observed) { data = observed.Data; readWarnings = observed.Warnings; }
+                result = Result.Ok(request.requestId, data, context, readWarnings);
                 if (JsonSerializer.SerializeToUtf8Bytes(result, Wire.Json).Length > Wire.PayloadBudget)
                     throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Read exceeds the response budget; request fewer handles or a smaller page.");
             }
@@ -144,16 +144,16 @@ internal sealed class CadReader
                 cancellationToken.ThrowIfCancellationRequested();
                 pointScope.Accept();
             }
-            if (request.operation == "inspect_solid_topology" && (args.IncludeNativeModelFaces||args.IncludeNativeModelEdges))
+            if (request.operation == "inspect_solid_topology" && (args.IncludeNativeModelFaces || args.IncludeNativeModelEdges))
             {
                 long bits = unchecked((long)ulong.Parse(args.Handles![0], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                 if (!document.Database.TryGetObjectId(new Handle(bits), out var sourceId) || sourceId.IsNull || !sourceId.IsValid || sourceId.IsErased)
                     throw new DomainException("OBJECT_NOT_FOUND", "Model body changed before native face inspection.");
-                using var nativeTrace=new NativeTopologyReadTrace362(state);
+                using var nativeTrace = new NativeTopologyReadTrace362(state);
                 var data = SolidTopologyReader.AttachNativeFaces(result.data!, sourceId, state, _instance, cancellationToken, args.IncludeNativeModelFaces, args.IncludeNativeModelEdges);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (state.Revision != context.revision)
-                    throw new DomainException("STALE_DOCUMENT", "Document changed during native face inspection.", true,nativeTrace.Snapshot());
+                    throw new DomainException("STALE_DOCUMENT", "Document changed during native face inspection.", true, nativeTrace.Snapshot());
                 result = Result.Ok(request.requestId, data, context);
                 if (JsonSerializer.SerializeToUtf8Bytes(result, Wire.Json).Length > Wire.PayloadBudget)
                     throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Native topology exceeds the response budget.");
@@ -183,79 +183,93 @@ internal sealed class CadReader
     }
     private object DocumentInfo(Arguments args, DocumentState state, ObjectId modelId)
     {
-        var document=state.Document; var db=document.Database;
-        var data=new Dictionary<string,object?> {
-            ["document_id"]=state.Id,["name"]=Path.GetFileName(document.Name),["path"]=document.IsNamedDrawing?document.Name:null,
-            ["is_named"]=document.IsNamedDrawing,["is_read_only"]=document.IsReadOnly,
-            ["units"]=new{name=db.Insunits.ToString(),value=(int)db.Insunits},
-            ["active_space"]=db.CurrentSpaceId==modelId?"model":"paper",["revision"]=state.Revision,["fingerprint_guid"]=db.FingerprintGuid
-        };
-        if(args.IncludeView)
+        var document = state.Document; var db = document.Database;
+        var data = new Dictionary<string, object?>
         {
-            var observation=CameraViewReader.Read(_instance,state);
-            data["view"]=observation.view; data["view_unavailable_reason"]=observation.view_unavailable_reason;
+            ["document_id"] = state.Id,
+            ["name"] = Path.GetFileName(document.Name),
+            ["path"] = document.IsNamedDrawing ? document.Name : null,
+            ["is_named"] = document.IsNamedDrawing,
+            ["is_read_only"] = document.IsReadOnly,
+            ["units"] = new { name = db.Insunits.ToString(), value = (int)db.Insunits },
+            ["active_space"] = db.CurrentSpaceId == modelId ? "model" : "paper",
+            ["revision"] = state.Revision,
+            ["fingerprint_guid"] = db.FingerprintGuid
+        };
+        if (args.IncludeView)
+        {
+            var observation = CameraViewReader.Read(_instance, state);
+            data["view"] = observation.view; data["view_unavailable_reason"] = observation.view_unavailable_reason;
         }
         return data;
     }
     private object ReadPage(string operation, Arguments args, DocumentState state, Transaction transaction, ObjectId modelId, CancellationToken cancellationToken)
     {
         bool selection = operation == "get_selection";
-        var queryOwner=!selection&&args.ReadSpace=="paper"?CadWriteSpace.Resolve(state.Document.Database,transaction,"paper"):modelId;
+        var queryOwner = !selection && args.ReadSpace == "paper" ? CadWriteSpace.Resolve(state.Document.Database, transaction, "paper") : modelId;
         // Check on continuation pages too: disabling PICKFIRST invalidates the
         // ability to interpret an earlier implied-selection snapshot.
         if (selection) HostReadGate.RequireImpliedSelection();
         var selectionRevision = selection ? state.SelectionRevision : null;
-        var watch=Stopwatch.StartNew();
-        int unavailableBounds=0;
+        var watch = Stopwatch.StartNew();
+        int unavailableBounds = 0;
         (Entity entity, EntitySummary summary)? ReadMatch(ulong handle)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if(!state.Document.Database.TryGetObjectId(new Handle(unchecked((long)handle)),out var id)||!id.IsValid||id.IsErased||id.IsEffectivelyErased)
-                throw new DomainException("STALE_DOCUMENT","An indexed object is no longer available.",true);
-            if(transaction.GetObject(id,OpenMode.ForRead) is not Entity entity)
-                throw new DomainException("OBJECT_READ_FAILED","Indexed identity is not an entity.");
-            bool paper=entity.OwnerId!=modelId&&transaction.GetObject(entity.OwnerId,OpenMode.ForRead) is BlockTableRecord owner&&owner.IsLayout;
-            var summary=EntityAdapter.Summary(entity,modelId,_instance,state.Id,paper);
-            if(args.Types!=null&&!args.Types.Contains(summary.type))return null;
-            if(args.Layers!=null&&!args.Layers.Contains(summary.layer!.name,StringComparer.OrdinalIgnoreCase))return null;
-            if(!CadTargetedRead407.MatchBlock(entity,args.QueryBlock,transaction,cancellationToken.ThrowIfCancellationRequested))return null;
-            if(!CadTargetedRead407.MatchText(entity,args.QueryText,cancellationToken.ThrowIfCancellationRequested))return null;
+            if (!state.Document.Database.TryGetObjectId(new Handle(unchecked((long)handle)), out var id) || !id.IsValid || id.IsErased || id.IsEffectivelyErased)
+                throw new DomainException("STALE_DOCUMENT", "An indexed object is no longer available.", true);
+            if (transaction.GetObject(id, OpenMode.ForRead) is not Entity entity)
+                throw new DomainException("OBJECT_READ_FAILED", "Indexed identity is not an entity.");
+            bool paper = entity.OwnerId != modelId && transaction.GetObject(entity.OwnerId, OpenMode.ForRead) is BlockTableRecord owner && owner.IsLayout;
+            var summary = EntityAdapter.Summary(entity, modelId, _instance, state.Id, paper);
+            if (args.Types != null && !args.Types.Contains(summary.type)) return null;
+            if (args.Layers != null && !args.Layers.Contains(summary.layer!.name, StringComparer.OrdinalIgnoreCase)) return null;
+            if (!CadTargetedRead407.MatchBlock(entity, args.QueryBlock, transaction, cancellationToken.ThrowIfCancellationRequested)) return null;
+            if (!CadTargetedRead407.MatchText(entity, args.QueryText, cancellationToken.ThrowIfCancellationRequested)) return null;
             return (entity, summary);
         }
         EntitySummary? Read(ulong handle)
         {
             if (ReadMatch(handle) is not { } match) return null;
-            if(!CadTargetedRead407.MatchBounds(match.entity,args.QueryBounds,cancellationToken.ThrowIfCancellationRequested,out var unavailable))
-            {if(unavailable)unavailableBounds++;return null;}
+            if (!CadTargetedRead407.MatchBounds(match.entity, args.QueryBounds, cancellationToken.ThrowIfCancellationRequested, out var unavailable))
+            { if (unavailable) unavailableBounds++; return null; }
             return match.summary;
         }
         object Convert(HandlePages<EntitySummary>.Page page)
         {
-            if(args.QueryBounds==null&&args.QueryText==null&&args.QueryBlock==null)
-                return new Page(page.items,page.total_count,page.returned_count,page.complete,page.next_cursor,page.selection_revision);
-            return new {page.items,page.total_count,page.returned_count,page.complete,page.next_cursor,page.selection_revision,
-                match_semantics=CadTargetedRead407.Semantics(args,unavailableBounds)};
+            if (args.QueryBounds == null && args.QueryText == null && args.QueryBlock == null)
+                return new Page(page.items, page.total_count, page.returned_count, page.complete, page.next_cursor, page.selection_revision);
+            return new
+            {
+                page.items,
+                page.total_count,
+                page.returned_count,
+                page.complete,
+                page.next_cursor,
+                page.selection_revision,
+                match_semantics = CadTargetedRead407.Semantics(args, unavailableBounds)
+            };
         }
         // Yield a continuation, including an empty filtered page, rather than reject
         // a drawing for exceeding a scan count/time. No entity DTOs are read ahead.
-        bool Yield()=>watch.ElapsedMilliseconds>=200;
-        if(args.Cursor!=null)return Convert(_snapshots.Next(args.Cursor,state.Id,state.Revision,selectionRevision,args.FilterKey(operation),args.PageSize,Read,Yield));
+        bool Yield() => watch.ElapsedMilliseconds >= 200;
+        if (args.Cursor != null) return Convert(_snapshots.Next(args.Cursor, state.Id, state.Revision, selectionRevision, args.FilterKey(operation), args.PageSize, Read, Yield));
         IEnumerable<ulong> Identities()
         {
             IEnumerable<ObjectId> ids;
-            if(selection)
+            if (selection)
             {
-                var selected=state.Document.Editor.SelectImplied();
-                if(selected.Status==PromptStatus.Error)yield break;
-                if(selected.Status!=PromptStatus.OK||selected.Value==null)throw new DomainException("OBJECT_READ_FAILED","Implied selection could not be read.");
-                ids=selected.Value.GetObjectIds();
+                var selected = state.Document.Editor.SelectImplied();
+                if (selected.Status == PromptStatus.Error) yield break;
+                if (selected.Status != PromptStatus.OK || selected.Value == null) throw new DomainException("OBJECT_READ_FAILED", "Implied selection could not be read.");
+                ids = selected.Value.GetObjectIds();
             }
-            else ids=((BlockTableRecord)transaction.GetObject(queryOwner,OpenMode.ForRead)).Cast<ObjectId>();
-            foreach(var id in ids)
+            else ids = ((BlockTableRecord)transaction.GetObject(queryOwner, OpenMode.ForRead)).Cast<ObjectId>();
+            foreach (var id in ids)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if(id.IsNull||!id.IsValid)throw new DomainException("OBJECT_READ_FAILED","Invalid enumerated identity.");
-                if(!id.IsErased&&!id.IsEffectivelyErased)yield return unchecked((ulong)id.Handle.Value);
+                if (id.IsNull || !id.IsValid) throw new DomainException("OBJECT_READ_FAILED", "Invalid enumerated identity.");
+                if (!id.IsErased && !id.IsEffectivelyErased) yield return unchecked((ulong)id.Handle.Value);
             }
             watch.Restart();
         }
@@ -268,7 +282,7 @@ internal sealed class CadReader
                         CadTargetedRead407.ReadBounds(match.entity, cancellationToken.ThrowIfCancellationRequested), args.QueryBounds);
             return summary.Result(args.ReadSpace);
         }
-        return Convert(_snapshots.First(state.Id,state.Revision,selectionRevision,args.FilterKey(operation),Identities(),args.PageSize,Read,Yield));
+        return Convert(_snapshots.First(state.Id, state.Revision, selectionRevision, args.FilterKey(operation), Identities(), args.PageSize, Read, Yield));
     }
     private object Inspect(Arguments args, DocumentState state, Transaction transaction, ObjectId modelId, CancellationToken cancellationToken)
     {
@@ -286,21 +300,21 @@ internal sealed class CadReader
                 if (id.IsErased || id.IsEffectivelyErased) throw new DomainException("OBJECT_ERASED", "The entity has been erased.");
                 if (transaction.GetObject(id, OpenMode.ForRead) is not Entity entity)
                     throw new DomainException("OUT_OF_SCOPE", "The handle does not identify an entity.");
-                bool paper=entity.OwnerId!=modelId&&transaction.GetObject(entity.OwnerId,OpenMode.ForRead) is BlockTableRecord owner&&owner.IsLayout;
-                var summary = EntityAdapter.Summary(entity, modelId, _instance, state.Id,paper);
-                if (entity.OwnerId != modelId&&!paper) throw new DomainException("OUT_OF_SCOPE", "Only top-level Model or paper-layout entities can be inspected; nested block content uses inspect_block.", false, new { summary });
-                bool needsGeometry=args.DetailSections==null||args.DetailSections.Contains("geometry",StringComparer.Ordinal)||args.DetailSections.Contains("editing",StringComparer.Ordinal);
-                if (summary.type == "Unknown"&&needsGeometry) throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Geometry for this type is not supported; sections:[] can still read its identity and owner.", false, new { summary });
-                if (summary.type == "PointCloud"&&needsGeometry) throw new DomainException("SPECIALIZED_READER_REQUIRED", "Use inspect_point_cloud for metadata/features or analyze_point_cloud for points, sections and measurements.", false, new { summary });
-                
-                if(args.DetailSections!=null)
-                    items.Add(new {handle,success=true,entity=CadTargetedRead407.Compact(entity,summary,args.DetailSections,cancellationToken),error=(DomainError?)null});
+                bool paper = entity.OwnerId != modelId && transaction.GetObject(entity.OwnerId, OpenMode.ForRead) is BlockTableRecord owner && owner.IsLayout;
+                var summary = EntityAdapter.Summary(entity, modelId, _instance, state.Id, paper);
+                if (entity.OwnerId != modelId && !paper) throw new DomainException("OUT_OF_SCOPE", "Only top-level Model or paper-layout entities can be inspected; nested block content uses inspect_block.", false, new { summary });
+                bool needsGeometry = args.DetailSections == null || args.DetailSections.Contains("geometry", StringComparer.Ordinal) || args.DetailSections.Contains("editing", StringComparer.Ordinal);
+                if (summary.type == "Unknown" && needsGeometry) throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Geometry for this type is not supported; sections:[] can still read its identity and owner.", false, new { summary });
+                if (summary.type == "PointCloud" && needsGeometry) throw new DomainException("SPECIALIZED_READER_REQUIRED", "Use inspect_point_cloud for metadata/features or analyze_point_cloud for points, sections and measurements.", false, new { summary });
+
+                if (args.DetailSections != null)
+                    items.Add(new { handle, success = true, entity = CadTargetedRead407.Compact(entity, summary, args.DetailSections, cancellationToken), error = (DomainError?)null });
                 else
-                    items.Add(new ItemResult(handle, true, EntityAdapter.Detail(entity, summary, cancellationToken,includeNativeCurve:true), null));
+                    items.Add(new ItemResult(handle, true, EntityAdapter.Detail(entity, summary, cancellationToken, includeNativeCurve: true), null));
             }
-            catch (DomainException e) { failed++;items.Add(new ItemResult(handle, false, null, e.Error)); }
+            catch (DomainException e) { failed++; items.Add(new ItemResult(handle, false, null, e.Error)); }
             catch (CadException e) when (!e.ErrorStatus.ToString().Contains("Lock", StringComparison.OrdinalIgnoreCase))
-            { failed++;items.Add(new ItemResult(handle, false, null, new("OBJECT_READ_FAILED", "nanoCAD could not read this object.", false, new { api_status = e.ErrorStatus.ToString() }))); }
+            { failed++; items.Add(new ItemResult(handle, false, null, new("OBJECT_READ_FAILED", "nanoCAD could not read this object.", false, new { api_status = e.ErrorStatus.ToString() }))); }
             bytes += JsonSerializer.SerializeToUtf8Bytes(items[^1], Wire.Json).Length;
             if (bytes > Wire.PayloadBudget) throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Batch exceeds byte budget; request fewer handles.");
         }

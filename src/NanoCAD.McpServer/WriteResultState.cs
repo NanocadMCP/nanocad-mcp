@@ -35,8 +35,11 @@ internal static class WriteResultState
 
         var current = await read("inspect_objects", new
         {
-            context.bridge_instance_id, context.document_id, expected_revision = context.revision,
-            handles = handles.ToArray(), sections = new[] { "geometry", "editing" }
+            context.bridge_instance_id,
+            context.document_id,
+            expected_revision = context.revision,
+            handles = handles.ToArray(),
+            sections = new[] { "geometry", "editing" }
         }, cancellation).ConfigureAwait(false);
         if (!current.success || current.data is null || !SameContext(current.context, context))
             return new("unavailable", context, null, current.error?.code ?? "WRITE_CONTEXT_CHANGED");
