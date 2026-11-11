@@ -60,6 +60,10 @@ internal static class OutputSchemas
             ("parent_view_id", Nullable(Text())), ("root_view_id", Nullable(Text())), ("child_view_ids", Array(Text()))));
         data["properties"]!["section_cut_changes"] = Array(SectionCutSchema351.Change(Ref("ref")));
         data["properties"]!["drawing_view_creation_results"] = Array(PaperDrawingViewsSchema356.Creation(Ref("ref")));
+        data["properties"]!["block_library_results"] = Array(Object(("source_path", Text()), ("source_sha256", Text()),
+            ("source_base_point", Point()), ("target_base_point", Point()), ("source_root_count", Integer()),
+            ("renamed_symbols", Array(Object(("source_handle", Text()), ("source_name", Text()), ("target_ref", Ref("ref")), ("target_name", Text())))),
+            ("retained_attribute_definitions", Array(Ref("ref"))), ("referring_insertions", Array(Ref("ref")))));
         return data;
     }
     private static JsonObject ModelParameterData()
@@ -71,6 +75,9 @@ internal static class OutputSchemas
             ("previous_expression", Text()), ("expression", Text()), ("previous_value", Number()), ("value", Number())));
         data["properties"]!["parameter_changes"]!["items"]!["properties"]!["value_unit"] = Text();
         data["properties"]!["parameter_changes"]!["items"]!["properties"]!["body_ref"] = Ref("ref");
+        data["properties"]!["parameter_changes"]!["items"]!["properties"]!["native_control_effect"] = Object(
+            ("native_value_category", Integer()), ("native_extent", Integer()), ("value_unit", Text()),
+            ("shape_changes", Array(Object(("field", Text()), ("previous_value", Number()), ("value", Number())))), ("scope", Text()));
         data["properties"]!["rebuilt_bodies"] = Array(Ref("ref"));
         data["properties"]!["model_healthy"] = new JsonObject
         {
@@ -94,6 +101,7 @@ internal static class OutputSchemas
         var data = Object(("operation_id", Text()), ("status", new JsonObject { ["type"] = "string", ["const"] = "committed" }), ("replayed", Bool()), ("modified", Array(Ref("ref"))),
             ("erased", Array(Ref("ref"))), ("created", Array(Ref("ref"))),
             ("copies", Array(Object(("operation_index", Integer()), ("source", Ref("ref")), ("created", Ref("ref"))))), ("undo_history", Text()));
+        data["properties"]!["dynamic_block_changes"] = Array(DynamicBlockPropertiesSchema.Change(Ref("ref")));
         data["properties"]!["solid_separation_results"] = Array(Object(("operation_index", Integer()), ("source", Ref("ref")), ("parts", Array(Ref("ref")))));
         data["properties"]!["repetition_results"] = Array(CopyTransforms2dSchema407.Result(Ref("ref")));
         data["properties"]!["solid_slice_results"] = Array(Object(("operation_index", Integer()), ("source", Ref("ref")), ("positive", Ref("ref")), ("negative", Ref("ref"))));
@@ -328,6 +336,7 @@ internal static class OutputSchemas
             ("downstream_variables", Nullable(Array(Text()))), ("downstream_objects", Nullable(Array(Text())))))));
         var item = schema["properties"]!["variables"]!["items"]!["properties"]!.AsObject();
         foreach (string field in new[] { "owner_kind", "sketch_id", "constraint_id", "control_kind" }) item[field] = Nullable(Text());
+        item["native_control"] = Nullable(Object(("native_value_category", Integer()), ("native_extent", Integer()), ("value_unit", Text()), ("scope", Text())));
         schema["properties"]!["parameter_binding_notes"] = Array(Object(("host_object_id", Text()), ("code", Text()), ("reason", Text())));
         return schema;
     }
@@ -431,6 +440,7 @@ internal static class OutputSchemas
             result["properties"]!["display"] = Nullable(DimensionEditingSchema341.ReadDisplay());
             result["properties"]!["display_unavailable_reason"] = Nullable(Text());
             result["properties"]!["association"] = DimensionAssociationSchema385.Read();
+            result["properties"]!["view_association"] = Nullable(ProjectedDimensionViewAssociation());
             return result;
         }
         return new JsonObject
@@ -447,6 +457,25 @@ internal static class OutputSchemas
             Kind("OrdinateDimension", Object(("origin", Point()), ("defining_point", Point()), ("leader_end_point", Point()), ("using_x_axis", Bool()))))
         };
     }
+    private static JsonObject ProjectedDimensionViewAssociation() => Object(
+        ("kind", new JsonObject { ["const"] = "mcs_dimension_view" }), ("active", Bool()),
+        ("status", new JsonObject { ["enum"] = new JsonArray("observed", "unavailable") }),
+        ("native_associative", Nullable(Bool())), ("native_view_classifier", Nullable(Bool())),
+        ("classification", Nullable(new JsonObject { ["enum"] = new JsonArray("native_drawing_view_classifier", "stored_native_view_anchors") })),
+        ("dimension_mc_id", Nullable(Text())), ("owner_document_id", Nullable(Text())), ("links_complete", Bool()),
+        ("drawing_view_mc_id", Nullable(Text())), ("native_view_snap_indicator", Nullable(Integer())), ("dimension_type", Nullable(Integer())),
+        ("anchors", Array(Object(("slot", Integer()), ("is_null", Bool()), ("source_mc_id", Nullable(Text())),
+            ("gs_marker", Nullable(Integer())), ("parameter", Nullable(Number())), ("data", Nullable(Text())),
+            ("complex_reference", Nullable(Text())), ("viewport_reference", Nullable(Text())),
+            ("evaluated_point_wcs", Nullable(Point())), ("dimension_snap_point", Nullable(Point())), ("dimension_snap_point_scope", Text()),
+            ("evaluation_unavailable_reason", Nullable(Text()))))),
+        ("links", Array(Object(("view_ref", Ref("ref")), ("view_mc_id", Text()), ("owner_document_id", Text()),
+            ("native_anchor_count", Integer()), ("source_refs", Array(Ref("ref"))), ("source_mc_ids", Array(Text())),
+            ("view_status", Text()), ("is_suppressed", Bool()), ("auto_update_enabled", Bool()), ("scale", Number()),
+            ("drawing_scale", Number()), ("healthy", Bool()), ("source_gs_marker", Nullable(Integer())),
+            ("source_gs_marker_unavailable_reason", Nullable(Text()))))),
+        ("unavailable_reason", Nullable(Text())), ("stored_anchor_parameters_available", Bool()),
+        ("stored_anchor_parameters_unavailable_reason", Nullable(Text())), ("scope", Text()));
     public static JsonElement For(string operation)
     {
         if (operation == "get_operation_result") return OperationResultSchema432.Output();
@@ -552,7 +581,12 @@ internal static class OutputSchemas
         definitions["hatch"]!["properties"]!["pattern_space"] = Nullable(Number());
         definitions["hatch"]!["properties"]!["origin_ocs"] = Nullable(Point(2));
         definitions["hatch"]!["properties"]!["hatch_style"] = Nullable(Text());
-        foreach (var kind431 in new[] { "block_reference", "block_array" }) definitions[kind431]!["properties"]!["associative_array"] = AssociativeArraySchema431.Observation();
+        foreach (var kind431 in new[] { "block_reference", "block_array" })
+        {
+            definitions[kind431]!["properties"]!["associative_array"] = AssociativeArraySchema431.Observation();
+            definitions[kind431]!["properties"]!["dynamic_properties"] = Nullable(DynamicBlockPropertiesSchema.Inventory(Ref("ref")));
+            definitions[kind431]!["properties"]!["dynamic_properties_unavailable_reason"] = Nullable(Text());
+        }
         definitions["entity"] = Object(("ref", Ref("ref")), ("type", Text()), ("runtime_type", Text()), ("layer", Nullable(Ref("layer"))),
             ("space", Text()), ("detail_support", Text()), ("coordinate_system", Text()),
             ("geometry", new JsonObject { ["oneOf"] = new JsonArray(Ref("line"), Ref("point"), Ref("ray"), Ref("xline"), Ref("circle"), Ref("ellipse"), Ref("spline"), Ref("region"), Ref("helix"), Ref("block_reference"), Ref("block_array"), Ref("wipeout"), Ref("external_reference"), Ref("arc"), Ref("polyline"), Ref("polyline2d"), Ref("polyline3d"), Ref("text"), Ref("mtext"), Ref("dimension"), Ref("tolerance"), Ref("mleader"), Ref("hatch"), Ref("table"), Ref("solid3d")) }),

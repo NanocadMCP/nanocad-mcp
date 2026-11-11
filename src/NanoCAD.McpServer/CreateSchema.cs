@@ -28,8 +28,8 @@ internal static class CreateSchema
         var revision = Text(20); revision["pattern"] = "^[0-9]{1,20}$";
         var entities = new JsonArray(
             Line(),
-            Entity("Circle", ("center", Point(), true), ("radius", Number(1e-9), true)),
-            Entity("Arc", ("center", Point(), true), ("radius", Number(1e-9), true), ("start_angle", start, true), ("sweep_angle", sweep, true)),
+            NativeCurveSnapSchema.WithPointAlternative(Entity("Circle", ("center", Point(), true), ("radius", Number(1e-9), true)), "center"),
+            NativeCurveSnapSchema.WithPointAlternative(Entity("Arc", ("center", Point(), true), ("radius", Number(1e-9), true), ("start_angle", start, true), ("sweep_angle", sweep, true)), "center"),
             Entity("Polyline", ("vertices", new JsonObject
             {
                 ["type"] = "array",
@@ -89,17 +89,40 @@ internal static class CreateSchema
             fields.Add(("associations", DimensionAssociationSchema385.Bindings(kind), false));
             entities.Add(Entity("Dimension", fields.ToArray()));
         }
-        entities.Add(Entity("Dimension",
-            ("kind", new JsonObject { ["const"] = "projected_aligned" }, true),
-            ("view_handle", new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" }, true),
-            ("line_index", new JsonObject
-            {
-                ["type"] = "integer",
-                ["minimum"] = 0,
-                ["maximum"] = int.MaxValue,
-                ["description"] = "Current visible Line index from get_drawing_views for this view."
-            }, true),
-            ("dimline_point", Point(), true)));
+        foreach (var (kind, indexField, geometry) in new[]
+        {
+            ("projected_aligned", "line_index", "Line"),
+            ("projected_diametric", "arc_index", "full circle"),
+            ("projected_radial", "arc_index", "circle or finite circular arc"),
+            ("projected_arc_length", "arc_index", "finite non-full circular arc"),
+            ("projected_angular", "arc_index", "finite non-full circular arc")
+        })
+        {
+            var placement = Point();
+            if (kind is "projected_diametric" or "projected_radial")
+                placement["description"] = "XY text position outside the circle on the active paper sheet.";
+            else if (kind is "projected_arc_length" or "projected_angular")
+                placement["description"] = "XY dimension-arc placement in the selected circular arc sector on the active paper sheet.";
+            var projected = Entity("Dimension",
+                ("kind", new JsonObject { ["const"] = kind }, true),
+                ("view_handle", new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" }, true),
+                (indexField, new JsonObject
+                {
+                    ["type"] = "integer",
+                    ["minimum"] = 0,
+                    ["maximum"] = int.MaxValue,
+                    ["description"] = $"Current visible {geometry} index from get_drawing_views."
+                }, true),
+                ("dimline_point", placement, true));
+            if (kind is "projected_radial" or "projected_arc_length" or "projected_angular")
+                projected["description"] = "Create an associative native DWG dimension from the actual visible circular primitive in an ordinary auto-updating Paper view of one local body at 1:1. " +
+                    (kind == "projected_radial" ? "Measure the native radius of a full circle or finite circular arc. " :
+                        kind == "projected_arc_length" ? "Measure the length of the selected finite non-full circular arc. " :
+                        "Measure the angle subtended by the selected finite non-full circular arc. This is an arc-based angle, not a two-line angle. ") +
+                    "Use arc_index from the current get_drawing_views geometry page and place dimline_point in sheet XY. Native original-view parameters retain the association; this does not invent a 3D source-edge key. " +
+                    "No independent defining coordinates, generic _snap inputs, workplane, text override or dimension_style is accepted. Create projected dimensions as their own group. Native preflight verifies the actual primitive, source/owner and placement. No implicit save.";
+            entities.Add(projected);
+        }
         JsonObject Points(int min) => new() { ["type"] = "array", ["minItems"] = min, ["items"] = Point() };
         JsonObject DimensionPoint() => new() { ["type"] = "array", ["minItems"] = 2, ["maxItems"] = 2, ["items"] = Number(-1e6, 1e6), ["description"] = "WCS XY millimeters, Z=0; coordinates within +/-1000000." };
         foreach (string kind in new[] { "angular_3point", "angular_2line", "ordinate" })
@@ -299,6 +322,7 @@ internal static class CreateSchema
         foreach (var schema in BasicModelingSchema.Creates()) entities.Add(schema);
         foreach (var schema in SolidFaceProfileCreateSchema390.Creates()) entities.Add(schema);
         var wipeout431 = WipeoutSchema431.Create(); wipeout431["properties"]!["workplane"] = WorkplaneSchema.Input(); entities.Add(wipeout431);
+        DimensionCreateSnapSchema.Apply(entities);
         return JsonSerializer.SerializeToElement(Object(new JsonObject
         {
             ["bridge_instance_id"] = Id(),

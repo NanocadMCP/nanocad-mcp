@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace NanoCAD.McpServer;
 
@@ -51,10 +52,134 @@ internal static class SchemaCompactor
             throw new InvalidOperationException("Variant discovery would overwrite existing guidance.");
         foreach (var branch in branches)
             RemoveDescriptions(branch?.AsObject() ?? throw new InvalidOperationException("Invalid published branch."));
+        if (operation == "create_entities")
+        {
+            HoistRepeatedEntityProperties(items, branches);
+            ShareNativeSnapValidation(items, branches);
+        }
         string discriminator = operation == "create_entities" ? "kind or type" : "operation";
-        items["description"] = "All input fields and validation remain inline. Field meanings and operating limits are in focused help. Before writing a variant, read " +
-            $"get_guidance(topic=operation, operation={operation}, variant=exact {discriminator} value) " +
-            "for its operating limits and item schema.";
+        items["description"] = "Shared item properties and patterns retain all inline validation. Before writing, read " +
+            $"get_guidance(topic=operation, operation={operation}, variant=exact {discriminator} value) for field meanings and operating limits.";
+        return JsonSerializer.SerializeToElement(root);
+    }
+
+    private static void HoistRepeatedEntityProperties(JsonObject items, JsonArray branches)
+    {
+        // Closed alternatives still declare their allowed fields. A sibling
+        // properties schema can therefore validate identical occurrences once
+        // without admitting a field to any other alternative.
+        if (items.ContainsKey("properties") || branches.Count < 2 ||
+            branches.Any(branch => branch is not JsonObject value || !HasClosedProperties(value) ||
+                value["properties"] is not JsonObject)) return;
+        var shared = new JsonObject();
+        var groups = branches.OfType<JsonObject>().SelectMany(branch => branch["properties"]!.AsObject())
+            .GroupBy(pair => pair.Key, StringComparer.Ordinal)
+            .OrderByDescending(group => group.Key.EndsWith("_snap", StringComparison.Ordinal));
+        foreach (var group in groups)
+        {
+            var occurrences = group.ToArray();
+            if (occurrences.Length < 2 || occurrences[0].Value is not JsonObject schema ||
+                occurrences.Any(pair => !JsonNode.DeepEquals(pair.Value, schema))) continue;
+            var declaration = new JsonObject();
+            if (schema["type"] is { } type) declaration["type"] = type.DeepClone();
+            int saving = (occurrences.Length - 1) * schema.ToJsonString().Length -
+                occurrences.Length * declaration.ToJsonString().Length - JsonValue.Create(group.Key)!.ToJsonString().Length - 2;
+            if (saving <= "\"properties\":{},".Length) continue;
+            shared[group.Key] = schema.DeepClone();
+            foreach (var branch in branches.OfType<JsonObject>())
+                if (branch["properties"]!.AsObject().ContainsKey(group.Key))
+                    branch["properties"]![group.Key] = declaration.DeepClone();
+        }
+        if (shared.Count > 0) items["properties"] = shared;
+    }
+
+    private static void ShareNativeSnapValidation(JsonObject items, JsonArray branches)
+    {
+        if (items.ContainsKey("patternProperties") || branches.Any(branch => branch is not JsonObject value ||
+            !HasClosedProperties(value) || value["properties"] is not JsonObject)) return;
+        var sharedProperties = items["properties"] as JsonObject ?? [];
+        foreach (var field in branches.OfType<JsonObject>().SelectMany(branch => branch["properties"]!.AsObject())
+            .Where(field => field.Key.EndsWith("_snap", StringComparison.Ordinal) && sharedProperties.ContainsKey(field.Key)))
+        {
+            var declaration = new JsonObject();
+            if (sharedProperties[field.Key]?["type"] is { } type) declaration["type"] = type.DeepClone();
+            if (!JsonNode.DeepEquals(field.Value, declaration)) return;
+        }
+        var fields = sharedProperties.Concat(branches.OfType<JsonObject>()
+                .SelectMany(branch => branch["properties"]!.AsObject()).Where(field => !sharedProperties.ContainsKey(field.Key)))
+            .Where(field => field.Key.EndsWith("_snap", StringComparison.Ordinal)).ToArray();
+        if (fields.Length < 2 || fields[0].Value is not JsonObject first ||
+            first["properties"] is not JsonObject || first["allOf"] is not JsonArray ||
+            fields.Any(field => !JsonNode.DeepEquals(field.Value, first))) return;
+        var sample = fields[0].Value!.AsObject();
+        var patterns = new JsonObject();
+        foreach (var field in sample["properties"]!.AsObject())
+            if (field.Value is JsonObject leaf && leaf["pattern"] is { } pattern)
+                patterns[field.Key] = new JsonObject { ["pattern"] = pattern.DeepClone() };
+        var validation = new JsonObject
+        {
+            ["allOf"] = sample["allOf"]!.DeepClone(),
+            ["properties"] = patterns
+        };
+        foreach (var field in fields)
+        {
+            var schema = field.Value!.AsObject();
+            schema.Remove("allOf");
+            foreach (var pattern in patterns) schema["properties"]![pattern.Key]!.AsObject().Remove("pattern");
+        }
+        string names = string.Join("|", fields.Select(field => field.Key).Distinct(StringComparer.Ordinal).Select(Regex.Escape));
+        // Field names/types, required base fields and closure remain at each
+        // occurrence. Only identical mode conditions and leaf regexes move.
+        items["patternProperties"] = new JsonObject { ["^(?:" + names + ")$"] = validation };
+    }
+
+    // Only the default catalog merges otherwise identical creation variants.
+    // A required, distinct constant discriminator makes their alternatives
+    // disjoint; an enum therefore preserves their exact oneOf validation.
+    // Focused and structured contracts retain the individual constant branches.
+    public static JsonElement ShareCreationKindAlternatives(JsonElement input)
+    {
+        var root = JsonNode.Parse(input.GetRawText())!.AsObject();
+        if (root["properties"]?["entities"]?["items"]?["oneOf"] is not JsonArray branches) return input;
+        var candidates = new List<(int Index, string Kind, JsonObject Shape)>();
+        for (int index = 0; index < branches.Count; index++)
+        {
+            if (branches[index] is not JsonObject branch || !HasClosedProperties(branch) ||
+                branch["properties"] is not JsonObject fields || fields["kind"] is not JsonObject discriminator ||
+                discriminator["const"] is not JsonValue value || !value.TryGetValue<string>(out var kind) ||
+                discriminator.ContainsKey("enum") || branch["required"] is not JsonArray required ||
+                !required.Any(field => field is JsonValue name && name.TryGetValue<string>(out var text) && text == "kind")) continue;
+            var shape = (JsonObject)branch.DeepClone();
+            shape["properties"]!["kind"]!.AsObject().Remove("const");
+            candidates.Add((index, kind, shape));
+        }
+        var groups = new Dictionary<int, string[]>();
+        var consumed = new HashSet<int>();
+        foreach (var candidate in candidates)
+        {
+            if (consumed.Contains(candidate.Index)) continue;
+            var same = candidates.Where(other => !consumed.Contains(other.Index) && JsonNode.DeepEquals(candidate.Shape, other.Shape)).ToArray();
+            // Duplicate constants previously matched two oneOf alternatives;
+            // merging them would incorrectly admit that discriminator value.
+            if (same.Length < 2 || same.Select(other => other.Kind).Distinct(StringComparer.Ordinal).Count() != same.Length) continue;
+            groups.Add(candidate.Index, same.Select(other => other.Kind).ToArray());
+            foreach (var item in same) consumed.Add(item.Index);
+        }
+        if (groups.Count == 0) return input;
+        var merged = new JsonArray();
+        for (int index = 0; index < branches.Count; index++)
+        {
+            if (groups.TryGetValue(index, out var group))
+            {
+                var branch = branches[index]!.DeepClone().AsObject();
+                var discriminator = branch["properties"]!["kind"]!.AsObject();
+                discriminator.Remove("const");
+                discriminator["enum"] = new JsonArray(group.Select(kind => (JsonNode?)JsonValue.Create(kind)).ToArray());
+                merged.Add(branch);
+            }
+            else if (!consumed.Contains(index)) merged.Add(branches[index]?.DeepClone());
+        }
+        root["properties"]!["entities"]!["items"]!["oneOf"] = merged;
         return JsonSerializer.SerializeToElement(root);
     }
 

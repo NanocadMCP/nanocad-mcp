@@ -2,6 +2,41 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 452
+
+- Snaps to existing geometry now include Circle/Arc centers and the point roles
+  of all nine ordinary dimension kinds. A snap resolves a point once;
+  persistent dimension associations remain separate.
+
+- Native projected radius, circular-arc length and arc-angle dimensions can
+  follow their selected sources in ordinary auto-updating 1:1 Paper views of
+  one local body.
+  Stored native view-anchor observations were verified for five existing
+  dimensions: one diameter, two radii, one arc length and one angle.
+
+- Named User formulas can drive a selected native control of an eligible fixed
+  Simple Hole. The assessed diameter change retained the formula and User
+  dependency, changed the bore and updated its projected diameter after DWG
+  reopening. Depth, seat and other Hole families remain unassessed.
+
+- Existing dynamic blocks expose native property inventories and single-property
+  editing. Distance, visibility and Int16 flip edits were checked against actual
+  geometry and retained their saved values and geometry after reopening.
+  Point2d, Point3d, Int32 and wider lookup/attribute/dependency combinations
+  remain unassessed. Dynamic-block authoring is unavailable.
+
+Named Shell-thickness formulas remain unavailable because native updates can
+lose the formula and dependency. Supported literal Shell operations remain.
+DWG-library import/redefinition writes are refused before mutation pending
+native acceptance; their read-only preflight does not establish a working
+import. The experimental native solid-replacement cleanup module is excluded;
+the existing replacement route retains its provisional lifetime scope.
+
+This package uses server 0.267.0, bridge 0.224.0 and IPC protocol 0.144.
+The installer is unsigned. See [GitHub Release 452](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/452)
+for the installer, archives and SHA-256 checksums. Read
+[capabilities and limits](docs/en/capabilities.md) for the supported contexts.
+
 ## Build 451
 
 Write tools can check a proposed operation with `validate_only` and return

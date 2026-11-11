@@ -79,7 +79,11 @@ public sealed record ModifiedEntities(string operation_id, string status, bool r
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SolidImprintChange393[]? solid_imprint_changes = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] RepetitionResult407[]? repetition_results = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ModelSketchVisibilityChange436[]? model_sketch_visibility_changes = null,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] TextFormatChange442[]? text_format_changes = null);
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] TextFormatChange442[]? text_format_changes = null)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public DynamicBlockPropertyChange[]? dynamic_block_changes { get; init; }
+}
 
 public static partial class ModifyValidation
 {
@@ -168,6 +172,7 @@ public static partial class ModifyValidation
             }
             switch (kind)
             {
+                case "set_dynamic_block_property": edits.Add(DynamicBlockPropertiesValidation.Parse(item, path)); break;
                 case "set_point_position": edits.Add(ParsePointPosition408(item, path, ids)); break;
                 case "set_legacy_polyline": edits.Add(ParseLegacyPolyline408(item, path, ids)); break;
                 case "copy_transform_2d": edits.Add(ParseCopyTransform407(item, path, ids)); break;
@@ -425,6 +430,7 @@ public static partial class ModifyValidation
             if (edits.Any(other => !ReferenceEquals(other, machining) && other.Handles.Contains(machining.Handles[0])))
                 throw Invalid("$.operations", "A machined solid cannot have another edit in the same batch; inspect its geometry after commit.", "INVALID_OPERATION_ORDER");
         DrawOrderValidation407.Batch(edits);
+        DynamicBlockPropertiesValidation.Batch(edits);
         HatchPropertiesValidation.Batch(edits);
         HatchFillValidation377.Batch(edits);
         NativeExplodeValidation386.Batch(edits);

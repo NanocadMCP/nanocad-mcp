@@ -41,13 +41,14 @@ internal static class AuditServerRoutingTests
                             ? value : properties.GetProperty("type").GetProperty("const")
                         : properties.GetProperty("operation").GetProperty("const")).GetString()!;
                 }
-                var branches = published.GetProperty("properties").GetProperty(field).GetProperty("items").GetProperty("oneOf");
+                var items = published.GetProperty("properties").GetProperty(field).GetProperty("items");
+                var branches = items.GetProperty("oneOf");
                 foreach (var group in branches.EnumerateArray().GroupBy(Key))
                 {
                     var focused = AuditServerContractSupport.Input(operation, group.Key);
                     var fullBranch = focused.GetProperty("properties").GetProperty(field).GetProperty("items");
-                    var publicBranch = group.Count() == 1 ? group.Single()
-                        : JsonSerializer.SerializeToElement(new { oneOf = group.ToArray() });
+                    var publicBranch = group.Count() == 1 ? AuditServerContractSupport.RestoreSharedItemProperties(items, group.Single())
+                        : JsonSerializer.SerializeToElement(new { oneOf = group.Select(branch => AuditServerContractSupport.RestoreSharedItemProperties(items, branch)).ToArray() });
                     if (!JsonNode.DeepEquals(WithoutDescriptions(fullBranch), WithoutDescriptions(publicBranch)))
                         throw new Exception("Compaction changed callable fields, defaults or validation: " + operation + "/" + group.Key);
                     if (publicBranch.GetRawText().Contains("\"$ref\"", StringComparison.Ordinal))
@@ -83,6 +84,13 @@ internal static class AuditServerRoutingTests
                     }
                     if (published.OutputSchema is not null || !Nullable.Equals(tool.OutputSchema, canonical.OutputSchema))
                         throw new Exception("Input publication changed response mode contracts: " + tool.Name);
+                    if (tool.Name == "nanocad.create_entities")
+                    {
+                        var restored = AuditServerContractSupport.RestoreCreationKindAlternatives(tool.InputSchema, published.InputSchema);
+                        if (!JsonNode.DeepEquals(JsonNode.Parse(tool.InputSchema.GetRawText()), JsonNode.Parse(restored.GetRawText())))
+                            throw new Exception("Default creation kind sharing changed fields outside the exact alternatives.");
+                        continue;
+                    }
                     if (tool.Name is not ("nanocad.modify_entities" or "nanocad.modify_structure"))
                     {
                         if (!JsonElement.DeepEquals(tool.InputSchema, published.InputSchema))

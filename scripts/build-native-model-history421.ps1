@@ -1,9 +1,9 @@
-param([ValidateSet('Debug','Release')][string]$Configuration='Debug')
+param([ValidateSet('Debug','Release')][string]$Configuration='Debug',[string]$OutputDirectory)
 # Compile only. Never load the resulting DLL or control nanoCAD here.
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
 & (Join-Path $root 'src\NanoCAD.NativeParameters\generate-sdk-slice412.ps1')
-$out=Join-Path $root ('artifacts\native-model-history421\'+$Configuration)
+$out=if($OutputDirectory){[IO.Path]::GetFullPath($OutputDirectory)}else{Join-Path $root ('artifacts\native-model-history421\'+$Configuration)}
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $vs=& 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
 if(!$vs){throw 'MSVC x64 tools are required to build the native model-history adapter.'}

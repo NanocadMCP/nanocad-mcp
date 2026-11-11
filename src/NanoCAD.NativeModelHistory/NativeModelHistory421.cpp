@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cstring>
 #include <cwchar>
+#include <limits>
+#include <string>
 
 #define _MCS_CORE_ONLY
 #define NOACGE
@@ -16,6 +18,18 @@
 #include "../NanoCAD.NativeParameters/sdk-compat/generated/IMcObjects.h"
 #include "../NanoCAD.NativeParameters/sdk-compat/generated/IMcDocuments.h"
 #include "../NanoCAD.NativeParameters/sdk-compat/generated/3DCore.h"
+// SDK26 refers to this native MAPI enum but omits its declaration. The installed
+// primary MAPI assemblies expose the global type with value__ FIELD I4 (0608).
+// An opaque declaration supplies that proved width without invented values or
+// changes to any vendor member, complete interface, inheritance or virtual order.
+enum McsDimTolVertJustifyEnum : int;
+static_assert(sizeof(McsDimTolVertJustifyEnum) == sizeof(std::int32_t));
+#include "../NanoCAD.NativeParameters/sdk-compat/generated/IMcDimension.h"
+// Both installed primary MAPI assemblies publish these NativeCppClass sizes.
+// See artifacts/continuation-259-build/native-dimension-data-abi.json.
+static_assert(sizeof(McDimensionData) == 1608, "Installed native dimension-data ABI differs from the supplied SDK.");
+static_assert(sizeof(McGeometryParam) == 208, "Installed native geometry-parameter ABI differs from the supplied SDK.");
+static_assert(sizeof(CTechSize) == 40, "Installed native tolerance-value ABI differs from the supplied SDK.");
 
 extern "C"
 {
@@ -75,6 +89,153 @@ NanoCAD_NativeModelHistoryAbiVersion()
     return 1;
 }
 
+// Read the public McDimensionData interface, including its actual three stored
+// McGeometryParam slots (IMcDimension.h:825-981). No dimension update is called.
+// Text contains ten consecutive strings: view; three sources; three complex
+// paths; three viewport IDs. Their lengths are explicit, without terminators.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadProjectedDimensionAssociationV2(const wchar_t* documentGuid, const wchar_t* dimensionGuid,
+    int* state, int* flags, int* markers, double* parameters, std::int64_t* data,
+    double* points, int* textLengths, wchar_t* text, int textCapacity, int* requiredText)
+{
+    if (!state || !flags || !markers || !parameters || !data || !points || !textLengths ||
+        !requiredText || textCapacity < 0 || (textCapacity != 0 && !text)) return E_INVALIDARG;
+    std::memset(state, 0, 5 * sizeof(int));
+    std::memset(flags, 0, 12 * sizeof(int));
+    std::memset(markers, 0, 3 * sizeof(int));
+    std::memset(parameters, 0, 3 * sizeof(double));
+    std::memset(data, 0, 3 * sizeof(std::int64_t));
+    std::memset(points, 0, 18 * sizeof(double));
+    std::memset(textLengths, 0, 10 * sizeof(int));
+    *requiredText = 0;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, dimensionGuid, object);
+        if (FAILED(status)) return status;
+        IMcDimensionPtr dimension = object;
+        McDimensionDataPtr stored = object;
+        if (!dimension || !stored) return E_NOINTERFACE;
+        mcsWorkID viewId;
+        int indicator = 0;
+        state[1] = stored->m_iDimtype;
+        state[3] = dimension->getAssociative() ? 1 : 0;
+        const bool nativeView = stored->isSetToDrawingView(&viewId, &indicator);
+        state[4] = nativeView ? 1 : 0;
+        state[2] = indicator; // SDK does not document whether this is a count or mask.
+        if (!nativeView)
+        {
+            // isSetToDrawingView is not documented as a complete inventory of
+            // every dimension family's stored references. Query the actual
+            // public anchors, never a guessed subtype/marker/coordinate alias.
+            viewId.setNull();
+            mcsWorkID ownerId;
+            status = ParseId(documentGuid, ownerId);
+            if (FAILED(status)) return status;
+            for (const McGeometryParam& anchor : stored->m_Snaps)
+            {
+                if (anchor.isNull() || anchor.getID().isNull()) continue;
+                IMcObjectPtr candidate = gpMcObjManager->getObject(anchor.getID());
+                if (!candidate || candidate->ID() != anchor.getID()) continue;
+                IMc3dDrawingViewPtr view = candidate;
+                if (!view) continue;
+                state[0] = 1; // Recognized actual view reference, even if its owner check fails.
+                IMcDbEntityPtr viewEntity = candidate;
+                if (!viewEntity || viewEntity->getDocumentID() != ownerId) return E_INVALIDARG;
+                if (!viewId.isNull() && viewId != candidate->ID()) return E_INVALIDARG;
+                viewId = candidate->ID();
+            }
+            if (viewId.isNull()) return S_FALSE;
+        }
+        state[0] = 1;
+        if (viewId.isNull()) return E_FAIL;
+        auto IdText = [](const mcsWorkID& id) -> std::wstring
+        {
+            if (id.isNull()) return {};
+            wchar_t result[GuidCapacity]{};
+            if (!id.getStrID(result, GuidCapacity)) throw E_FAIL;
+            return result;
+        };
+        std::wstring strings[10];
+        strings[0] = IdText(viewId);
+        // This bound is the actual public m_Snaps[3] member, not a product limit.
+        static_assert(sizeof(stored->m_Snaps) / sizeof(stored->m_Snaps[0]) == 3);
+        for (int slot = 0; slot < 3; ++slot)
+        {
+            const McGeometryParam& anchor = stored->m_Snaps[slot];
+            flags[slot * 4] = anchor.isNull() ? 1 : 0;
+            flags[slot * 4 + 2] = S_FALSE;
+            flags[slot * 4 + 3] = S_FALSE;
+            if (anchor.isNull()) continue;
+            strings[1 + slot] = IdText(anchor.getID());
+            flags[slot * 4 + 1] = anchor.getComplexID().isSimple() ? 0 : 1;
+            if (flags[slot * 4 + 1])
+            {
+                const McsString path = anchor.getComplexID().getPathAsString();
+                strings[4 + slot] = static_cast<LPCWSTR>(path);
+            }
+            strings[7 + slot] = IdText(anchor.idViewport);
+            markers[slot] = anchor.iGSMarker;
+            parameters[slot] = anchor.rParam;
+            data[slot] = anchor.iData;
+            mcsPoint evaluated(0, 0, 0), dimensionSnap(0, 0, 0);
+            const HRESULT evaluatedStatus = anchor.getPoint(evaluated, nullptr, McGeometryParam::kPaperSpace, true);
+            // SDK GetSnapPoint considers the drawing-view flag but does not
+            // specify its output frame. Return it unconverted, without a WCS claim.
+            const bool snapAvailable = stored->GetSnapPoint(slot, dimensionSnap);
+            flags[slot * 4 + 2] = evaluatedStatus;
+            flags[slot * 4 + 3] = snapAvailable ? S_OK : E_FAIL;
+            const mcsPoint values[2] = { evaluated, dimensionSnap };
+            for (int kind = 0; kind < 2; ++kind)
+            {
+                if ((kind == 0 && FAILED(evaluatedStatus)) || (kind == 1 && !snapAvailable)) continue;
+                const auto& point = values[kind];
+                if (!std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z))
+                { flags[slot * 4 + 2 + kind] = E_FAIL; continue; }
+                points[slot * 6 + kind * 3] = point.x;
+                points[slot * 6 + kind * 3 + 1] = point.y;
+                points[slot * 6 + kind * 3 + 2] = point.z;
+            }
+        }
+        std::size_t required = 0;
+        for (int i = 0; i < 10; ++i)
+        {
+            if (strings[i].size() > static_cast<std::size_t>((std::numeric_limits<int>::max)())) return E_OUTOFMEMORY;
+            textLengths[i] = static_cast<int>(strings[i].size());
+            required += strings[i].size();
+        }
+        if (required > static_cast<std::size_t>((std::numeric_limits<int>::max)())) return E_OUTOFMEMORY;
+        *requiredText = static_cast<int>(required);
+        if (textCapacity < *requiredText) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        int offset = 0;
+        for (int i = 0; i < 10; ++i)
+        {
+            if (textLengths[i]) std::memcpy(text + offset, strings[i].data(), textLengths[i] * sizeof(wchar_t));
+            offset += textLengths[i];
+        }
+        return S_OK;
+    }
+    catch (HRESULT error) { return error; }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+// Keep the original three-state ABI and classifier semantics for older bridge
+// callers. The new bridge requests V2 explicitly, so mixed native bytes cannot
+// silently reinterpret an expanded state buffer.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadProjectedDimensionAssociation(const wchar_t* documentGuid, const wchar_t* dimensionGuid,
+    int* state, int* flags, int* markers, double* parameters, std::int64_t* data,
+    double* points, int* textLengths, wchar_t* text, int textCapacity, int* requiredText)
+{
+    if (!state) return E_INVALIDARG;
+    int observed[5]{};
+    const HRESULT status = NanoCAD_ReadProjectedDimensionAssociationV2(documentGuid, dimensionGuid,
+        observed, flags, markers, parameters, data, points, textLengths, text, textCapacity, requiredText);
+    std::memcpy(state, observed, 3 * sizeof(int));
+    if (observed[0] && !observed[4]) { state[0] = 0; return S_FALSE; }
+    return status;
+}
+
 extern "C" __declspec(dllexport) HRESULT __cdecl
 NanoCAD_SetHoleExtent(const wchar_t* documentGuid, const wchar_t* bodyGuid,
     const wchar_t* featureGuid, int through)
@@ -95,6 +256,28 @@ NanoCAD_SetHoleExtent(const wchar_t* documentGuid, const wchar_t* bodyGuid,
         hole->setExtent(extent);
         if (through) hole->updateDepth();
         return hole->getExtent() == extent && hole->isFullDepth() == (through != 0) ? S_OK : E_FAIL;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadHoleControlState(const wchar_t* documentGuid, const wchar_t* bodyGuid,
+    const wchar_t* featureGuid, const wchar_t* variableGuid, std::uint32_t* category, int* extent)
+{
+    if (!category || !extent) return E_INVALIDARG;
+    *category = 0; *extent = -1;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, featureGuid, object);
+        if (FAILED(status)) return status;
+        mcsWorkID bodyId, variableId;
+        if (FAILED(ParseId(bodyGuid, bodyId)) || FAILED(ParseId(variableGuid, variableId))) return E_INVALIDARG;
+        IMc3dHolePtr hole = object;
+        if (!hole || hole->getHostSolidID() != bodyId) return E_INVALIDARG;
+        *category = hole->getVarValueType(variableId);
+        *extent = static_cast<int>(hole->getExtent());
+        return S_OK;
     }
     catch (...) { return E_UNEXPECTED; }
 }
@@ -151,6 +334,102 @@ NanoCAD_ReadProjectedDimensionAnchors(const wchar_t* documentGuid, const wchar_t
             }
             parameters[index] = anchor.rParam;
             data[index++] = anchor.iData;
+        }
+        return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+// Read the original native parameters of two opposite points of the same
+// verified projected circle. Line-end fallback parameters do not apply here.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadProjectedDiameterAnchors(const wchar_t* documentGuid, const wchar_t* viewGuid,
+    int marker, const double* endpoints, double* parameters, std::int64_t* data)
+{
+    if (!endpoints || !parameters || !data || marker < 0) return E_INVALIDARG;
+    for (int i = 0; i < 6; ++i) if (!std::isfinite(endpoints[i])) return E_INVALIDARG;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, viewGuid, object);
+        if (FAILED(status)) return status;
+        IMc3dDrawingViewPtr view = object;
+        if (!view) return E_NOINTERFACE;
+        const mcsComplexWorkID simpleView(object->ID());
+        for (int i = 0; i < 2; ++i)
+        {
+            const mcsPoint endpoint(endpoints[3 * i], endpoints[3 * i + 1], endpoints[3 * i + 2]);
+            McGeometryParam anchor;
+            if (!view->getOrigParamAtPoint(endpoint, anchor) || anchor.isNull())
+                return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+            if (anchor.getID() != object->ID() || anchor.getComplexID() != simpleView ||
+                anchor.isInViewport() || anchor.iGSMarker != marker)
+                return E_NOINTERFACE;
+            mcsPoint evaluated, original;
+            if (FAILED(anchor.getPoint(evaluated)) || evaluated.distanceTo(endpoint) > 1e-7 ||
+                !view->getOrigGeomByParam(anchor, original) || original.distanceTo(endpoint) > 1e-7)
+                return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+            parameters[i] = anchor.rParam;
+            data[i] = anchor.iData;
+        }
+        return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+// Preserve the original circular primitive when resolving finite arc ends.
+// Curve-inference data comes from the SDK; no line-end parameter constants
+// are transferred to a circular arc.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadProjectedCircularArcAnchors(const wchar_t* documentGuid, const wchar_t* viewGuid,
+    int marker, const double* points, const double* observedParameters, double* parameters, std::int64_t* data)
+{
+    if (!points || !observedParameters || !parameters || !data || marker < 0) return E_INVALIDARG;
+    for (int i = 0; i < 9; ++i) if (!std::isfinite(points[i])) return E_INVALIDARG;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, viewGuid, object);
+        if (FAILED(status)) return status;
+        IMc3dDrawingViewPtr view = object;
+        if (!view) return E_NOINTERFACE;
+        const mcsComplexWorkID simpleView(object->ID());
+        const mcsPoint interior(points[6], points[7], points[8]);
+        McGeometryParam origin;
+        if (!view->getOrigParamAtPoint(interior, origin) || origin.isNull() ||
+            origin.getID() != object->ID() || origin.getComplexID() != simpleView ||
+            origin.isInViewport() || origin.iGSMarker != marker) return E_NOINTERFACE;
+        const auto matches = [&](const McGeometryParam& anchor, const mcsPoint& expected)
+        {
+            if (anchor.isNull() || anchor.getID() != origin.getID() ||
+                anchor.getComplexID() != origin.getComplexID() || anchor.idViewport != origin.idViewport ||
+                anchor.iGSMarker != marker) return false;
+            mcsPoint evaluated, original;
+            return SUCCEEDED(anchor.getPoint(evaluated)) && evaluated.distanceTo(expected) <= 1e-7 &&
+                view->getOrigGeomByParam(anchor, original) && original.distanceTo(expected) <= 1e-7;
+        };
+        if (!matches(origin, interior)) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+        for (int i = 0; i < 2; ++i)
+        {
+            const mcsPoint endpoint(points[3 * i], points[3 * i + 1], points[3 * i + 2]);
+            McGeometryParam anchor = origin;
+            if (FAILED(anchor.setPoint(endpoint)) || !matches(anchor, endpoint))
+            {
+                if (!view->getOrigParamAtPoint(endpoint, anchor) || !matches(anchor, endpoint))
+                {
+                    // The managed SDK unique-parameter conversion was already
+                    // round-tripped on the actual selected circular primitive.
+                    // Keep its original marker/Data and verify both native
+                    // evaluators again; never substitute line-end constants.
+                    const double parameter = observedParameters[i];
+                    if (!std::isfinite(parameter)) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+                    anchor = origin;
+                    anchor.rParam = parameter;
+                    if (!matches(anchor, endpoint)) return HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+                }
+            }
+            parameters[i] = anchor.rParam;
+            data[i] = anchor.iData;
         }
         return S_OK;
     }

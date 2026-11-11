@@ -75,7 +75,8 @@ internal static class HatchPatternTests
                 catch (DomainException error) when (error.Error.code == "UNSUPPORTED_BLOCK_CONTENT") { }
             }
             var tools = ToolCatalog.Tools;
-            var variants = tools.Single(t => t.Name == "nanocad.create_entities").InputSchema.GetProperty("properties").GetProperty("entities").GetProperty("items").GetProperty("oneOf").EnumerateArray()
+            var items = tools.Single(t => t.Name == "nanocad.create_entities").InputSchema.GetProperty("properties").GetProperty("entities").GetProperty("items");
+            var variants = items.GetProperty("oneOf").EnumerateArray()
                 .Where(v => v.GetProperty("properties").GetProperty("type").GetProperty("const").GetString() == "Hatch").ToArray();
             var legacy = variants.Single(v => v.GetProperty("properties").TryGetProperty("boundary", out _));
             var direct = variants.Single(v => v.GetProperty("properties").TryGetProperty("boundary_handle", out _));
@@ -102,7 +103,8 @@ internal static class HatchPatternTests
                 .Single(v => v.GetProperty("properties").TryGetProperty("boundary_groups", out _));
             string scope = help.GetProperty("description").GetString()!;
             if (!scope.Contains("Spline") || !scope.Contains("WCS XY/Z0") || !System.Text.Json.Nodes.JsonNode.DeepEquals(
-                AuditServerRoutingTests.WithoutDescriptions(help), AuditServerRoutingTests.WithoutDescriptions(grouped))) throw new Exception("Focused native Hatch source/plane contract is missing or differs from published validation.");
+                AuditServerRoutingTests.WithoutDescriptions(help), AuditServerRoutingTests.WithoutDescriptions(
+                    AuditServerContractSupport.RestoreSharedItemProperties(items, grouped)))) throw new Exception("Focused native Hatch source/plane contract is missing or differs from published validation.");
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!, "tools-list.json"), JsonSerializer.Serialize(tools, Wire.Json));
         });
     }

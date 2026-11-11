@@ -308,9 +308,17 @@ internal sealed class CadReader
                 if (summary.type == "PointCloud" && needsGeometry) throw new DomainException("SPECIALIZED_READER_REQUIRED", "Use inspect_point_cloud for metadata/features or analyze_point_cloud for points, sections and measurements.", false, new { summary });
 
                 if (args.DetailSections != null)
-                    items.Add(new { handle, success = true, entity = CadTargetedRead407.Compact(entity, summary, args.DetailSections, cancellationToken), error = (DomainError?)null });
+                {
+                    var detail = CadTargetedRead407.Compact(entity, summary, args.DetailSections, cancellationToken);
+                    if (needsGeometry) CadDynamicBlockObservation.Compact(detail, entity, transaction, _instance, state.Id, cancellationToken.ThrowIfCancellationRequested);
+                    items.Add(new { handle, success = true, entity = detail, error = (DomainError?)null });
+                }
                 else
-                    items.Add(new ItemResult(handle, true, EntityAdapter.Detail(entity, summary, cancellationToken, includeNativeCurve: true), null));
+                {
+                    var detail = EntityAdapter.Detail(entity, summary, cancellationToken, includeNativeCurve: true);
+                    detail = CadDynamicBlockObservation.Detail(detail, entity, transaction, _instance, state.Id, cancellationToken.ThrowIfCancellationRequested);
+                    items.Add(new ItemResult(handle, true, detail, null));
+                }
             }
             catch (DomainException e) { failed++; items.Add(new ItemResult(handle, false, null, e.Error)); }
             catch (CadException e) when (!e.ErrorStatus.ToString().Contains("Lock", StringComparison.OrdinalIgnoreCase))

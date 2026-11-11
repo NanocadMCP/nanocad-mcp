@@ -16,8 +16,8 @@ public sealed record CreateLayerEdit(string Name, LayerChanges Properties) : Str
 public sealed record SetLayerEdit(string Handle, LayerChanges Properties) : StructureEdit("set_layer_properties");
 public sealed record SetCurrentLayerEdit(string Handle, string ExpectedCurrentHandle) : StructureEdit("set_current_layer");
 public sealed record SetAttributeEdit(string BlockHandle, string AttributeHandle, string ExpectedText, string Text, string ContentType = "single_line",
-    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? OwnerDefinitionHandle=null,
-    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? ExpectedDefinitionToken=null) : StructureEdit("set_attribute_text");
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? OwnerDefinitionHandle = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? ExpectedDefinitionToken = null) : StructureEdit("set_attribute_text");
 public sealed record StructureWriteArguments(string BridgeId, string DocumentId, string ExpectedRevision,
     string OperationId, string Units, StructureEdit[] Operations,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? TargetSpace = null) : IWriteArguments
@@ -35,14 +35,15 @@ public sealed record ModifiedStructure(string operation_id, string status, bool 
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TableStyleChange337[]? table_style_changes = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DrawingViewLifecycleChange345[]? drawing_view_lifecycle_changes = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] PaperDrawingViewCreation356[]? drawing_view_creation_results = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ViewportClippingChange358[]? viewport_clipping_changes = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ViewportClippingChange358[]? viewport_clipping_changes = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] BlockLibraryDwgResult[]? block_library_results = null);
 
 public static class StructureWriteValidation
 {
     public static readonly int[] LayerLineweights = ModifyValidation.Lineweights.Where(w => w == -3 || w >= 0).ToArray();
     // These operations change document settings, without coordinates in drawing units.
     public static bool IsSettingsOnly(IEnumerable<StructureEdit> operations) => operations.All(op => op is
-        DrawingGroupEdit431 or ReferenceLifecycle385 or SetRasterImageDisplay390 or SetRasterImageClip391{Mode:"clear"} or SetViewportClipping358 or CreateLayerEdit or SetLayerEdit or RenameLayerEdit or RenameBlockDefinition349 or SetBlockDefinitionText391 or SetBlockDefinitionMembers392{AddEntities:[]} or NativeStyleLifecycle352 or SetCurrentLayerEdit or SetTextStyleFontEdit or RenameLayoutEdit or StructureLifecycleEdit or DeleteDrawingViewsEdit or DeleteViewportEdit or SetAttributeEdit or SetDrawingViewPropertiesEdit{Origin:null} ||
+        DrawingGroupEdit431 or ReferenceLifecycle385 or SetRasterImageDisplay390 or SetRasterImageClip391 { Mode: "clear" } or SetViewportClipping358 or CreateLayerEdit or SetLayerEdit or RenameLayerEdit or RenameBlockDefinition349 or SetBlockDefinitionText391 or SetBlockDefinitionMembers392 { AddEntities: [] } or NativeStyleLifecycle352 or SetCurrentLayerEdit or SetTextStyleFontEdit or RenameLayoutEdit or StructureLifecycleEdit or DeleteDrawingViewsEdit or DeleteViewportEdit or SetAttributeEdit or SetDrawingViewPropertiesEdit { Origin: null } ||
         op is SetLayoutPropertiesEdit or SetDrawingViewSources345 or RenameDrawingView345 ||
         op is TableStyleEdit337 tableStyle && TableStyleValidation337.IsSettingsOnly(tableStyle) ||
         op is MLeaderStyleEdit337 leaderStyle && MLeaderStyleValidation337.IsSettingsOnly(leaderStyle) ||
@@ -112,7 +113,7 @@ public static class StructureWriteValidation
         if (revision.Any(c => c is < '0' or > '9') || !ulong.TryParse(revision, NumberStyles.None, CultureInfo.InvariantCulture, out var number)) throw Invalid("$.expected_revision", "Expected decimal uint64 string.");
         if (units != "Millimeters") throw Invalid("$.units", "Explicit Millimeters required.", "UNSUPPORTED_UNITS");
         var array = Required(input, "operations", "$");
-        if (array.ValueKind != JsonValueKind.Array || array.GetArrayLength()<1) throw Invalid("$.operations", "Expected a nonempty operation group.");
+        if (array.ValueKind != JsonValueKind.Array || array.GetArrayLength() < 1) throw Invalid("$.operations", "Expected a nonempty operation group.");
         var edits = new List<StructureEdit>(); var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var texts = new Dictionary<string, (string Block, string Text)>(StringComparer.Ordinal);
         foreach (var item in array.EnumerateArray())
@@ -122,14 +123,15 @@ public static class StructureWriteValidation
             string kind = Text(item, "operation", path);
             switch (kind)
             {
-                case var nativeStyleKind when NativeStyleLifecycleValidation352.Handles(nativeStyleKind): edits.Add(NativeStyleLifecycleValidation352.Parse(item,path));break;
-                case "rename_layer": edits.Add(LayerRenameValidation.Parse(item,path));break;
-                case "rename_block_definition": edits.Add(BlockDefinitionRenameValidation349.Parse(item,path));break;
-                case "set_block_definition_geometry": edits.Add(BlockDefinitionGeometryValidation388.Parse(item,path));break;
-                case "create_group": case "set_group": case "dissolve_group": edits.Add(DrawingGroups431.Parse(item,path));break;
-                case "create_block_from_objects": edits.Add(BlockFromObjectsValidation407.Parse(item,path));break;
-                case "set_block_definition_text": edits.Add(BlockDefinitionTextValidation391.Parse(item,path));break;
-                case "set_block_definition_members": edits.Add(BlockDefinitionMembersValidation392.Parse(item,path));break;
+                case var nativeStyleKind when NativeStyleLifecycleValidation352.Handles(nativeStyleKind): edits.Add(NativeStyleLifecycleValidation352.Parse(item, path)); break;
+                case "rename_layer": edits.Add(LayerRenameValidation.Parse(item, path)); break;
+                case "rename_block_definition": edits.Add(BlockDefinitionRenameValidation349.Parse(item, path)); break;
+                case "set_block_definition_geometry": edits.Add(BlockDefinitionGeometryValidation388.Parse(item, path)); break;
+                case "create_group": case "set_group": case "dissolve_group": edits.Add(DrawingGroups431.Parse(item, path)); break;
+                case "create_block_from_objects": edits.Add(BlockFromObjectsValidation407.Parse(item, path)); break;
+                case var libraryKind when LibraryBlockDwgValidation.Handles(libraryKind): edits.Add(LibraryBlockDwgValidation.Parse(item, path)); break;
+                case "set_block_definition_text": edits.Add(BlockDefinitionTextValidation391.Parse(item, path)); break;
+                case "set_block_definition_members": edits.Add(BlockDefinitionMembersValidation392.Parse(item, path)); break;
                 case "create_layer":
                     Shape(item, path, "operation", "name", "properties");
                     string name = Text(item, "name", path, 255);
@@ -162,46 +164,46 @@ public static class StructureWriteValidation
                     if (texts.TryGetValue(attribute, out var previous) && (previous.Block != block || previous.Text != expected))
                         throw Invalid(path, "Repeated attribute edits must address the same insertion and expect the preceding replacement.", "INVALID_OPERATION_ORDER");
                     texts[attribute] = (block, replacement);
-                    string? ownerDefinition=null,definitionToken=null;
-                    if(item.TryGetProperty("owner_definition_handle",out _)||item.TryGetProperty("expected_definition_token",out _))
+                    string? ownerDefinition = null, definitionToken = null;
+                    if (item.TryGetProperty("owner_definition_handle", out _) || item.TryGetProperty("expected_definition_token", out _))
                     {
-                        ownerDefinition=Validation.NormalizeHandle(Text(item,"owner_definition_handle",path,16));
-                        definitionToken=Text(item,"expected_definition_token",path,64);
-                        if(definitionToken.Length!=64||definitionToken.Any(c=>!"0123456789ABCDEF".Contains(c)))throw Invalid(path+".expected_definition_token","Read the exact current inspect_block nested_attribute_editing/definition_membership token.");
-                        if(ownerDefinition==block||ownerDefinition==attribute)throw Invalid(path,"Definition, nested insertion and owned attribute handles must differ.");
+                        ownerDefinition = Validation.NormalizeHandle(Text(item, "owner_definition_handle", path, 16));
+                        definitionToken = Text(item, "expected_definition_token", path, 64);
+                        if (definitionToken.Length != 64 || definitionToken.Any(c => !"0123456789ABCDEF".Contains(c))) throw Invalid(path + ".expected_definition_token", "Read the exact current inspect_block nested_attribute_editing/definition_membership token.");
+                        if (ownerDefinition == block || ownerDefinition == attribute) throw Invalid(path, "Definition, nested insertion and owned attribute handles must differ.");
                     }
-                    edits.Add(new SetAttributeEdit(block, attribute, expected, replacement, contentType,ownerDefinition,definitionToken));
+                    edits.Add(new SetAttributeEdit(block, attribute, expected, replacement, contentType, ownerDefinition, definitionToken));
                     break;
-                case var referenceOperation when ExternalReferenceValidation385.Handles(referenceOperation): edits.Add(ExternalReferenceValidation385.Parse(item,path));break;
+                case var referenceOperation when ExternalReferenceValidation385.Handles(referenceOperation): edits.Add(ExternalReferenceValidation385.Parse(item, path)); break;
                 case "define_block": edits.Add(BlockWriteValidation.ParseDefine(item, path)); break;
                 case "insert_block": edits.Add(BlockWriteValidation.ParseInsert(item, path)); break;
                 case "insert_block_array":
                 case "set_block_array_properties": edits.Add(NativeBlockArrayValidation384.Parse(item, path)); break;
-                case "set_text_style_font": edits.Add(StyleWriteValidation.ParseFont(item,path)); break;
+                case "set_text_style_font": edits.Add(StyleWriteValidation.ParseFont(item, path)); break;
                 case "create_text_style": edits.Add(StyleWriteValidation.ParseCreate(item, path)); break;
                 case "set_text_style_properties": edits.Add(StyleWriteValidation.ParseSet(item, path)); break;
                 case "create_dimension_style": edits.Add(DimensionStyleWriteValidation.ParseCreate(item, path)); break;
                 case "set_dimension_style_properties": edits.Add(DimensionStyleWriteValidation.ParseSet(item, path)); break;
                 case "create_linetype": edits.Add(LinetypeWriteValidation.ParseCreate(item, path)); break;
-                case "set_viewport_clipping": edits.Add(ViewportClippingValidation358.Parse(item,path));break;
+                case "set_viewport_clipping": edits.Add(ViewportClippingValidation358.Parse(item, path)); break;
                 case "set_viewport_view": edits.Add(ViewportWriteValidation.Parse(item, path)); break;
                 case "create_layout": edits.Add(LayoutCreateValidation.Parse(item, path)); break;
                 case "rename_layout":
                 case "set_layout_properties": edits.Add(LayoutEditValidation.Parse(item, path)); break;
                 case "create_drawing_views": edits.Add(DrawingViewCreateValidation.Parse(item, path)); break;
                 case "create_section_view": edits.Add(SectionViewValidation.Parse(item, path)); break;
-                case "set_section_view_cut": edits.Add(SectionCutValidation351.Parse(item,path)); break;
+                case "set_section_view_cut": edits.Add(SectionCutValidation351.Parse(item, path)); break;
                 case "create_viewport": edits.Add(ViewportCreateValidation.Parse(item, path)); break;
-                case var tableStyleKind when TableStyleValidation337.Handles(tableStyleKind): edits.Add(TableStyleValidation337.Parse(item,path)); break;
-                case var leaderStyleKind when MLeaderStyleValidation337.Operations.Contains(leaderStyleKind,StringComparer.Ordinal): edits.Add(MLeaderStyleValidation337.Parse(item,path)); break;
-                case var viewportLifecycleKind when ViewportLifecycleValidation.Handles(viewportLifecycleKind): edits.Add(ViewportLifecycleValidation.Parse(item,path)); break;
-                case var lifecycleKind when StructureLifecycleValidation.Handles(lifecycleKind): edits.Add(StructureLifecycleValidation.Parse(item,path)); break;
-                case var lifecycleKind when DrawingViewLifecycleValidation345.Handles(lifecycleKind): edits.Add(DrawingViewLifecycleValidation345.Parse(item,path)); break;
-                case var drawingViewKind when DrawingViewEditValidation.Handles(drawingViewKind): edits.Add(DrawingViewEditValidation.Parse(item,path)); break;
-                default: throw Invalid(path + ".operation", "Supported: set_text_style_font, set_text_style_properties, set_dimension_style_properties, create_layer, set_layer_properties, set_current_layer, rename_layer, rename_block_definition, set_block_definition_geometry, create_block_from_objects, set_block_definition_text, set_block_definition_members, set_attribute_text, define_block, insert_block, insert_block_array, set_block_array_properties, create_text_style, create_dimension_style, create_linetype, set_viewport_clipping, set_viewport_view, create_layout, rename_layout, set_layout_properties, create_viewport, create_drawing_views, create_section_view, set_section_view_cut, native current style and safe record lifecycle operations.");
+                case var tableStyleKind when TableStyleValidation337.Handles(tableStyleKind): edits.Add(TableStyleValidation337.Parse(item, path)); break;
+                case var leaderStyleKind when MLeaderStyleValidation337.Operations.Contains(leaderStyleKind, StringComparer.Ordinal): edits.Add(MLeaderStyleValidation337.Parse(item, path)); break;
+                case var viewportLifecycleKind when ViewportLifecycleValidation.Handles(viewportLifecycleKind): edits.Add(ViewportLifecycleValidation.Parse(item, path)); break;
+                case var lifecycleKind when StructureLifecycleValidation.Handles(lifecycleKind): edits.Add(StructureLifecycleValidation.Parse(item, path)); break;
+                case var lifecycleKind when DrawingViewLifecycleValidation345.Handles(lifecycleKind): edits.Add(DrawingViewLifecycleValidation345.Parse(item, path)); break;
+                case var drawingViewKind when DrawingViewEditValidation.Handles(drawingViewKind): edits.Add(DrawingViewEditValidation.Parse(item, path)); break;
+                default: throw Invalid(path + ".operation", "Supported: set_text_style_font, set_text_style_properties, set_dimension_style_properties, create_layer, set_layer_properties, set_current_layer, rename_layer, rename_block_definition, set_block_definition_geometry, create_block_from_objects, import_block_dwg, redefine_block_from_dwg, set_block_definition_text, set_block_definition_members, set_attribute_text, define_block, insert_block, insert_block_array, set_block_array_properties, create_text_style, create_dimension_style, create_linetype, set_viewport_clipping, set_viewport_view, create_layout, rename_layout, set_layout_properties, create_viewport, create_drawing_views, create_section_view, set_section_view_cut, native current style and safe record lifecycle operations.");
             }
         }
-        if(edits.Any(e=>e is SetTextStyleFontEdit) && edits.Count!=1)throw Invalid("operations", "Change one text style font in a separate request before creating or editing annotations.");
+        if (edits.Any(e => e is SetTextStyleFontEdit) && edits.Count != 1) throw Invalid("operations", "Change one text style font in a separate request before creating or editing annotations.");
         if (edits.Any(e => e is SetCurrentLayerEdit) && edits.Count != 1)
             throw Invalid("operations", "Set the current layer in a separate request, using the current handle from get_structure layers.", "INVALID_OPERATION_ORDER");
         if (edits.Any(e => e is SetTextStylePropertiesEdit or SetDimensionStylePropertiesEdit) && edits.Count != 1)
@@ -211,15 +213,16 @@ public static class StructureWriteValidation
         BlockDefinitionRenameValidation349.Batch(edits);
         BlockDefinitionGeometryValidation388.Batch(edits);
         BlockFromObjectsValidation407.Batch(edits);
+        LibraryBlockDwgValidation.Batch(edits);
         DrawingGroups431.Batch(edits);
         BlockDefinitionTextValidation391.Batch(edits);
         BlockDefinitionMembersValidation392.Batch(edits);
-        if(edits.Any(e=>e is SetAttributeEdit{OwnerDefinitionHandle:not null}))
+        if (edits.Any(e => e is SetAttributeEdit { OwnerDefinitionHandle: not null }))
         {
-            var nested=edits.OfType<SetAttributeEdit>().ToArray();
-            if(nested.Length!=edits.Count||nested.Any(e=>e.OwnerDefinitionHandle!=nested[0].OwnerDefinitionHandle||e.ExpectedDefinitionToken!=nested[0].ExpectedDefinitionToken)||
-                nested.Select(e=>e.AttributeHandle).Distinct(StringComparer.Ordinal).Count()!=nested.Length)
-                throw Invalid("operations","Edit distinct nested attributes of one shared owner definition with one fresh definition token in a separate request.","INVALID_OPERATION_ORDER");
+            var nested = edits.OfType<SetAttributeEdit>().ToArray();
+            if (nested.Length != edits.Count || nested.Any(e => e.OwnerDefinitionHandle != nested[0].OwnerDefinitionHandle || e.ExpectedDefinitionToken != nested[0].ExpectedDefinitionToken) ||
+                nested.Select(e => e.AttributeHandle).Distinct(StringComparer.Ordinal).Count() != nested.Length)
+                throw Invalid("operations", "Edit distinct nested attributes of one shared owner definition with one fresh definition token in a separate request.", "INVALID_OPERATION_ORDER");
         }
         NativeBlockArrayValidation384.Batch(edits);
         StructureLifecycleValidation.Batch(edits);
@@ -230,19 +233,19 @@ public static class StructureWriteValidation
         MLeaderStyleValidation337.Batch(edits);
         NativeStyleLifecycleValidation352.Batch(edits);
         ViewportClippingValidation358.Batch(edits);
-        if(edits.Count>0&&edits.All(edit=>edit is ViewportLifecycleEdit))
-            return new(bridge,document,number.ToString(CultureInfo.InvariantCulture),operation,units,edits.ToArray(),targetSpace);
+        if (edits.Count > 0 && edits.All(edit => edit is ViewportLifecycleEdit))
+            return new(bridge, document, number.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray(), targetSpace);
         // A validated nonempty view-only group creates no new definitions.
         // Unrelated creator budgets cannot cap a native aligned view tree.
-        if(edits.Count>0&&edits.All(edit=>edit is SetDrawingViewPropertiesEdit))
-            return new(bridge,document,number.ToString(CultureInfo.InvariantCulture),operation,units,edits.ToArray(),targetSpace);
+        if (edits.Count > 0 && edits.All(edit => edit is SetDrawingViewPropertiesEdit))
+            return new(bridge, document, number.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray(), targetSpace);
         LayoutEditValidation.Batch(edits);
         DrawingViewCreateValidation.ValidateBatch(edits);
-        DrawingViewCreateValidation.ValidateTargetSpace(edits,targetSpace??"model");
+        DrawingViewCreateValidation.ValidateTargetSpace(edits, targetSpace ?? "model");
         SectionViewValidation.ValidateBatch(edits);
         SectionCutValidation351.Batch(edits);
         ViewportCreateValidation.ValidateBatch(edits);
-        return new(bridge, document, number.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray(),targetSpace);
+        return new(bridge, document, number.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray(), targetSpace);
     }
 }
 

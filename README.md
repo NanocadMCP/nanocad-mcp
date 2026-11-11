@@ -8,10 +8,10 @@ You describe the result, dimensions and constraints. The assistant reads the dra
 
 ## What you can do
 
-- Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks.
+- Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks; adjust supported properties of existing dynamic blocks.
 - Build solids with extrusion, revolution, sweep, loft, Boolean operations and finishing tools.
 - Use supported native sketches, constraints, parameters and dependent features to build editable individual parts.
-- Prepare editable DWG documentation and work with local drawing and raster references.
+- Prepare editable DWG documentation with dimensions linked to supported drawing views, and work with local drawing and raster references.
 - Measure and section loaded point clouds, and move or rotate their insertion without changing source points.
 
 Each operation has its own requirements. Read [capabilities and limits](docs/en/capabilities.md) before relying on a workflow. Persistent assembly mates, printing and PDF export are outside this integration.
@@ -26,14 +26,14 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Download the installer or ready-to-run ZIP from [release 451](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/451).
+Download the installer or ready-to-run ZIP from [release 452](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/452).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-451.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-451.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-452.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-452.zip` | Manual setup, or installation from an extracted folder |
 
-The release page also provides `SHA256SUMS-451.txt` and archives of the source and documentation from the tagged build.
+The release page also provides `SHA256SUMS-452.txt` and archives of the source and documentation from the tagged build.
 
 ## Get started
 

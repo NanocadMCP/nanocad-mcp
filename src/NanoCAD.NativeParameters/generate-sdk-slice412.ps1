@@ -9,14 +9,18 @@ $anchors=@{
     'IMcCutter.h'='2E3444E919673542BBD73A65738B34D2A2C2F01763E3C88CC82B46C3F4576535'
     'McsGeometry.h'='D8A377471B5A460DC54044B453868013785B9ED855B64BAC5930D334EE13D573'
     '3DCore.h'='710E2603AD27B75C44A3C55C0BED154544D5FB245975598163EC601C36A7E314'
+    'IMcDimension.h'='5CEC267EEB966DE567D53C070069804FEF9D593339DD9A9BA22A9839423EB115'
+    'IMcStyles.h'='5151C1191EACF2B0F8C42622F6C634BF231AC7FC7FA9B7BCC7598EC941AD7D9F'
 }
 $coreKeep=@('m3dIPPDef','IMc3dHistoryItem','IMc3dSolid','IMcFeatureEntity','IMc3dHole','IMc3dThicknessFeature','IMcsDocVariablesManager',
     'IMc3dArrFeatureType','IMc3dCircPatFeature','IMc3dRectPatFeature','IMcSketch','IMcPlanarSketch',
     'IMc3dCoordSysObject','IMc3dWorkPlane','IMc3dDrawingView')
 $required=@{
-    'IMcObjects.h'=@('IMcPropertySource','IMcDbObject','IMcDbEntity','IMcEntity','IMc3dConstraintCompatible','IMcObjectsManager')
+    'IMcObjects.h'=@('IMcPropertySource','IMcDbObject','IMcDbEntity','IMcEntity','IMc3dConstraintCompatible','IMcObjectsManager','mcsComplexWorkID','McGeometryParam')
     '3DCore.h'=$coreKeep
     'IMcDocuments.h'=@('IMcDocument','IMcDocumentsManager')
+    'IMcDimension.h'=@('IMcDimension','McDimensionData','CTechSize')
+    'IMcStyles.h'=@('IMcDimStyle')
 }
 $records=@{};$definitions=[Collections.Generic.List[object]]::new();$removed=[Collections.Generic.List[object]]::new();$exceptions=[Collections.Generic.List[object]]::new()
 function Hash-Text([string]$text){$hash=[Security.Cryptography.SHA256]::Create();try{[BitConverter]::ToString($hash.ComputeHash($encoding.GetBytes($text))).Replace('-','')}finally{$hash.Dispose()}}
@@ -32,8 +36,19 @@ function Preview-Declaration([string]$text){
     return [pscustomobject]@{Text=$text.Replace($method,$declaration);Original=$method;Declaration=$declaration;Signature=$method.Substring(0,$open)}
 }
 function Slice-Classes([string]$name,[string]$text){
+    if($name -eq 'IMcStyles.h'){
+        # The dimension's complete style and enum declarations are one contiguous
+        # vendor region. Uncalled UI/XML/native-gate interfaces are not imported.
+        $start=$text.IndexOf('enum MCS_DIMSTYLE_TYPE',[StringComparison]::Ordinal)
+        $last='typedef MComQIPtr<IMcDimStyle> IMcDimStylePtr;'
+        $end=$text.IndexOf($last,[StringComparison]::Ordinal)
+        if($start -lt 0 -or $end -lt $start){throw 'Vendor dimension-style declaration region changed'}
+        $license=$text.Substring(0,$text.IndexOf('#pragma once',[StringComparison]::Ordinal))
+        $text=$license+'#pragma once'+"`r`n"+'#include "MCSTypes.h"'+"`r`n"+'#include "McsGeometry.h"'+"`r`n"+
+            $text.Substring($start,$end+$last.Length-$start)+"`r`n"
+    }
     $masked=Mask-Cpp $text;$changes=[Collections.Generic.List[object]]::new();$found=@{}
-    foreach($match in [regex]::Matches($masked,'(?m)^(?<kind>struct|class)\s+(?:(?:MC_API_CLASS|M3D_API)\s+)?(?<name>\w+)\b')){
+    foreach($match in [regex]::Matches($masked,'(?m)^(?<kind>struct|class)\s+(?:(?:MC_API_CLASS|M3D_API|MECHCTL_API)\s+)?(?<name>\w+)\b')){
         $type=$match.Groups['name'].Value;$open=$masked.IndexOf('{',$match.Index+$match.Length);$semi=$masked.IndexOf(';',$match.Index+$match.Length)
         if($open -lt 0 -or ($semi -ge 0 -and $semi -lt $open)){continue}
         $depth=1;$end=$open+1;while($depth -gt 0 -and $end -lt $masked.Length){if($masked[$end] -eq '{'){$depth++}elseif($masked[$end] -eq '}'){$depth--};$end++}
@@ -81,10 +96,17 @@ function Slice-Classes([string]$name,[string]$text){
     }
     return $text
 }
+function Source-Sha256([string]$path){
+    # MSBuild invokes Windows PowerShell, whose inherited module search path
+    # need not expose the Get-FileHash function. Hash the same bytes directly.
+    $algorithm=[Security.Cryptography.SHA256]::Create()
+    try{return [BitConverter]::ToString($algorithm.ComputeHash([IO.File]::ReadAllBytes($path))).Replace('-','')}
+    finally{$algorithm.Dispose()}
+}
 function Visit([string]$path){
     $path=[IO.Path]::GetFullPath($path);if($records.ContainsKey($path)){return}
     $relative=$path.Substring($sdk.Length+1);$name=[IO.Path]::GetFileName($path)
-    if($anchors.ContainsKey($relative) -and (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $anchors[$relative]){throw "SDK source changed: $relative"}
+    if($anchors.ContainsKey($relative) -and (Source-Sha256 $path) -ne $anchors[$relative]){throw "SDK source changed: $relative"}
     $original=$encoding.GetString([IO.File]::ReadAllBytes($path));$text=Slice-Classes $relative $original
     $record=[pscustomobject]@{Path=$path;Relative=$relative;Original=$original;Text=$text;Changed=($original -cne $text);Copy=$false;Children=@()}
     $records[$path]=$record
@@ -94,7 +116,7 @@ function Visit([string]$path){
         if(Test-Path -LiteralPath $child){$child=[IO.Path]::GetFullPath($child);if($child.StartsWith($sdk,[StringComparison]::OrdinalIgnoreCase)){$record.Children+=,$child;Visit $child}}
     }
 }
-foreach($name in @('IMcObjects.h','IMcDocuments.h','3DCore.h')){Visit (Join-Path $sdk $name)}
+foreach($name in @('IMcObjects.h','IMcDocuments.h','3DCore.h','IMcDimension.h')){Visit (Join-Path $sdk $name)}
 do{$changed=$false;foreach($record in @($records.Values)){if(!$record.Copy -and ($record.Changed -or @($record.Children|Where-Object{$records[$_].Copy}).Count -gt 0)){$record.Copy=$true;$changed=$true}}}while($changed)
 $expectedHeaders=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach($record in @($records.Values|Where-Object Copy)){[void]$expectedHeaders.Add($record.Relative)}
@@ -111,7 +133,7 @@ $files=@(foreach($record in @($records.Values|Where-Object Copy|Sort-Object Rela
 # Assert all called class/base definitions survived byte-for-byte. Omitting an
 # unrelated top-level declaration must never alter a retained virtual method.
 foreach($definition in $definitions){$record=$records[(Join-Path $sdk $definition.file)];$masked=Mask-Cpp $record.Text
-    $pattern='(?m)^(struct|class)\s+(?:(?:MC_API_CLASS|M3D_API)\s+)?'+[regex]::Escape($definition.type)+'\b(?=[^{;]*\{)'
+    $pattern='(?m)^(struct|class)\s+(?:(?:MC_API_CLASS|M3D_API|MECHCTL_API)\s+)?'+[regex]::Escape($definition.type)+'\b(?=[^{;]*\{)'
     $match=[regex]::Match($masked,$pattern);$open=$masked.IndexOf('{',$match.Index+$match.Length);$depth=1;$end=$open+1
     while($depth -gt 0){if($masked[$end] -eq '{'){$depth++}elseif($masked[$end] -eq '}'){$depth--};$end++}
     while([char]::IsWhiteSpace($masked[$end])){$end++};$end++

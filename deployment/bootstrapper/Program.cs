@@ -13,8 +13,8 @@ using System.Windows.Forms;
 
 [assembly: AssemblyTitle("nanoCAD MCP — Setup")]
 [assembly: AssemblyProduct("nanoCAD MCP")]
-[assembly: AssemblyVersion("0.451.0.0")]
-[assembly: AssemblyFileVersion("0.451.0.0")]
+[assembly: AssemblyVersion("0.452.0.0")]
+[assembly: AssemblyFileVersion("0.452.0.0")]
 
 internal static class Program
 {

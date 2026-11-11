@@ -20,6 +20,7 @@ internal static class McpPresentation
             _ => null
         };
         var input = SchemaCompactor.PublishFlatInput(tool.InputSchema);
+        if (!structured && tool.Name == "nanocad.create_entities") input = SchemaCompactor.ShareCreationKindAlternatives(input);
         if (compactDescription is not null) input = SchemaCompactor.PublishOperationIndex(input);
         return new Tool
         {

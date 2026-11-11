@@ -9,17 +9,23 @@ public sealed record BlockInfo(EntityRef @ref, string name, bool is_layout, bool
     bool is_xref, bool is_overlay, bool is_dependent, double[] origin, string units, string? external_path);
 public sealed record AttributeInfo(EntityRef @ref, string tag, string text, double[] position, double height, double rotation,
     bool invisible, bool constant, string coordinate_system, double[] transform_to_wcs, LayerDto layer, object properties, AttributeTextFormat text_format, object? multiline = null);
-public sealed record AttributeTextFormat(EntityRef text_style_ref,string text_style_name,double width_factor,double oblique,
-    string horizontal_mode,string vertical_mode,double[] alignment_point);
+public sealed record AttributeTextFormat(EntityRef text_style_ref, string text_style_name, double width_factor, double oblique,
+    string horizontal_mode, string vertical_mode, double[] alignment_point);
 public sealed record InsertInfo(BlockInfo definition, double[] position, double[] normal, double[] scale_factors, double rotation,
     double[] transform_to_parent, double[] transform_to_wcs, AttributeInfo[] attributes, bool is_dynamic, string expansion, object properties);
 public sealed record BlockNode(string[] occurrence_path, EntitySummary summary, double[] parent_to_wcs,
     EntityDetail? entity, InsertInfo? insert, AttributeInfo? attribute_definition);
 public sealed record BlockInspection(EntityRef root, BlockNode[] nodes, bool complete, string[] warnings,
-    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] object? definition_editing=null,
-    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] object? definition_text_editing=null,
-    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] object? definition_membership=null,
-    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] object? nested_attribute_editing=null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? definition_editing = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? definition_text_editing = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? definition_membership = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? nested_attribute_editing = null)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DynamicBlockPropertiesInventory? dynamic_properties { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? dynamic_properties_unavailable_reason { get; init; }
+}
 
 public static class StructureValidation
 {

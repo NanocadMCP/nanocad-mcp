@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 using Multicad;
 using NanoCAD.Contracts;
 using Teigha.DatabaseServices;
-using G=Multicad.Geometry;
+using G = Multicad.Geometry;
 
 namespace NanoCADBridge;
 
@@ -15,6 +15,10 @@ internal static class DrawingViewsReader
     private sealed record LocalSource(McObjectId Id, EntityRef Ref);
     internal sealed record ProjectedLine(McObjectId ViewId, int Marker,
         Teigha.Geometry.Point3d Start, Teigha.Geometry.Point3d End);
+    internal sealed record ProjectedCircle(McObjectId ViewId, int Marker, Teigha.Geometry.Point3d Center, double Radius);
+    internal sealed record ProjectedCircularArc(McObjectId ViewId, int Marker, Teigha.Geometry.Point3d Center,
+        double Radius, Teigha.Geometry.Point3d Start, Teigha.Geometry.Point3d End,
+        Teigha.Geometry.Point3d Midpoint, double Sweep, bool FullCircle, double StartParameter, double EndParameter);
     private sealed record SourceEdge(McObjectId Id, string RefKey);
     private sealed record ProjectionSource(string status, string? unavailable_reason, string? view_marker,
         EntityRef? source_ref, string? native_edge_id, string? native_ref_key)
@@ -123,8 +127,8 @@ internal static class DrawingViewsReader
         return new(nativeSources.Single(), sourceRef);
     }
 
-    internal static ProjectedLine ResolveProjectedLine(Entity entity, DocumentState state, Transaction tx,
-        string instance, int index, Action cancel)
+    private static (Multicad.Mc3D.DrawingView View, McObjectId ViewId, LocalSource Source) ResolveProjectedSource(
+        Entity entity, DocumentState state, Transaction tx, string instance, Action cancel)
     {
         var database = state.Document.Database;
         var document = Multicad.DatabaseServices.McDocument.ActiveDocument;
@@ -142,6 +146,13 @@ internal static class DrawingViewsReader
         var sourceRefs = CadDrawingViewLifecycleState345.SourceRefs(nativeSources, database, tx, instance, state.Id, cancel);
         var source = OrdinarySource(view, nativeSources, sourceRefs.Refs, view.Attached2dBreaks is { Length: 0 })
             ?? throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "Select a healthy ordinary projection of one local model solid.");
+        return (view, viewId, source);
+    }
+
+    internal static ProjectedLine ResolveProjectedLine(Entity entity, DocumentState state, Transaction tx,
+        string instance, int index, Action cancel)
+    {
+        var (view, viewId, source) = ResolveProjectedSource(entity, state, tx, instance, cancel);
         cancel();
         var geometry = view.GetViewGeometry(true, 0);
         if (geometry == null || geometry.Count == 0)
@@ -170,18 +181,201 @@ internal static class DrawingViewsReader
         }
     }
 
-    private static object ReadGeometry(Multicad.Mc3D.DrawingView view,Entity entity,string instance,string document,int start,int pageSize,
+    private readonly record struct CircleShape(Teigha.Geometry.Point3d Center, double Radius)
+    {
+        internal bool Matches(CircleShape other) =>
+            Center.DistanceTo(other.Center) <= 1e-7 && Math.Abs(Radius - other.Radius) <= 1e-7;
+
+        internal static CircleShape? Read(G.EntityGeometry item)
+        {
+            if (item.GeometryType != G.EntityGeomType.kCircArc) return null;
+            using var arc = item.CircArc;
+            var center = arc.Center;
+            var normal = arc.Normal;
+            double radius = Finite(arc.Radius);
+            double sweep = Math.Abs(Finite(arc.EndAng) - Finite(arc.StartAng));
+            if (radius <= 1e-7 || Math.Abs(sweep - 2 * Math.PI) > 1e-8 ||
+                Math.Abs(Finite(center.Z)) > 1e-7 || Math.Abs(Finite(normal.X)) > 1e-8 ||
+                Math.Abs(Finite(normal.Y)) > 1e-8 || Math.Abs(Math.Abs(Finite(normal.Z)) - 1) > 1e-8)
+                return null;
+            return new CircleShape(new(Finite(center.X), Finite(center.Y), center.Z), radius);
+        }
+    }
+
+    private static bool ContainsCircle(IEnumerable<G.EntityGeometry> geometry, int marker,
+        CircleShape circle, bool rejectCoincident, Action cancel)
+    {
+        bool found = false;
+        foreach (var item in geometry)
+        {
+            cancel();
+            if (item == null) continue;
+            if (item.GSMarker == marker)
+            {
+                if (found || CircleShape.Read(item) is not { } shape || !shape.Matches(circle)) return false;
+                found = true;
+            }
+            else if (rejectCoincident && CircleShape.Read(item) is { } other && other.Matches(circle)) return false;
+        }
+        return found;
+    }
+
+    internal static ProjectedCircle ResolveProjectedCircle(Entity entity, DocumentState state, Transaction tx,
+        string instance, int index, Action cancel)
+    {
+        var (view, viewId, source) = ResolveProjectedSource(entity, state, tx, instance, cancel);
+        if (!view.EnableAutoUpdate)
+            throw new DomainException("OUT_OF_SCOPE", "Enable automatic updates for the selected paper view before adding an associative diameter.");
+        cancel();
+        var geometry = view.GetViewGeometry(true, 0);
+        if (geometry == null)
+            throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Selected native drawing view has no projected geometry.");
+        try
+        {
+            if (index < 0 || index >= geometry.Count || geometry[index] is not { } item ||
+                CircleShape.Read(item) is not { } circle)
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected projection index is not a full native circle in the sheet plane.");
+            int marker = item.GSMarker;
+            if (marker < 0 || !ContainsCircle(geometry, marker, circle, false, cancel))
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circle has no unique native projection marker.");
+            var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source.Id, true, true));
+            if (visible == null)
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The native visible projection is unavailable.");
+            try
+            {
+                if (!ContainsCircle(visible, marker, circle, true, cancel))
+                    throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circle is not unique in the visible projection of this source.");
+            }
+            finally
+            {
+                foreach (var element in visible.Distinct(ReferenceEqualityComparer.Instance))
+                    if (element is IDisposable owned) owned.Dispose();
+            }
+            if (ReadProjectionSource(view, source, marker).Reason == SourceMismatch)
+                throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The native projection marker reports a conflicting source identity.");
+            return new(viewId, marker, circle.Center, circle.Radius);
+        }
+        finally
+        {
+            foreach (var item in geometry.Distinct(ReferenceEqualityComparer.Instance))
+                if (item is IDisposable owned) owned.Dispose();
+        }
+    }
+
+    private sealed record CircularArcShape(Teigha.Geometry.Point3d Center, double Radius,
+        Teigha.Geometry.Point3d Start, Teigha.Geometry.Point3d End, Teigha.Geometry.Point3d Midpoint,
+        double Sweep, bool FullCircle)
+    {
+        internal bool Matches(CircularArcShape other) => Center.DistanceTo(other.Center) <= 1e-7 &&
+            Math.Abs(Radius - other.Radius) <= 1e-7 && FullCircle == other.FullCircle &&
+            (FullCircle || Math.Abs(Sweep - other.Sweep) <= 1e-8 &&
+                Start.DistanceTo(other.Start) <= 1e-7 && End.DistanceTo(other.End) <= 1e-7);
+
+        internal static CircularArcShape? Read(G.EntityGeometry item)
+        {
+            if (item.GeometryType != G.EntityGeomType.kCircArc) return null;
+            using var arc = item.CircArc;
+            var center = arc.Center; var normal = arc.Normal; var reference = arc.RefVector;
+            double radius = Finite(arc.Radius), first = Finite(arc.StartAng), last = Finite(arc.EndAng);
+            double span = last - first, sweep = Math.Abs(span);
+            if (radius <= 1e-7 || sweep <= 1e-8 || sweep > 2 * Math.PI + 1e-8 ||
+                Math.Abs(Finite(center.Z)) > 1e-7 || Math.Abs(Finite(normal.X)) > 1e-8 ||
+                Math.Abs(Finite(normal.Y)) > 1e-8 || Math.Abs(Math.Abs(Finite(normal.Z)) - 1) > 1e-8 ||
+                Math.Abs(Finite(reference.Z)) > 1e-8 ||
+                Math.Abs(Finite(reference.X) * reference.X + Finite(reference.Y) * reference.Y - 1) > 1e-8)
+                return null;
+            var origin = new Teigha.Geometry.Point3d(Finite(center.X), Finite(center.Y), center.Z);
+            Teigha.Geometry.Point3d At(double angle) => new(
+                origin.X + radius * (reference.X * Math.Cos(angle) - normal.Z * reference.Y * Math.Sin(angle)),
+                origin.Y + radius * (reference.Y * Math.Cos(angle) + normal.Z * reference.X * Math.Sin(angle)), origin.Z);
+            var start = At(first); var end = At(last);
+            // Ordinary DWG arc dimensions use the counterclockwise sheet sector.
+            // Keep the exact native primitive; only its endpoint order changes.
+            if (span * normal.Z < 0) (start, end) = (end, start);
+            return new(origin, radius, start, end, At((first + last) / 2), sweep,
+                Math.Abs(sweep - 2 * Math.PI) <= 1e-8);
+        }
+    }
+
+    internal static ProjectedCircularArc ResolveProjectedCircularArc(Entity entity, DocumentState state,
+        Transaction tx, string instance, int index, Action cancel)
+    {
+        var (view, viewId, source) = ResolveProjectedSource(entity, state, tx, instance, cancel);
+        if (!view.EnableAutoUpdate)
+            throw new DomainException("OUT_OF_SCOPE", "Enable automatic updates for the selected view before adding an associative circular dimension.");
+        cancel();
+        var geometry = view.GetViewGeometry(true, 0);
+        if (geometry == null)
+            throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Selected native drawing view has no projected geometry.");
+        try
+        {
+            if (index < 0 || index >= geometry.Count || geometry[index] is not { } item ||
+                CircularArcShape.Read(item) is not { } arc)
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Select a finite native circular arc or circle in the sheet plane.");
+            int marker = item.GSMarker;
+            bool Contains(IEnumerable<G.EntityGeometry> values, bool rejectCoincident)
+            {
+                bool found = false;
+                foreach (var value in values)
+                {
+                    cancel(); if (value == null) continue;
+                    if (value.GSMarker == marker)
+                    {
+                        if (found || CircularArcShape.Read(value) is not { } selected || !selected.Matches(arc)) return false;
+                        found = true;
+                    }
+                    else if (rejectCoincident && CircularArcShape.Read(value) is { } other && other.Matches(arc)) return false;
+                }
+                return found;
+            }
+            if (marker < 0 || !Contains(geometry, false))
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circular arc has no unique native projection marker.");
+            var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source.Id, true, true));
+            if (visible == null)
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The native visible projection is unavailable.");
+            try
+            {
+                if (!Contains(visible, true))
+                    throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circular arc is not unique in the visible projection of this source.");
+            }
+            finally
+            {
+                foreach (var value in visible.Distinct(ReferenceEqualityComparer.Instance))
+                    if (value is IDisposable owned) owned.Dispose();
+            }
+            if (ReadProjectionSource(view, source, marker).Reason == SourceMismatch)
+                throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The native projection marker reports a conflicting source identity.");
+            double startParameter = 0, endParameter = 0;
+            G.Point3d Native(Teigha.Geometry.Point3d point) => new(point.X, point.Y, point.Z);
+            if (!item.GetParamAtPoint(Native(arc.Start), out startParameter) ||
+                !item.GetParamAtPoint(Native(arc.End), out endParameter) ||
+                !double.IsFinite(startParameter) || !double.IsFinite(endParameter) ||
+                !item.GetPointAtParam(startParameter, out var roundtripStart) ||
+                !item.GetPointAtParam(endParameter, out var roundtripEnd) ||
+                new Teigha.Geometry.Point3d(roundtripStart.X, roundtripStart.Y, roundtripStart.Z).DistanceTo(arc.Start) > 1e-7 ||
+                new Teigha.Geometry.Point3d(roundtripEnd.X, roundtripEnd.Y, roundtripEnd.Z).DistanceTo(arc.End) > 1e-7)
+                throw new DomainException("DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The native circular arc did not round-trip its unique endpoint parameters.");
+            return new(viewId, marker, arc.Center, arc.Radius, arc.Start, arc.End, arc.Midpoint, arc.Sweep, arc.FullCircle, startParameter, endParameter);
+        }
+        finally
+        {
+            foreach (var value in geometry.Distinct(ReferenceEqualityComparer.Instance))
+                if (value is IDisposable owned) owned.Dispose();
+        }
+    }
+
+    private static object ReadGeometry(Multicad.Mc3D.DrawingView view, Entity entity, string instance, string document, int start, int pageSize,
         bool includeSources, LocalSource? source, Action budget)
     {
         budget();
-        var geometry=view.GetViewGeometry(true,0);
-        if(geometry==null||geometry.Count==0)
-            throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE","Selected native drawing view has no projected geometry.");
+        var geometry = view.GetViewGeometry(true, 0);
+        if (geometry == null || geometry.Count == 0)
+            throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Selected native drawing view has no projected geometry.");
         try
         {
-            if(start>geometry.Count)throw new DomainException("INVALID_ARGUMENT","geometry_start_index exceeds the selected projection inventory; refresh the current view/revision.");
-            var items=new List<object>();bool complete=true;long bytes=2048;
-            int end=start+Math.Min(pageSize,geometry.Count-start);
+            if (start > geometry.Count) throw new DomainException("INVALID_ARGUMENT", "geometry_start_index exceeds the selected projection inventory; refresh the current view/revision.");
+            var items = new List<object>(); bool complete = true; long bytes = 2048;
+            int end = start + Math.Min(pageSize, geometry.Count - start);
             LineIndex? allLines = null;
             LineIndex? visible = null;
             if (includeSources && source != null && start < end)
@@ -189,17 +383,22 @@ internal static class DrawingViewsReader
                 visible = ReadVisibleMarkers(view, source.Id, budget);
                 if (visible != null) allLines = IndexLines(geometry, budget);
             }
-            for(int index=start;index<end;index++)
+            for (int index = start; index < end; index++)
             {
-                budget();var item=geometry[index];object? detail=null;
+                budget(); var item = geometry[index]; object? detail = null;
                 LineEnds? lineEnds = null;
-                if(item?.GeometryType==G.EntityGeomType.kLine)
-                {using var line=item.LineSeg;detail=SketchGeometryReader.Line(line);if(includeSources)lineEnds=LineEnds.Read(line);}
-                else if(item?.GeometryType==G.EntityGeomType.kCircArc)
-                {using var arc=item.CircArc;detail=SketchGeometryReader.Arc(arc);}
-                object entry=new{index,native_geometry_type=item?.GeometryType.ToString(),
-                    status=detail==null?"unsupported_geometry":"read",geometry=detail,
-                    unavailable_reason=detail==null?"native_geometry_type_not_serialized":(string?)null};
+                if (item?.GeometryType == G.EntityGeomType.kLine)
+                { using var line = item.LineSeg; detail = SketchGeometryReader.Line(line); if (includeSources) lineEnds = LineEnds.Read(line); }
+                else if (item?.GeometryType == G.EntityGeomType.kCircArc)
+                { using var arc = item.CircArc; detail = SketchGeometryReader.Arc(arc); }
+                object entry = new
+                {
+                    index,
+                    native_geometry_type = item?.GeometryType.ToString(),
+                    status = detail == null ? "unsupported_geometry" : "read",
+                    geometry = detail,
+                    unavailable_reason = detail == null ? "native_geometry_type_not_serialized" : (string?)null
+                };
                 if (includeSources)
                 {
                     ProjectionSource observation;
@@ -221,150 +420,197 @@ internal static class DrawingViewsReader
                     row["projection_source"] = JsonSerializer.SerializeToNode(observation, Wire.Json);
                     entry = row;
                 }
-                int size=JsonSerializer.SerializeToUtf8Bytes(entry,Wire.Json).Length+1;
-                if(bytes+size>Wire.PayloadBudget-8192)
+                int size = JsonSerializer.SerializeToUtf8Bytes(entry, Wire.Json).Length + 1;
+                if (bytes + size > Wire.PayloadBudget - 8192)
                 {
-                    if(items.Count==0)throw new DomainException("RESPONSE_LIMIT_EXCEEDED","One native projected element exceeds the actual serialized-byte budget.");
+                    if (items.Count == 0) throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "One native projected element exceeds the actual serialized-byte budget.");
                     break;
                 }
-                bytes+=size;items.Add(entry);if(detail==null)complete=false;
+                bytes += size; items.Add(entry); if (detail == null) complete = false;
             }
-            return new{view_ref=new EntityRef(instance,document,entity.Handle.ToString()),
-                coordinate_system="WCS",unit="drawing_units",geometry_details_complete=complete,
-                element_identity="projection_order_only_not_persistent_subentity_ids",geometry_scope="requested_projection_page",
-                total_elements=geometry.Count,start_index=start,next_index=start+items.Count<geometry.Count?(int?)(start+items.Count):null,
-                complete=start+items.Count==geometry.Count,items};
+            return new
+            {
+                view_ref = new EntityRef(instance, document, entity.Handle.ToString()),
+                coordinate_system = "WCS",
+                unit = "drawing_units",
+                geometry_details_complete = complete,
+                element_identity = "projection_order_only_not_persistent_subentity_ids",
+                geometry_scope = "requested_projection_page",
+                total_elements = geometry.Count,
+                start_index = start,
+                next_index = start + items.Count < geometry.Count ? (int?)(start + items.Count) : null,
+                complete = start + items.Count == geometry.Count,
+                items
+            };
         }
         finally
         {
-            foreach(var item in geometry.Distinct(ReferenceEqualityComparer.Instance))
-                if(item is IDisposable disposable)disposable.Dispose();
+            foreach (var item in geometry.Distinct(ReferenceEqualityComparer.Instance))
+                if (item is IDisposable disposable) disposable.Dispose();
         }
     }
-    public static object Read(Arguments args,DocumentState state,Transaction tx,string instance,CancellationToken cancellation)
+    public static object Read(Arguments args, DocumentState state, Transaction tx, string instance, CancellationToken cancellation)
     {
-        var loaded=AppDomain.CurrentDomain.GetAssemblies().Select(a=>a.GetName().Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if(!loaded.Contains("mapimgd") || !loaded.Contains("MapiBaseTypes"))throw new DomainException("CAPABILITY_UNAVAILABLE","MultiCAD runtime is not already loaded.");
-        var db=state.Document.Database;
-        long bits=unchecked((long)ulong.Parse(args.Handles![0],NumberStyles.HexNumber,CultureInfo.InvariantCulture));
-        if(!db.TryGetObjectId(new Handle(bits),out var id) || id.IsNull || !id.IsValid)throw new DomainException("OBJECT_NOT_FOUND","Layout not found.");
-        if(id.IsErased || id.IsEffectivelyErased)throw new DomainException("OBJECT_ERASED","Layout erased.");
-        if(tx.GetObject(id,OpenMode.ForRead) is not Layout layout || layout.OwnerId!=db.LayoutDictionaryId)
-            throw new DomainException("OUT_OF_SCOPE","layout_handle must identify a layout in the requested drawing.");
-        var block=(BlockTableRecord)tx.GetObject(layout.BlockTableRecordId,OpenMode.ForRead);
-        if(!block.IsLayout || block.OwnerId!=db.BlockTableId)throw new DomainException("OUT_OF_SCOPE","Invalid layout block record.");
-        return ReadMultiCad(args,state,tx,layout,block,instance,cancellation);
+        var loaded = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!loaded.Contains("mapimgd") || !loaded.Contains("MapiBaseTypes")) throw new DomainException("CAPABILITY_UNAVAILABLE", "MultiCAD runtime is not already loaded.");
+        var db = state.Document.Database;
+        long bits = unchecked((long)ulong.Parse(args.Handles![0], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        if (!db.TryGetObjectId(new Handle(bits), out var id) || id.IsNull || !id.IsValid) throw new DomainException("OBJECT_NOT_FOUND", "Layout not found.");
+        if (id.IsErased || id.IsEffectivelyErased) throw new DomainException("OBJECT_ERASED", "Layout erased.");
+        if (tx.GetObject(id, OpenMode.ForRead) is not Layout layout || layout.OwnerId != db.LayoutDictionaryId)
+            throw new DomainException("OUT_OF_SCOPE", "layout_handle must identify a layout in the requested drawing.");
+        var block = (BlockTableRecord)tx.GetObject(layout.BlockTableRecordId, OpenMode.ForRead);
+        if (!block.IsLayout || block.OwnerId != db.BlockTableId) throw new DomainException("OUT_OF_SCOPE", "Invalid layout block record.");
+        return ReadMultiCad(args, state, tx, layout, block, instance, cancellation);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static object ReadMultiCad(Arguments args,DocumentState state,Transaction tx,Layout layout,BlockTableRecord block,string instance,CancellationToken cancellation)
+    private static object ReadMultiCad(Arguments args, DocumentState state, Transaction tx, Layout layout, BlockTableRecord block, string instance, CancellationToken cancellation)
     {
-        var watch=Stopwatch.StartNew();int scanned=0;
-        void Budget(){cancellation.ThrowIfCancellationRequested();}
-        var document=Multicad.DatabaseServices.McDocument.ActiveDocument;
-        if(document==null || !state.Document.IsNamedDrawing || !string.Equals(Path.GetFullPath(document.Path),Path.GetFullPath(state.Document.Name),StringComparison.OrdinalIgnoreCase))
-            throw new DomainException("DOCUMENT_CONTEXT_MISMATCH","MultiCAD active document differs from the requested document.");
-        string? Id(Multicad.McObjectId id)=>id.IsNull?null:id.ToString();
+        var watch = Stopwatch.StartNew(); int scanned = 0;
+        void Budget() { cancellation.ThrowIfCancellationRequested(); }
+        var document = Multicad.DatabaseServices.McDocument.ActiveDocument;
+        if (document == null || !state.Document.IsNamedDrawing || !string.Equals(Path.GetFullPath(document.Path), Path.GetFullPath(state.Document.Name), StringComparison.OrdinalIgnoreCase))
+            throw new DomainException("DOCUMENT_CONTEXT_MISMATCH", "MultiCAD active document differs from the requested document.");
+        string? Id(Multicad.McObjectId id) => id.IsNull ? null : id.ToString();
         string[]? Ids(ICollection<Multicad.McObjectId>? ids)
         {
-            if(ids==null)return null;
-            
-            return ids.Select(x=>x.ToString()).ToArray();
+            if (ids == null) return null;
+
+            return ids.Select(x => x.ToString()).ToArray();
         }
-        double[] Vector(Multicad.Geometry.Vector3d p)=>new[]{Finite(p.X),Finite(p.Y),Finite(p.Z)};
-        double[] Point(Multicad.Geometry.Point3d p)=>new[]{Finite(p.X),Finite(p.Y),Finite(p.Z)};
-        object Plane(Multicad.Geometry.Plane3d plane)=>new{origin=Point(plane.Origin),axis_u=Vector(plane.DirU),axis_v=Vector(plane.DirV),normal=Vector(plane.Normal)};
-        var items=new List<object>();
-        var found=new List<(Entity Entity,Multicad.McObjectId Id,Multicad.Mc3D.DrawingView View)>();
-        var layoutHandles=new Dictionary<Multicad.McObjectId,List<string>>();
+        double[] Vector(Multicad.Geometry.Vector3d p) => new[] { Finite(p.X), Finite(p.Y), Finite(p.Z) };
+        double[] Point(Multicad.Geometry.Point3d p) => new[] { Finite(p.X), Finite(p.Y), Finite(p.Z) };
+        object Plane(Multicad.Geometry.Plane3d plane) => new { origin = Point(plane.Origin), axis_u = Vector(plane.DirU), axis_v = Vector(plane.DirV), normal = Vector(plane.Normal) };
+        var items = new List<object>();
+        var found = new List<(Entity Entity, Multicad.McObjectId Id, Multicad.Mc3D.DrawingView View)>();
+        var layoutHandles = new Dictionary<Multicad.McObjectId, List<string>>();
         LocalSource? selectedSource = null;
-        foreach(ObjectId nativeId in block)
+        foreach (ObjectId nativeId in block)
         {
-            Budget();scanned++;
-            if(nativeId.IsErased || nativeId.IsEffectivelyErased || nativeId.ObjectClass.DxfName.Equals("3DSOLID",StringComparison.OrdinalIgnoreCase))continue;
-            if(tx.GetObject(nativeId,OpenMode.ForRead) is not Entity entity || entity.OwnerId!=block.ObjectId)
-                throw new DomainException("OBJECT_READ_FAILED","Invalid layout member.");
-            var id=Multicad.McObjectId.FromHandle(entity.Handle.Value,document.ID);
-            if(id.IsNull)continue;
-            if(!layoutHandles.TryGetValue(id,out var handles)){handles=new List<string>();layoutHandles.Add(id,handles);}
+            Budget(); scanned++;
+            if (nativeId.IsErased || nativeId.IsEffectivelyErased || nativeId.ObjectClass.DxfName.Equals("3DSOLID", StringComparison.OrdinalIgnoreCase)) continue;
+            if (tx.GetObject(nativeId, OpenMode.ForRead) is not Entity entity || entity.OwnerId != block.ObjectId)
+                throw new DomainException("OBJECT_READ_FAILED", "Invalid layout member.");
+            var id = Multicad.McObjectId.FromHandle(entity.Handle.Value, document.ID);
+            if (id.IsNull) continue;
+            if (!layoutHandles.TryGetValue(id, out var handles)) { handles = new List<string>(); layoutHandles.Add(id, handles); }
             handles.Add(entity.Handle.ToString());
-            var view=id.GetObjectOfType<Multicad.Mc3D.DrawingView>();
-            if(view==null)continue;
-            if(view.ID!=id)throw new DomainException("OBJECT_IDENTITY_MISMATCH","DrawingView lookup returned a different identity.");
-            
-            found.Add((entity,id,view));
+            var view = id.GetObjectOfType<Multicad.Mc3D.DrawingView>();
+            if (view == null) continue;
+            if (view.ID != id) throw new DomainException("OBJECT_IDENTITY_MISMATCH", "DrawingView lookup returned a different identity.");
+
+            found.Add((entity, id, view));
         }
-        foreach(var entry in found)
+        foreach (var entry in found)
         {
-            Budget();var entity=entry.Entity;var id=entry.Id;var view=entry.View;
-            var children=Ids(view.ChildViews)??Array.Empty<string>();
+            Budget(); var entity = entry.Entity; var id = entry.Id; var view = entry.View;
+            var children = Ids(view.ChildViews) ?? Array.Empty<string>();
             var nativeSources = view.GetTop3dEntitiesInView();
-            var sources=Ids(nativeSources);Budget();
-            var freshness=CadDrawingViewLifecycleState345.TryToken(view,entity,layout.ObjectId,tx,Budget);
-            var sourceRefs=CadDrawingViewLifecycleState345.SourceRefs(nativeSources,state.Document.Database,tx,instance,state.Id,Budget);
-            var attached=view.Attached2dBreaks;
-            if(attached==null)throw new DomainException("MODEL_STATE_UNAVAILABLE","Native break inventory is unavailable.");
+            var sources = Ids(nativeSources); Budget();
+            var freshness = CadDrawingViewLifecycleState345.TryToken(view, entity, layout.ObjectId, tx, Budget);
+            var sourceRefs = CadDrawingViewLifecycleState345.SourceRefs(nativeSources, state.Document.Database, tx, instance, state.Id, Budget);
+            var attached = view.Attached2dBreaks;
+            if (attached == null) throw new DomainException("MODEL_STATE_UNAVAILABLE", "Native break inventory is unavailable.");
             if (args.IncludeGeometrySources && Validation.NormalizeHandle(entity.Handle.ToString()) == args.GeometryViewHandle)
                 selectedSource = OrdinarySource(view, nativeSources, sourceRefs.Refs, attached.Length == 0);
-            
-            var breakData=DrawingViewBreakReader.Read(attached,id,layoutHandles,instance,state.Id,Budget);
-            object? sectionData=null;SectionCutRead351? sectionCut=null;string? sectionCutReason=null;
-            if(!view.SectionID.IsNull)
+
+            var breakData = DrawingViewBreakReader.Read(attached, id, layoutHandles, instance, state.Id, Budget);
+            object? sectionData = null; SectionCutRead351? sectionCut = null; string? sectionCutReason = null;
+            if (!view.SectionID.IsNull)
             {
-                var section=view.SectionID.GetObjectOfType<Multicad.Mc3D.Section>();
-                if(section==null || section.ID!=view.SectionID)throw new DomainException("OBJECT_IDENTITY_MISMATCH","View section identity unavailable.");
-                var metadata=SectionViewState.Read(section,Budget);
-                
-                
-                sectionData=metadata;
-                (sectionCut,sectionCutReason)=CadSectionCutState351.Describe(section,state,tx,instance,Budget);
+                var section = view.SectionID.GetObjectOfType<Multicad.Mc3D.Section>();
+                if (section == null || section.ID != view.SectionID) throw new DomainException("OBJECT_IDENTITY_MISMATCH", "View section identity unavailable.");
+                var metadata = SectionViewState.Read(section, Budget);
+
+
+                sectionData = metadata;
+                (sectionCut, sectionCutReason) = CadSectionCutState351.Describe(section, state, tx, instance, Budget);
             }
-            items.Add(new{@ref=new EntityRef(instance,state.Id,entity.Handle.ToString()),mc_id=id.ToString(),name=Text(view.Name),
-                status=view.Status.ToString(),suppressed=view.IsSuppressed,direction=view.DirectionType.ToString(),
-                native_owner_document_id=Id(view.DbEntity.DocumentID),
-                section_id=Id(view.SectionID),section=sectionData,section_cut=sectionCut,section_cut_unavailable_reason=sectionCutReason,parent_view_id=Id(view.ParentViewID),root_view_id=Id(view.RootViewID),child_view_ids=children,
-                attached_break_ids=attached.Select(i=>i.ToString()).ToArray(),breaks=breakData.Items,breaks_unavailable_reason=breakData.UnavailableReason,
-                top_source_ids=sources,source_inventory_available=sources!=null,view_plane=Plane(view.ViewPlane),projection_plane=Plane(view.ProjPlane),
-                view_token=freshness.Token,view_token_unavailable_reason=freshness.Reason,
-                source_refs=sourceRefs.Refs,source_refs_unavailable_reason=sourceRefs.Reason,
-                model_scale=Finite(view.DbEntity.DScale),design_scale=Finite(view.DbEntity.Scale),
-                is_slice=view.IsSlice,is_based_on_section=view.IsBasedOnSection,is_root_section_view=view.IsRootSectionView,
-                depends_on_slice=view.DependsOnSlice,auto_update_enabled=view.EnableAutoUpdate,
-                align_on_parent=view.AlignOnParent,attached_local_cut_ids=view.AttachedLocalCuts?.Select(cut=>cut.ToString()).ToArray(),outer_cut_sketch_id=Id(view.OuterCutSketch),
-                show_hidden_lines=view.ShowHiddenLines,show_hatches=view.ShowHatches,show_tangent_edges=view.ShowTangentEdges});
+            items.Add(new
+            {
+                @ref = new EntityRef(instance, state.Id, entity.Handle.ToString()),
+                mc_id = id.ToString(),
+                name = Text(view.Name),
+                status = view.Status.ToString(),
+                suppressed = view.IsSuppressed,
+                direction = view.DirectionType.ToString(),
+                native_owner_document_id = Id(view.DbEntity.DocumentID),
+                section_id = Id(view.SectionID),
+                section = sectionData,
+                section_cut = sectionCut,
+                section_cut_unavailable_reason = sectionCutReason,
+                parent_view_id = Id(view.ParentViewID),
+                root_view_id = Id(view.RootViewID),
+                child_view_ids = children,
+                attached_break_ids = attached.Select(i => i.ToString()).ToArray(),
+                breaks = breakData.Items,
+                breaks_unavailable_reason = breakData.UnavailableReason,
+                top_source_ids = sources,
+                source_inventory_available = sources != null,
+                view_plane = Plane(view.ViewPlane),
+                projection_plane = Plane(view.ProjPlane),
+                view_token = freshness.Token,
+                view_token_unavailable_reason = freshness.Reason,
+                source_refs = sourceRefs.Refs,
+                source_refs_unavailable_reason = sourceRefs.Reason,
+                model_scale = Finite(view.DbEntity.DScale),
+                design_scale = Finite(view.DbEntity.Scale),
+                is_slice = view.IsSlice,
+                is_based_on_section = view.IsBasedOnSection,
+                is_root_section_view = view.IsRootSectionView,
+                depends_on_slice = view.DependsOnSlice,
+                auto_update_enabled = view.EnableAutoUpdate,
+                align_on_parent = view.AlignOnParent,
+                attached_local_cut_ids = view.AttachedLocalCuts?.Select(cut => cut.ToString()).ToArray(),
+                outer_cut_sketch_id = Id(view.OuterCutSketch),
+                show_hidden_lines = view.ShowHiddenLines,
+                show_hatches = view.ShowHatches,
+                show_tangent_edges = view.ShowTangentEdges
+            });
         }
-        object? selectedGeometry=null;
-        if(args.GeometryViewHandle!=null)
+        object? selectedGeometry = null;
+        if (args.GeometryViewHandle != null)
         {
-            var selected=found.SingleOrDefault(x=>Validation.NormalizeHandle(x.Entity.Handle.ToString())==args.GeometryViewHandle);
-            if(selected.View==null)throw new DomainException("OUT_OF_SCOPE","geometry_view_handle is not a native drawing view in the requested layout.");
-            selectedGeometry=ReadGeometry(selected.View,selected.Entity,instance,state.Id,args.GeometryStartIndex,args.GeometryPageSize,
-                args.IncludeGeometrySources,selectedSource,Budget);
+            var selected = found.SingleOrDefault(x => Validation.NormalizeHandle(x.Entity.Handle.ToString()) == args.GeometryViewHandle);
+            if (selected.View == null) throw new DomainException("OUT_OF_SCOPE", "geometry_view_handle is not a native drawing view in the requested layout.");
+            selectedGeometry = ReadGeometry(selected.View, selected.Entity, instance, state.Id, args.GeometryStartIndex, args.GeometryPageSize,
+                args.IncludeGeometrySources, selectedSource, Budget);
         }
         Budget();
-        var result=new{layout_ref=new EntityRef(instance,state.Id,args.Handles![0]),layout_name=Text(layout.LayoutName),space=layout.ModelType?"model":"paper",
-            identity_scope="bridge_document_revision",reference_scope="opaque_native_ids_no_external_traversal",coordinate_system="native_view_planes",
-            geometry_state=selectedGeometry==null?"stored_metadata_not_regenerated":"selected_native_projection_without_regeneration",
-            selected_geometry=selectedGeometry,scanned_entities=scanned,complete=true,items};
-        if(args.DrawingViewSourceIdentityHandle is {} sourceHandle)
+        var result = new
         {
-            var selected=found.SingleOrDefault(item=>Validation.NormalizeHandle(item.Entity.Handle.ToString())==sourceHandle);
-            if(selected.View==null)throw new DomainException("OUT_OF_SCOPE","source_identity_view_handle is not a native view in the explicitly selected layout.");
-            SectionSourceSelectionRead357? selection=null;
-            if(!selected.View.SectionID.IsNull)
+            layout_ref = new EntityRef(instance, state.Id, args.Handles![0]),
+            layout_name = Text(layout.LayoutName),
+            space = layout.ModelType ? "model" : "paper",
+            identity_scope = "bridge_document_revision",
+            reference_scope = "opaque_native_ids_no_external_traversal",
+            coordinate_system = "native_view_planes",
+            geometry_state = selectedGeometry == null ? "stored_metadata_not_regenerated" : "selected_native_projection_without_regeneration",
+            selected_geometry = selectedGeometry,
+            scanned_entities = scanned,
+            complete = true,
+            items
+        };
+        if (args.DrawingViewSourceIdentityHandle is { } sourceHandle)
+        {
+            var selected = found.SingleOrDefault(item => Validation.NormalizeHandle(item.Entity.Handle.ToString()) == sourceHandle);
+            if (selected.View == null) throw new DomainException("OUT_OF_SCOPE", "source_identity_view_handle is not a native view in the explicitly selected layout.");
+            SectionSourceSelectionRead357? selection = null;
+            if (!selected.View.SectionID.IsNull)
             {
-                var section=selected.View.SectionID.GetObjectOfType<Multicad.Mc3D.Section>();
-                if(section==null||section.ID!=selected.View.SectionID)throw new DomainException("OBJECT_IDENTITY_MISMATCH","Selected view Section identity is unavailable.");
-                selection=SectionSourceSelection357.Read(section,state,tx,Budget);
+                var section = selected.View.SectionID.GetObjectOfType<Multicad.Mc3D.Section>();
+                if (section == null || section.ID != selected.View.SectionID) throw new DomainException("OBJECT_IDENTITY_MISMATCH", "Selected view Section identity is unavailable.");
+                selection = SectionSourceSelection357.Read(section, state, tx, Budget);
             }
-            var detail=new{view_ref=new EntityRef(instance,state.Id,selected.Entity.Handle.ToString()),identity=DrawingViewSources356.Capture(selected.View,Budget),section_source_selection=selection};
-            var output=System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(result,Wire.Json))!.AsObject();
-            output["selected_source_identity"]=System.Text.Json.JsonSerializer.SerializeToNode(detail,Wire.Json);
-            var expanded=Wire.Element(output);CadDrawingViewLifecycleState345.Bytes(expanded,Budget,Wire.PayloadBudget-8192);return expanded;
+            var detail = new { view_ref = new EntityRef(instance, state.Id, selected.Entity.Handle.ToString()), identity = DrawingViewSources356.Capture(selected.View, Budget), section_source_selection = selection };
+            var output = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(result, Wire.Json))!.AsObject();
+            output["selected_source_identity"] = System.Text.Json.JsonSerializer.SerializeToNode(detail, Wire.Json);
+            var expanded = Wire.Element(output); CadDrawingViewLifecycleState345.Bytes(expanded, Budget, Wire.PayloadBudget - 8192); return expanded;
         }
-        CadDrawingViewLifecycleState345.Bytes(result,Budget,Wire.PayloadBudget-8192);return result;
+        CadDrawingViewLifecycleState345.Bytes(result, Budget, Wire.PayloadBudget - 8192); return result;
     }
-    private static string Text(string value)=>System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value,Wire.Json).Length<=Wire.PayloadBudget-8192?value:
-        throw new DomainException("RESPONSE_LIMIT_EXCEEDED","Drawing view text exceeds the actual serialized-byte budget.");
-    private static double Finite(double value)=>double.IsFinite(value)?value:throw new DomainException("INVALID_GEOMETRY","Non-finite drawing view metadata.");
+    private static string Text(string value) => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(value, Wire.Json).Length <= Wire.PayloadBudget - 8192 ? value :
+        throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Drawing view text exceeds the actual serialized-byte budget.");
+    private static double Finite(double value) => double.IsFinite(value) ? value : throw new DomainException("INVALID_GEOMETRY", "Non-finite drawing view metadata.");
 }

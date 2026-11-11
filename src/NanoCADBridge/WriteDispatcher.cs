@@ -145,7 +145,7 @@ internal sealed class WriteDispatcher : IDisposable
             var preflightStarted = System.Diagnostics.Stopwatch.StartNew();
             var bound = job.Arguments is DocumentArguments documentArgs
                 ? _documents.PreflightSave(documentArgs, check: job.CheckCancellation)
-                : _writer.Preflight((IWriteArguments)job.Arguments, false, cancel: job.CheckCancellation);
+                : _writer.Preflight((IWriteArguments)job.Arguments, false, cancel: job.CheckCancellation, libraryAdmissionOnly: true);
             Trace(job, "write_preflight_return", elapsedMs: preflightStarted.ElapsedMilliseconds);
             job.CheckCancellation();
             attempt = new(job, bound);

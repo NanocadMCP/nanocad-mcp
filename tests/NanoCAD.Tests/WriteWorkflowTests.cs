@@ -92,6 +92,38 @@ internal static class WriteWorkflowTests
                 (_, _, _) => throw new Exception("Native command has not ended."), default) is { reason: "COMMAND_COMPLETION_PENDING" },
                 "An early commit receipt must wait for command completion before a result read.");
         });
+        await test("write workflow returns current block tokens through structural inspection without rereading settings as entities", async () =>
+        {
+            var block = new EntityRef(Bridge, Document, "A2");
+            var changed = new StructureChange(0, "redefine_block_from_dwg", block, "block_definition", "Library", false);
+            var receipt = Result.Ok(Operation, new ModifiedStructure(Operation, "committed", false, [changed, changed], "not_guaranteed"), Current);
+            int reads = 0;
+            Task<Result> Read(string tool, object arguments, CancellationToken _)
+            {
+                reads++; var input = Wire.Element(arguments);
+                Check(tool == "inspect_block" && input.GetProperty("handle").GetString() == "A2" &&
+                    input.GetProperty("expected_revision").GetString() == Current.revision, "Use the native block reader at the confirmed write revision.");
+                return Task.FromResult(Result.Ok(Operation, new
+                {
+                    root = block,
+                    complete = true,
+                    nodes = Array.Empty<object>(),
+                    definition_membership = new { definition_token = new string('B', 64) }
+                }, Current));
+            }
+            var observed = await WriteResultState.ReadAsync("modify_structure", receipt, Read, default);
+            Check(reads == 1 && observed is { status: "observed", observations: not null } &&
+                Wire.Element(observed.observations).GetProperty("blocks")[0].GetProperty("inspection")
+                    .GetProperty("definition_membership").GetProperty("definition_token").GetString() == new string('B', 64),
+                "Duplicate returned references must yield one fresh native block snapshot and its editing token.");
+            var stale = await WriteResultState.ReadAsync("modify_structure", receipt,
+                async (tool, input, cancel) => (await Read(tool, input, cancel)) with { context = Current with { revision = "43" } }, default);
+            Check(stale is { status: "unavailable", observations: null } && receipt.success, "Do not relabel the committed write when a block observation is stale.");
+            var layer = Result.Ok(Operation, new ModifiedStructure(Operation, "committed", false,
+                [changed with { kind = "layer" }], "not_guaranteed"), Current);
+            Check(await WriteResultState.ReadAsync("modify_structure", layer, (_, _, _) => throw new Exception("Settings must not use an entity reader."), default)
+                is { status: "in_result" }, "Keep settings on their existing result route.");
+        });
         await test("write workflow transports preview on the read route and observes only committed outputs", async () =>
         {
             var requests = new System.Collections.Concurrent.ConcurrentQueue<Request>();

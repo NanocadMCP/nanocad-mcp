@@ -1,4 +1,5 @@
 using HostMgd.ApplicationServices;
+using System.Text.Json;
 using NanoCAD.Contracts;
 using NanoCAD.Ipc;
 using Teigha.DatabaseServices;
@@ -15,7 +16,7 @@ internal sealed class CadWriter
     private readonly int _uiThread = Environment.CurrentManagedThreadId;
     public CadWriter(string instance, DocumentRegistry documents, JsonLog log) { _instance = instance; _documents = documents; _log = log; }
     public DocumentState Preflight(IWriteArguments args, bool insideCommand, DocumentState? bound = null, Action? cancel = null,
-        Action<object?>? observePlan = null)
+        Action<object?>? observePlan = null, bool libraryAdmissionOnly = false)
     {
         if (Environment.CurrentManagedThreadId != _uiThread) throw new DomainException("UI_THREAD_MISMATCH", "Write access requires the host UI thread.");
         if (args.BridgeId != _instance) throw new DomainException("BRIDGE_UNAVAILABLE", "Request addresses another bridge lifetime.");
@@ -41,7 +42,8 @@ internal sealed class CadWriter
         }
         else if (args is ModifyArguments modify)
         {
-            if (ModelBodyEraseWriter429.Handles(modify, state, tr)) ModelBodyEraseWriter429.Preflight(modify, state, tr, cancel);
+            if (CadDynamicBlockProperties.Handles(modify)) CadDynamicBlockProperties.Preflight(modify, state, tr, cancel ?? (() => { }));
+            else if (ModelBodyEraseWriter429.Handles(modify, state, tr)) ModelBodyEraseWriter429.Preflight(modify, state, tr, cancel);
             else if (CadTextFormat442.Handles(modify)) CadTextFormat442.Preflight(modify, state, tr, cancel);
             else if (CadAssociativeArray431.Handles(modify)) CadAssociativeArray431.Preflight(modify, state, tr, cancel);
             else if (CadDrawOrder407.Handles(modify)) CadDrawOrder407.Preflight(modify, state, tr, cancel);
@@ -105,6 +107,28 @@ internal sealed class CadWriter
         {
             if (CadDrawingGroups431.Handles(structure)) CadDrawingGroups431.Preflight(structure, state, tr, cancel);
             else if (CadBlockFromObjects407.Handles(structure)) CadBlockFromObjects407.Preflight(structure, state, tr, cancel ?? (() => { }));
+            else if (CadLibraryBlockDwg.Handles(structure))
+            {
+                void Checkpoint(string phase)
+                {
+                    try
+                    {
+                        _log.Write(args.Operation, "", "library_preflight_checkpoint", transaction: JsonSerializer.Serialize(new
+                        {
+                            phase,
+                            inside_command = insideCommand,
+                            admission_only = libraryAdmissionOnly,
+                            expected_revision = args.ExpectedRevision,
+                            current_revision = state.Revision
+                        }, Wire.Json), operationId: args.OperationId);
+                    }
+                    catch (System.Exception) {/* Diagnostics cannot alter write admission. */}
+                }
+                Checkpoint("target_admission_before");
+                if (libraryAdmissionOnly) CadLibraryBlockDwg.Admit(structure, state, tr, cancel ?? (() => { }));
+                else CadLibraryBlockDwg.Preflight(structure, state, tr, cancel ?? (() => { }), Checkpoint);
+                Checkpoint("target_admission_after");
+            }
             else if (CadBlockDefinitionGeometry388.Handles(structure)) CadBlockDefinitionGeometry388.Preflight(structure, state, tr, cancel ?? (() => { }));
             else if (CadBlockDefinitionText391.Handles(structure)) CadBlockDefinitionText391.Preflight(structure, state, tr, cancel ?? (() => { }));
             else if (CadBlockDefinitionMembers392.Handles(structure)) CadBlockDefinitionMembers392.Preflight(structure, state, tr, cancel ?? (() => { }));
@@ -127,7 +151,7 @@ internal sealed class CadWriter
 
     private static CreateArguments MaterializeSnaps(CreateArguments args, Database database, Transaction tr, Action cancel)
     {
-        if (!args.Entities.Any(entity => entity is PointFromNativeSnapSpec or LineFromNativeSnapSpec)) return args;
+        if (!args.Entities.Any(entity => entity is PointFromNativeSnapSpec or LineFromNativeSnapSpec or INativeSnappedCreation)) return args;
         var space = CadWriteSpace.Resolve(database, tr, args.TargetSpace);
         return args with
         {
@@ -135,6 +159,16 @@ internal sealed class CadWriter
         {
             PointFromNativeSnapSpec point => CadNativeCurveSnap.ResolvePoint(point, database, tr, space, cancel),
             LineFromNativeSnapSpec line => CadNativeCurveSnap.ResolveLine(line, database, tr, space, cancel),
+            INativeSnappedCreation planar => planar.Materialize(input =>
+            {
+                if (input.Point is { } literal) return literal;
+                var world = CadNativeCurveSnap.Resolve(input.Snap!, database, tr, space, cancel);
+                if (entity.Workplane is { } frame)
+                    return DrawingWorkplane.Local(frame, new Point3(world.X, world.Y, world.Z));
+                if (Math.Abs(world.Z) > 1e-7)
+                    throw new DomainException("OUT_OF_SCOPE", "The resolved snap must lie in WCS XY/Z0 for this planar creation.");
+                return new Point2(world.X, world.Y);
+            }),
             _ => entity
         }).ToArray()
         };
@@ -362,7 +396,7 @@ internal sealed class CadWriter
             var args = (IWriteArguments)job.Arguments;
             referenceStages = args is StructureWriteArguments referenceArguments && referenceArguments.Operations.Any(value => value is ExternalReferenceEdit385);
             if (referenceStages) Trace("reference_context_preflight_before");
-            var state = Preflight(args, true, bound, job.CheckCancellation); context = Context(state);
+            var state = Preflight(args, true, bound, job.CheckCancellation, libraryAdmissionOnly: true); context = Context(state);
             if (referenceStages) Trace("reference_context_preflight_returned");
             if (args is ModifyArguments rangeArgs && CadTableFormulaRange350.Handles(rangeArgs))
             {
@@ -380,6 +414,7 @@ internal sealed class CadWriter
                 if (nativeErase) return ModelBodyEraseWriter429.Execute(eraseModelArgs, state, job, context, _log);
             }
             if (args is ModifyArguments orderArgs && CadDrawOrder407.Handles(orderArgs)) return CadDrawOrder407.Execute(orderArgs, state, job, context, _log);
+            if (args is ModifyArguments dynamicArgs && CadDynamicBlockProperties.Handles(dynamicArgs)) return CadDynamicBlockProperties.Execute(dynamicArgs, state, job, context, _log);
             if (args is ModifyArguments imprintArgs && CadSolidImprintEditor393.Handles(imprintArgs)) return CadSolidImprintEditor393.Execute(imprintArgs, state, job, context, _log);
             if (args is ModifyArguments nativeExplodeArgs && CadNativeExplode386.Handles(nativeExplodeArgs)) return CadNativeExplode386.Execute(nativeExplodeArgs, state, job, context, _log);
             if (args is ModifyArguments placementArgs && ModelPlacementWriter.Handles(placementArgs)) return ModelPlacementWriter.Execute(placementArgs, state, job, context, _log);
@@ -425,6 +460,7 @@ internal sealed class CadWriter
             if (args is ModifyArguments arrayArgs431 && CadAssociativeArray431.Handles(arrayArgs431)) return CadAssociativeArray431.Execute(arrayArgs431, state, job, context, _log);
             if (args is StructureWriteArguments groupArgs && CadDrawingGroups431.Handles(groupArgs)) return CadDrawingGroups431.Execute(groupArgs, state, job, context, _log);
             if (args is StructureWriteArguments blockFromArgs && CadBlockFromObjects407.Handles(blockFromArgs)) return CadBlockFromObjects407.Execute(blockFromArgs, state, job, context, _log);
+            if (args is StructureWriteArguments libraryBlockArgs && CadLibraryBlockDwg.Handles(libraryBlockArgs)) return CadLibraryBlockDwg.Execute(libraryBlockArgs, state, job, context, _log);
             if (args is StructureWriteArguments blockGeometryArgs && CadBlockDefinitionGeometry388.Handles(blockGeometryArgs)) return CadBlockDefinitionGeometry388.Execute(blockGeometryArgs, state, job, context, _log);
             if (args is StructureWriteArguments blockTextArgs && CadBlockDefinitionText391.Handles(blockTextArgs)) return CadBlockDefinitionText391.Execute(blockTextArgs, state, job, context, _log);
             if (args is StructureWriteArguments blockMembersArgs && CadBlockDefinitionMembers392.Handles(blockMembersArgs)) return CadBlockDefinitionMembers392.Execute(blockMembersArgs, state, job, context, _log);

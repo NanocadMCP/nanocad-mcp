@@ -31,11 +31,35 @@ internal static class AngularOrdinateCreateTests
             Reject(new { type = "Dimension", kind = "ordinate", dimension_style = "Standard", origin = new[] { 0, 0 }, defining_point = new[] { 10, 10 }, leader_end_point = new[] { 20, 10 }, axis = "x" });
             return Task.CompletedTask;
         });
+        await test("projected diameter binds a current arc index and requires Paper", () =>
+        {
+            object Spec(int arcIndex) => new
+            {
+                type = "Dimension",
+                kind = "projected_diametric",
+                view_handle = "4d",
+                arc_index = arcIndex,
+                dimline_point = new[] { 30, 40 }
+            };
+            var selected = Parse(Spec(2));
+            if (selected is not ProjectedDiametricDimensionSpec { ViewHandle: "4D", ArcIndex: 2, DimLinePoint: { X: 30, Y: 40 } })
+                throw new Exception("Projected diameter lost its view, arc or paper placement.");
+            Reject(Spec(-1));
+            Reject(new { type = "Dimension", kind = "projected_diametric", view_handle = "4d", line_index = 2, dimline_point = new[] { 30, 40 } });
+            var arguments = new CreateArguments("b", "d", "7", "op", "Millimeters", [selected]);
+            var paper = arguments with { TargetSpace = "paper" };
+            WriteSpace.Check(paper);
+            if (paper.Fingerprint() == (paper with { Entities = [Parse(Spec(3))] }).Fingerprint())
+                throw new Exception("Projected arc index lost from replay fingerprint.");
+            try { WriteSpace.Check(arguments); }
+            catch (DomainException failure) when (failure.Error.code == "OUT_OF_SCOPE") { return Task.CompletedTask; }
+            throw new Exception("Projected diameter accepted an active Model context.");
+        });
         await test("angular ordinate creation is byte bounded and publishes each supported kind", () =>
         {
             if (CreateValidation.ParseEntities(Wire.Element(Enumerable.Repeat(Angular, 17).ToArray()), allowDimensions: true).Length != 17) throw new Exception("Former dimension count ceiling remains.");
             var kinds = ToolCatalog.Tools.Single(t => t.Name == "nanocad.create_entities").InputSchema.GetProperty("properties").GetProperty("entities").GetProperty("items").GetProperty("oneOf").EnumerateArray().Where(v => v.GetProperty("properties").GetProperty("type").GetProperty("const").GetString() == "Dimension").Select(v => v.GetProperty("properties").GetProperty("kind").GetProperty("const").GetString()!).ToArray();
-            var expected = new[] { "aligned", "rotated", "radial", "diametric", "angular_3point", "angular_2line", "ordinate", "arc_length", "jogged_radial", "projected_aligned" };
+            var expected = new[] { "aligned", "rotated", "radial", "diametric", "angular_3point", "angular_2line", "ordinate", "arc_length", "jogged_radial", "projected_aligned", "projected_diametric", "projected_radial", "projected_arc_length", "projected_angular" };
             if (kinds.Length != expected.Length || !expected.ToHashSet(StringComparer.Ordinal).SetEquals(kinds))
                 throw new Exception("The published dimension kind set differs from the supported contract.");
             return Task.CompletedTask;

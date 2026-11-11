@@ -47,10 +47,19 @@ public static class ReadPreparation433
 
     public static JsonObject Build(string reader, ReadPreparationSelection433 selection, Result result)
     {
-        var output = new JsonObject { ["operation"] = selection.Operation, ["variant"] = selection.Variant,
-            ["status"] = "source_unavailable", ["detail"] = "No current context-bound observations were bound. Preparation never changes whether an existing operation is supported.",
-            ["source"] = new JsonObject { ["reader"] = reader, ["context"] = result.context == null ? null : JsonSerializer.SerializeToNode(result.context),
-                ["scope"] = "this_returned_read_only; no_additional_reads_or_solver_assessment" } };
+        var output = new JsonObject
+        {
+            ["operation"] = selection.Operation,
+            ["variant"] = selection.Variant,
+            ["status"] = "source_unavailable",
+            ["detail"] = "No current context-bound observations were bound. Preparation never changes whether an existing operation is supported.",
+            ["source"] = new JsonObject
+            {
+                ["reader"] = reader,
+                ["context"] = result.context == null ? null : JsonSerializer.SerializeToNode(result.context),
+                ["scope"] = "this_returned_read_only; no_additional_reads_or_solver_assessment"
+            }
+        };
         if (!result.success || result.context == null || result.data == null) return output;
         var data = Wire.Element(result.data);
         var bindings = new JsonArray();
@@ -110,8 +119,13 @@ public static class ReadPreparation433
             foreach (var property in properties.EnumerateObject())
             {
                 if (property.Name is "entities" or "operations") continue;
-                var field = new JsonObject { ["argument"] = prefix + "/" + property.Name, ["required"] = required.Contains(property.Name),
-                    ["alternative"] = alternative, ["schema_pointer"] = schemaPointer + "/properties/" + property.Name };
+                var field = new JsonObject
+                {
+                    ["argument"] = prefix + "/" + property.Name,
+                    ["required"] = required.Contains(property.Name),
+                    ["alternative"] = alternative,
+                    ["schema_pointer"] = schemaPointer + "/properties/" + property.Name
+                };
                 foreach (string key in new[] { "type", "description", "const", "enum", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum" })
                     if (property.Value.TryGetProperty(key, out var value)) field[key] = JsonNode.Parse(value.GetRawText());
                 if (property.Name == "operation_id") field["role"] = "new_write_identity; never preallocated by a read";
@@ -147,8 +161,14 @@ public static class ReadPreparation433
             catch (Exception error) when (error is JsonException or InvalidOperationException) { return false; }
         }
         if (Fits(preparation)) return preparation;
-        var marker = new JsonObject { ["operation"] = preparation["operation"]!.DeepClone(), ["variant"] = preparation["variant"]?.DeepClone(),
-            ["status"] = "details_omitted", ["details_omitted"] = true, ["detail"] = "Optional preparation exceeded remaining response bytes. Original read is unchanged. Use a narrower read and focused operation/schema help; no operation is disabled." };
+        var marker = new JsonObject
+        {
+            ["operation"] = preparation["operation"]!.DeepClone(),
+            ["variant"] = preparation["variant"]?.DeepClone(),
+            ["status"] = "details_omitted",
+            ["details_omitted"] = true,
+            ["detail"] = "Optional preparation exceeded remaining response bytes. Original read is unchanged. Use a narrower read and focused operation/schema help; no operation is disabled."
+        };
         return Fits(marker) ? marker : null;
     }
     private static string? ArrayField(string operation) => operation == "create_entities" ? "entities" : operation is "modify_entities" or "modify_structure" ? "operations" : null;

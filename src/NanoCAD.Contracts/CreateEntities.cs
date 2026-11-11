@@ -184,14 +184,9 @@ public static partial class CreateValidation
                     if (Coincident(start, end)) throw Invalid(path, "Line endpoints must differ.", "INVALID_GEOMETRY");
                     specs.Add(new LineSpec(start, end, layer)); break;
                 case "Circle":
-                    Shape(item, path, "type", "layer", "center", "radius");
-                    specs.Add(new CircleSpec(Point(item, "center", path), Size("radius"), layer)); break;
+                    specs.Add(ParsePlanarCircle(item, path, layer, allowDimensions)); break;
                 case "Arc":
-                    Shape(item, path, "type", "layer", "center", "radius", "start_angle", "sweep_angle");
-                    double angle = Number(Required(item, "start_angle", path), path + ".start_angle", 0, Math.PI * 2);
-                    double sweep = Number(Required(item, "sweep_angle", path), path + ".sweep_angle", Minimum, Math.PI * 2);
-                    if (angle >= Math.PI * 2 || sweep >= Math.PI * 2) throw Invalid(path, "Arc angles must be below 2π; use Circle for a full circle.", "INVALID_GEOMETRY");
-                    specs.Add(new ArcSpec(Point(item, "center", path), Size("radius"), angle, sweep, layer)); break;
+                    specs.Add(ParsePlanarArc(item, path, layer, allowDimensions)); break;
                 case "Polyline":
                     if (item.TryGetProperty("construction", out _))
                     {

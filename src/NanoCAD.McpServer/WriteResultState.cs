@@ -15,8 +15,34 @@ internal static class WriteResultState
         if (data.ValueKind != JsonValueKind.Object || !data.TryGetProperty("status", out var status) ||
             status.ValueKind != JsonValueKind.String || status.GetString() is not ("committed" or "completed")) return null;
 
-        // The write already returned the document/view/structure state. An
-        // object lookup on a layer, layout or camera would use the wrong API.
+        if (operation == "modify_structure" && data.TryGetProperty("changes", out var changes) && changes.ValueKind == JsonValueKind.Array)
+        {
+            var blockHandles = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var change in changes.EnumerateArray())
+                if (change.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String &&
+                    kind.GetString() is "block_definition" or "block_insert" or "block_reference" &&
+                    change.TryGetProperty("ref", out var reference) && TryReference(reference, out var handle)) blockHandles.Add(handle);
+            if (blockHandles.Count != 0)
+            {
+                var blocks = new List<object>(); bool complete = true;
+                foreach (string handle in blockHandles)
+                {
+                    var inspected = await read("inspect_block", new
+                    { context.bridge_instance_id, context.document_id, expected_revision = context.revision, handle }, cancellation).ConfigureAwait(false);
+                    if (!inspected.success || inspected.data is null || !SameContext(inspected.context, context))
+                        return new("unavailable", context, null, inspected.error?.code ?? "WRITE_CONTEXT_CHANGED");
+                    var snapshot = Element(inspected.data);
+                    if (!snapshot.TryGetProperty("root", out var root) || !TryReference(root, out var found) || found != handle ||
+                        !snapshot.TryGetProperty("complete", out var finished) || finished.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                        return new("unavailable", context, null, "INVALID_OBSERVATION");
+                    complete &= finished.GetBoolean(); blocks.Add(new { @ref = root, inspection = snapshot });
+                }
+                return new(complete ? "observed" : "partial", context, new { blocks },
+                    complete ? null : "Some returned block hierarchies are partial; each inspection reports its own token and coverage.");
+            }
+        }
+
+        // Layer, layout and camera results must not be read as entities.
         if (operation is "manage_document" or "modify_structure" or "set_view")
             return new("in_result", context, null, "The operation's verified document, structure or view data is in data.");
 
