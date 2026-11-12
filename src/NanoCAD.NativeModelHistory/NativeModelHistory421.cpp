@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cwchar>
 #include <limits>
+#include <set>
 #include <string>
 
 #define _MCS_CORE_ONLY
@@ -30,6 +31,9 @@ static_assert(sizeof(McsDimTolVertJustifyEnum) == sizeof(std::int32_t));
 static_assert(sizeof(McDimensionData) == 1608, "Installed native dimension-data ABI differs from the supplied SDK.");
 static_assert(sizeof(McGeometryParam) == 208, "Installed native geometry-parameter ABI differs from the supplied SDK.");
 static_assert(sizeof(CTechSize) == 40, "Installed native tolerance-value ABI differs from the supplied SDK.");
+// Installed mapimgd publishes this NativeCppClass size. Both view references
+// are read through the complete vendor declaration, never a private offset.
+static_assert(sizeof(McDrawingViewLocalCutData) == 72, "Installed native local-cut-data ABI differs from the supplied SDK.");
 
 extern "C"
 {
@@ -40,6 +44,7 @@ extern "C"
 namespace
 {
     constexpr int GuidCapacity = 39;
+    constexpr int OwnedDataSlotCount = 9;
 
     HRESULT ParseId(const wchar_t* text, mcsWorkID& id)
     {
@@ -70,6 +75,22 @@ namespace
         if (!entity) return E_NOINTERFACE;
         if (entity->getDocumentID() != document->ID()) return E_INVALIDARG;
         return S_OK;
+    }
+
+    bool SameCurrentIdText(const mcsWorkID& actual, const wchar_t* expected)
+    {
+        if (!expected || wcsnlen_s(expected, GuidCapacity) != GuidCapacity - 1 ||
+            expected[0] != L'{' || expected[GuidCapacity - 2] != L'}' || actual.isNull()) return false;
+        wchar_t text[GuidCapacity]{};
+        return actual.getStrID(text, GuidCapacity) &&
+            CompareStringOrdinal(text, -1, expected, -1, TRUE) == CSTR_EQUAL;
+    }
+
+    HRESULT WriteOwnedDataId(wchar_t* text, int slot, const mcsWorkID& id)
+    {
+        if (slot < 0 || slot >= OwnedDataSlotCount) return E_INVALIDARG;
+        if (id.isNull()) return S_OK;
+        return id.getStrID(text + slot * GuidCapacity, GuidCapacity) ? S_OK : E_FAIL;
     }
 
     // Public value/identity comparison, without geometric tolerance or private
@@ -277,6 +298,305 @@ NanoCAD_ReadHoleControlState(const wchar_t* documentGuid, const wchar_t* bodyGui
         if (!hole || hole->getHostSolidID() != bodyId) return E_INVALIDARG;
         *category = hole->getVarValueType(variableId);
         *extent = static_cast<int>(hole->getExtent());
+        return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+// Read the actual native owner's existing canonical AlienSolidData link. The
+// physical root handle resolves a current WorkID through the active drawing;
+// expected WorkID text is a cross-check, never a persistent-GUID lookup key.
+// Nine independent terminated GUID slots avoid first-NUL string truncation.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadOwnedAlienDataAssociation(const wchar_t* drawingWorkId,
+    const wchar_t* ownerDocumentWorkId, const wchar_t* topDocumentWorkId,
+    std::uint64_t physicalRootHandle, const wchar_t* expectedRootWorkId,
+    const wchar_t* expectedDataWorkId, wchar_t* ids, int idCapacity, int* phase)
+{
+    if (!phase) return E_INVALIDARG;
+    *phase = 0;
+    if (!ids || idCapacity != OwnedDataSlotCount * GuidCapacity) return E_INVALIDARG;
+    std::memset(ids, 0, idCapacity * sizeof(wchar_t));
+    try
+    {
+        *phase = 1;
+        if (!physicalRootHandle || !gpMcObjManager || !gpMcDocManager) return E_INVALIDARG;
+        IMcDocumentPtr drawing = gpMcDocManager->getActiveDoc();
+        if (!drawing) return E_INVALIDARG;
+        if (FAILED(WriteOwnedDataId(ids, 0, drawing->ID()))) return E_FAIL;
+        if (!SameCurrentIdText(drawing->ID(), drawingWorkId)) return E_INVALIDARG;
+        IMcDocumentPtr top = drawing->isSub() ? drawing->getTopDoc() : drawing;
+        if (top && FAILED(WriteOwnedDataId(ids, 1, top->ID()))) return E_FAIL;
+        if (!top || !SameCurrentIdText(top->ID(), topDocumentWorkId)) return E_INVALIDARG;
+        *phase = 2;
+        std::int64_t signedHandle = 0;
+        std::memcpy(&signedHandle, &physicalRootHandle, sizeof(signedHandle));
+        const mcsWorkID rootId = mcsWorkID::fromHandle(signedHandle, drawing->ID());
+        if (rootId.isNull() || !SameCurrentIdText(rootId, expectedRootWorkId)) return E_INVALIDARG;
+        IMcObjectPtr rootObject = gpMcObjManager->getObject(rootId);
+        if (!rootObject) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        if (FAILED(WriteOwnedDataId(ids, 3, rootObject->ID()))) return E_FAIL;
+        if (rootObject->ID() != rootId) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+
+        *phase = 3;
+        IMc3dAlienSolidPtr alien = rootObject;
+        IMcDbEntityPtr rootEntity = rootObject;
+        if (!alien || !rootEntity || alien->ID() != rootId || rootEntity->ID() != rootId) return E_NOINTERFACE;
+        // Derive the owner document from the actual canonical root, not a
+        // caller-supplied GUID. Expected text only cross-checks real WorkIDs.
+        const mcsWorkID ownerId = rootEntity->getDocumentID();
+        if (ownerId.isNull()) return E_INVALIDARG;
+        IMcDocumentPtr owner = gpMcDocManager->getDocument(ownerId);
+        if (owner && FAILED(WriteOwnedDataId(ids, 2, owner->ID()))) return E_FAIL;
+        if (!owner || owner->ID() != ownerId || !SameCurrentIdText(owner->ID(), ownerDocumentWorkId)) return E_INVALIDARG;
+        IMcDocumentPtr ownerTop = owner->isSub() ? owner->getTopDoc() : owner;
+        if (!ownerTop || ownerTop->ID() != top->ID() || rootId.hostTopDocID() != top->ID()) return E_INVALIDARG;
+
+        *phase = 4;
+        mcsWorkIDArray filtered;
+        HRESULT status = rootEntity->getChildrenIDsEx(filtered, kChildrenSysFilter_AlienSolidData);
+        if (FAILED(status)) return status;
+        const auto& children = rootEntity->getChildrenIDs();
+        // The public canonical getter itself requires exactly one data child.
+        // Refuse ambiguous/unclassified ownership instead of selecting a member.
+        if (filtered.GetSize() != 1 || children.GetSize() != 1 || children[0] != filtered[0] ||
+            !SameCurrentIdText(filtered[0], expectedDataWorkId)) return E_INVALIDARG;
+        const mcsWorkID filteredId = filtered[0];
+
+        *phase = 5;
+        IMc3dAlienSolidDataPtr data = alien->lokupAlienSolidData();
+        if (!data) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        if (FAILED(WriteOwnedDataId(ids, 4, data->ID()))) return E_FAIL;
+        if (data->ID() != filteredId) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+
+        *phase = 6;
+        IMc3dSolidPtr solid = data;
+        IMcDbEntityPtr dataEntity = data;
+        if (!solid || !dataEntity || solid->ID() != filteredId || dataEntity->ID() != filteredId) return E_NOINTERFACE;
+        const mcsWorkID parentId = dataEntity->getParentID();
+        if (FAILED(WriteOwnedDataId(ids, 5, parentId))) return E_FAIL;
+        if (parentId != rootId) return E_INVALIDARG;
+
+        *phase = 7;
+        const mcsWorkID dataDocument = dataEntity->getDocumentID();
+        const mcsWorkID dataHost = filteredId.hostDocID();
+        const mcsWorkID dataTop = filteredId.hostTopDocID();
+        if (FAILED(WriteOwnedDataId(ids, 6, dataDocument)) ||
+            FAILED(WriteOwnedDataId(ids, 7, dataHost)) ||
+            FAILED(WriteOwnedDataId(ids, 8, dataTop))) return E_FAIL;
+        if ((!dataDocument.isNull() && dataDocument != owner->ID()) ||
+            (!dataHost.isNull() && dataHost != owner->ID()) ||
+            (!dataTop.isNull() && dataTop != top->ID())) return E_INVALIDARG;
+
+        *phase = 8;
+        IMcDocumentPtr current = gpMcDocManager->getActiveDoc();
+        mcsWorkIDArray finalFiltered;
+        status = rootEntity->getChildrenIDsEx(finalFiltered, kChildrenSysFilter_AlienSolidData);
+        if (FAILED(status)) return status;
+        const auto& finalChildren = rootEntity->getChildrenIDs();
+        if (!current || current->ID() != drawing->ID() ||
+            mcsWorkID::fromHandle(signedHandle, current->ID()) != rootId || rootObject->ID() != rootId ||
+            rootEntity->getDocumentID() != owner->ID() || rootId.hostTopDocID() != top->ID() || finalFiltered.GetSize() != 1 || finalChildren.GetSize() != 1 ||
+            finalFiltered[0] != filteredId || finalChildren[0] != filteredId || data->ID() != filteredId ||
+            dataEntity->getParentID() != rootId) return E_INVALIDARG;
+        *phase = 9;
+        return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+// The installed managed GetLocalCutData copies m_idDV into both ID fields.
+// Read the complete public SDK structure instead. The physical handle resolves
+// the current sketch; all supplied WorkID strings are cross-checks only.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadDrawingViewLocalCutData(const wchar_t* drawingWorkId,
+    const wchar_t* ownerDocumentWorkId, const wchar_t* topDocumentWorkId,
+    std::uint64_t physicalSketchHandle, const wchar_t* expectedSketchWorkId,
+    wchar_t* ids, int idCapacity, double* values, int* phase)
+{
+    constexpr int SlotCount = 6;
+    if (!phase) return E_INVALIDARG;
+    *phase = 0;
+    if (!ids || idCapacity != SlotCount * GuidCapacity || !values) return E_INVALIDARG;
+    std::memset(ids, 0, idCapacity * sizeof(wchar_t));
+    std::memset(values, 0, 4 * sizeof(double));
+    auto WriteId = [ids](int slot, const mcsWorkID& id) -> HRESULT
+    {
+        if (id.isNull()) return S_OK;
+        return id.getStrID(ids + slot * GuidCapacity, GuidCapacity) ? S_OK : E_FAIL;
+    };
+    try
+    {
+        *phase = 1;
+        if (!physicalSketchHandle || !gpMcObjManager || !gpMcDocManager) return E_INVALIDARG;
+        IMcDocumentPtr drawing = gpMcDocManager->getActiveDoc();
+        if (!drawing || FAILED(WriteId(0, drawing->ID())) || !SameCurrentIdText(drawing->ID(), drawingWorkId)) return E_INVALIDARG;
+        IMcDocumentPtr top = drawing->isSub() ? drawing->getTopDoc() : drawing;
+        if (!top || FAILED(WriteId(1, top->ID())) || !SameCurrentIdText(top->ID(), topDocumentWorkId)) return E_INVALIDARG;
+
+        *phase = 2;
+        std::int64_t signedHandle = 0;
+        std::memcpy(&signedHandle, &physicalSketchHandle, sizeof(signedHandle));
+        const mcsWorkID sketchId = mcsWorkID::fromHandle(signedHandle, drawing->ID());
+        if (sketchId.isNull() || !SameCurrentIdText(sketchId, expectedSketchWorkId)) return E_INVALIDARG;
+        IMcObjectPtr object = gpMcObjManager->getObject(sketchId);
+        if (!object || object->ID() != sketchId) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        IMcPlanarSketchPtr sketch = object;
+        IMcDbEntityPtr entity = object;
+        if (!sketch || !entity || sketch->ID() != sketchId || entity->ID() != sketchId) return E_NOINTERFACE;
+        if (FAILED(WriteId(3, sketch->ID()))) return E_FAIL;
+
+        *phase = 3;
+        const mcsWorkID ownerId = entity->getDocumentID();
+        if (ownerId.isNull()) return E_INVALIDARG;
+        IMcDocumentPtr owner = gpMcDocManager->getDocument(ownerId);
+        if (!owner || owner->ID() != ownerId || FAILED(WriteId(2, owner->ID())) ||
+            !SameCurrentIdText(owner->ID(), ownerDocumentWorkId)) return E_INVALIDARG;
+        IMcDocumentPtr ownerTop = owner->isSub() ? owner->getTopDoc() : owner;
+        if (!ownerTop || ownerTop->ID() != top->ID() || sketchId.hostTopDocID() != top->ID()) return E_INVALIDARG;
+
+        *phase = 4;
+        const McDrawingViewLocalCutData* stored = sketch->getDrawingViewLocalCutData();
+        if (!stored) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        const McDrawingViewLocalCutData snapshot(*stored);
+        if (FAILED(WriteId(4, snapshot.m_idDV)) || FAILED(WriteId(5, snapshot.m_idDVPt))) return E_FAIL;
+        values[0] = snapshot.m_depthDefPoint_DvLcs.x;
+        values[1] = snapshot.m_depthDefPoint_DvLcs.y;
+        values[2] = snapshot.m_depthDefPoint_DvLcs.z;
+        values[3] = snapshot.m_depth;
+        for (int i = 0; i < 4; ++i) if (!std::isfinite(values[i])) return E_INVALIDARG;
+
+        *phase = 5;
+        IMcDocumentPtr current = gpMcDocManager->getActiveDoc();
+        const McDrawingViewLocalCutData* final = sketch->getDrawingViewLocalCutData();
+        if (!current || current->ID() != drawing->ID() ||
+            mcsWorkID::fromHandle(signedHandle, current->ID()) != sketchId || object->ID() != sketchId ||
+            sketch->ID() != sketchId || entity->ID() != sketchId || entity->getDocumentID() != owner->ID() ||
+            !final || snapshot != *final) return E_INVALIDARG;
+        *phase = 6;
+        return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+// A view owns its cut sketch through public native associations. The SDK does
+// not require a separate resident DWG entity for every parent-owned sketch.
+// Resolve from the current physical VIEW and its complete actual local-cut
+// inventory. Supplied sketch text is only a cross-check, never a lookup key.
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadOwnedDrawingViewLocalCutData(const wchar_t* drawingWorkId,
+    const wchar_t* ownerDocumentWorkId, const wchar_t* topDocumentWorkId,
+    std::uint64_t physicalViewHandle, const wchar_t* expectedViewWorkId,
+    const wchar_t* expectedSketchWorkId, wchar_t* ids, int idCapacity,
+    double* values, int* phase)
+{
+    constexpr int SlotCount = 6;
+    if (!phase) return E_INVALIDARG;
+    *phase = 0;
+    if (!ids || idCapacity != SlotCount * GuidCapacity || !values) return E_INVALIDARG;
+    std::memset(ids, 0, idCapacity * sizeof(wchar_t));
+    std::memset(values, 0, 4 * sizeof(double));
+    auto WriteId = [ids](int slot, const mcsWorkID& id) -> HRESULT
+    {
+        if (id.isNull()) return S_OK;
+        return id.getStrID(ids + slot * GuidCapacity, GuidCapacity) ? S_OK : E_FAIL;
+    };
+    auto Contains = [](const mcsWorkIDArray& array, const mcsWorkID& id) -> bool
+    {
+        for (int i = 0; i < array.GetSize(); ++i) if (array[i] == id) return true;
+        return false;
+    };
+    auto SameIds = [](const mcsWorkIDArray& before, const mcsWorkIDArray& after) -> bool
+    {
+        if (before.GetSize() != after.GetSize()) return false;
+        for (int i = 0; i < before.GetSize(); ++i) if (before[i] != after[i]) return false;
+        return true;
+    };
+    try
+    {
+        *phase = 1;
+        if (!physicalViewHandle || !gpMcObjManager || !gpMcDocManager) return E_INVALIDARG;
+        IMcDocumentPtr drawing = gpMcDocManager->getActiveDoc();
+        if (!drawing || FAILED(WriteId(0, drawing->ID())) || !SameCurrentIdText(drawing->ID(), drawingWorkId)) return E_INVALIDARG;
+        IMcDocumentPtr top = drawing->isSub() ? drawing->getTopDoc() : drawing;
+        if (!top || FAILED(WriteId(1, top->ID())) || !SameCurrentIdText(top->ID(), topDocumentWorkId)) return E_INVALIDARG;
+
+        *phase = 2;
+        std::int64_t signedHandle = 0;
+        std::memcpy(&signedHandle, &physicalViewHandle, sizeof(signedHandle));
+        const mcsWorkID viewId = mcsWorkID::fromHandle(signedHandle, drawing->ID());
+        if (viewId.isNull() || !SameCurrentIdText(viewId, expectedViewWorkId)) return E_INVALIDARG;
+        IMcObjectPtr viewObject = gpMcObjManager->getObject(viewId);
+        if (!viewObject || viewObject->ID() != viewId) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        IMc3dDrawingViewPtr view = viewObject;
+        IMcDbEntityPtr viewEntity = viewObject;
+        if (!view || !viewEntity || view->ID() != viewId || viewEntity->ID() != viewId) return E_NOINTERFACE;
+        if (view->getStatus() == kMc3dHistStatus_Erased) return E_INVALIDARG;
+
+        *phase = 3;
+        const mcsWorkID ownerId = viewEntity->getDocumentID();
+        if (ownerId.isNull()) return E_INVALIDARG;
+        IMcDocumentPtr owner = gpMcDocManager->getDocument(ownerId);
+        if (!owner || owner->ID() != ownerId || FAILED(WriteId(2, owner->ID())) ||
+            !SameCurrentIdText(owner->ID(), ownerDocumentWorkId)) return E_INVALIDARG;
+        IMcDocumentPtr ownerTop = owner->isSub() ? owner->getTopDoc() : owner;
+        if (!ownerTop || ownerTop->ID() != top->ID() || viewId.hostTopDocID() != top->ID()) return E_INVALIDARG;
+
+        *phase = 4;
+        mcsWorkIDArray attached;
+        view->getAttachedLocalCuts(attached);
+        const mcsWorkIDArray children(viewEntity->getChildrenIDs());
+        std::set<std::wstring> unique;
+        mcsWorkID sketchId;
+        for (int i = 0; i < attached.GetSize(); ++i)
+        {
+            wchar_t actual[GuidCapacity]{};
+            if (attached[i].isNull() || !attached[i].getStrID(actual, GuidCapacity) || !unique.insert(actual).second) return E_INVALIDARG;
+            if (SameCurrentIdText(attached[i], expectedSketchWorkId))
+            {
+                if (!sketchId.isNull()) return E_INVALIDARG;
+                sketchId = attached[i];
+            }
+        }
+        if (sketchId.isNull()) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        IMcObjectPtr object = gpMcObjManager->getObject(sketchId);
+        if (!object || object->ID() != sketchId) return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        IMcPlanarSketchPtr sketch = object;
+        IMcDbEntityPtr entity = object;
+        if (!sketch || !entity || sketch->ID() != sketchId || entity->ID() != sketchId) return E_NOINTERFACE;
+        if (sketch->getStatus() == kMc3dHistStatus_Erased) return E_INVALIDARG;
+        const mcsWorkID parent = entity->getParentID();
+        const mcsWorkID childHost = sketchId.hostDocID(), childTop = sketchId.hostTopDocID();
+        // The canonical parent and reciprocal native membership establish this
+        // specific internal child's owner. Available child host IDs must agree;
+        // null host IDs alone never establish locality or supply another ID.
+        if (entity->getDocumentID() != ownerId || parent != viewId || !Contains(children, sketchId) ||
+            (!childHost.isNull() && childHost != ownerId) || (!childTop.isNull() && childTop != top->ID())) return E_INVALIDARG;
+        if (FAILED(WriteId(3, sketch->ID()))) return E_FAIL;
+
+        *phase = 5;
+        const McDrawingViewLocalCutData* stored = sketch->getDrawingViewLocalCutData();
+        if (!stored || stored->m_idDV != viewId) return E_INVALIDARG;
+        const McDrawingViewLocalCutData snapshot(*stored);
+        if (FAILED(WriteId(4, snapshot.m_idDV)) || FAILED(WriteId(5, snapshot.m_idDVPt))) return E_FAIL;
+        values[0] = snapshot.m_depthDefPoint_DvLcs.x;
+        values[1] = snapshot.m_depthDefPoint_DvLcs.y;
+        values[2] = snapshot.m_depthDefPoint_DvLcs.z;
+        values[3] = snapshot.m_depth;
+        for (int i = 0; i < 4; ++i) if (!std::isfinite(values[i])) return E_INVALIDARG;
+        mcsWorkIDArray finalAttached;
+        view->getAttachedLocalCuts(finalAttached);
+        IMcDocumentPtr current = gpMcDocManager->getActiveDoc();
+        const McDrawingViewLocalCutData* final = sketch->getDrawingViewLocalCutData();
+        const mcsWorkIDArray finalChildren(viewEntity->getChildrenIDs());
+        if (!current || current->ID() != drawing->ID() || mcsWorkID::fromHandle(signedHandle, current->ID()) != viewId ||
+            viewObject->ID() != viewId || view->ID() != viewId || viewEntity->ID() != viewId || viewEntity->getDocumentID() != ownerId ||
+            !SameIds(attached, finalAttached) || !SameIds(children, finalChildren) || !Contains(finalChildren, sketchId) ||
+            object->ID() != sketchId || sketch->ID() != sketchId || entity->ID() != sketchId || entity->getDocumentID() != ownerId ||
+            entity->getParentID() != viewId || sketchId.hostDocID() != childHost || sketchId.hostTopDocID() != childTop ||
+            view->getStatus() == kMc3dHistStatus_Erased || sketch->getStatus() == kMc3dHistStatus_Erased ||
+            !final || snapshot != *final) return E_INVALIDARG;
+        *phase = 6;
         return S_OK;
     }
     catch (...) { return E_UNEXPECTED; }

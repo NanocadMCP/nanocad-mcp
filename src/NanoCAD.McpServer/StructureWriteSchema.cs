@@ -118,6 +118,7 @@ internal static class StructureWriteSchema
         foreach (var nativeStyle in NativeStyleLifecycleSchema352.Operations()) choices.Add(nativeStyle);
         foreach (var clipping in ViewportClippingSchema358.Operations()) choices.Add(clipping);
         choices.Add(JsonNode.Parse(DrawingViewEditSchema.Properties().GetRawText()));
+        choices.Add(JsonNode.Parse(DrawingViewEditSchema.Refresh().GetRawText()));
         choices.Add(JsonNode.Parse(DrawingViewEditSchema.Delete().GetRawText()));
         choices.Add(JsonNode.Parse(DrawingViewLifecycleSchema345.Sources().GetRawText()));
         choices.Add(JsonNode.Parse(DrawingViewLifecycleSchema345.Rename().GetRawText()));

@@ -20,6 +20,18 @@ Use a new drawing or identify a clear drawing area:
 
 **Review:** the dimensions agree with the actual outline and circles, the center distance is correct, and labels do not overlap. These are annotation dimensions; the request does not establish a parametric sketch.
 
+## Reuse a local DWG component
+
+Use a saved millimetre DWG whose Model Space contains the intended supported static 2D component:
+
+> Import the component from the DWG I identify as a new independent static block. Keep the rest of this drawing unchanged. Show the imported geometry and report the resulting definition before saving.
+
+For an eligible existing definition:
+
+> Replace this shared block's geometry from the revised component DWG. Keep the same definition, all insertion placements and existing attribute values. Check the affected insertions and show the result before saving.
+
+**Review:** the intended definition and insertions were used; geometry changed as requested; retained placement and attribute values are correct. This does not create a live external reference or author new dynamic-block behavior.
+
 ## Make a parametric mounting plate
 
 Use a new drawing or a working copy with sufficient empty space:

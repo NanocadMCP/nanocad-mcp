@@ -19,6 +19,21 @@ internal static class NativeModelHistory421
     internal delegate int ReadHoleControlState(string document, string body, string feature, string variable,
         out uint category, out int extent);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal delegate int ReadOwnedAlienDataAssociation(string drawing, string ownerDocument, string topDocument,
+        ulong physicalRootHandle, string expectedRootWorkId, string expectedDataWorkId,
+        [Out, MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 7)] char[] ids,
+        int idCapacity, out int phase);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal delegate int ReadDrawingViewLocalCutData(string drawing, string ownerDocument, string topDocument,
+        ulong physicalSketchHandle, string expectedSketchWorkId,
+        [Out, MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 6)] char[] ids,
+        int idCapacity, [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 4)] double[] values, out int phase);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal delegate int ReadOwnedDrawingViewLocalCutData(string drawing, string ownerDocument, string topDocument,
+        ulong physicalViewHandle, string expectedViewWorkId, string expectedSketchWorkId,
+        [Out, MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 7)] char[] ids,
+        int idCapacity, [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 4)] double[] values, out int phase);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     internal delegate int ReadProjectedDimensionAnchors(string document, string view, int marker,
         [MarshalAs(UnmanagedType.LPArray, SizeConst = 6)] double[] endpoints,
         [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] double[] parameters,
@@ -72,6 +87,16 @@ internal static class NativeModelHistory421
         }
     }
     internal static void EnsureAvailable() => _ = Load();
+    internal static NativeSolidReplacement409.InvokeNative LoadSolidReplacement409()
+    {
+        var library = Load().Library;
+        if (!NativeLibrary.TryGetExport(library, "NanoCAD_SolidReplacement409AbiVersion", out var abiAddress) ||
+            !NativeLibrary.TryGetExport(library, "NanoCAD_SolidReplacement409", out var address))
+            throw Unavailable("The native model-history adapter does not expose owning solid replacement.");
+        if (Marshal.GetDelegateForFunctionPointer<AbiVersion>(abiAddress)() != 1)
+            throw Unavailable("The native solid-replacement adapter has an incompatible ABI.");
+        return Marshal.GetDelegateForFunctionPointer<NativeSolidReplacement409.InvokeNative>(address);
+    }
     internal static SetHoleExtent LoadHoleExtent()
     {
         if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_SetHoleExtent", out var address))
@@ -111,6 +136,27 @@ internal static class NativeModelHistory421
         if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ReadHoleControlState", out var address))
             throw Unavailable("The native model-history adapter does not expose the Hole control state reader.");
         return Marshal.GetDelegateForFunctionPointer<ReadHoleControlState>(address);
+    }
+
+    internal static ReadOwnedAlienDataAssociation LoadOwnedAlienDataAssociation()
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ReadOwnedAlienDataAssociation", out var address))
+            throw Unavailable("The native model-history adapter does not expose the owning AlienSolidData association reader.");
+        return Marshal.GetDelegateForFunctionPointer<ReadOwnedAlienDataAssociation>(address);
+    }
+
+    internal static ReadDrawingViewLocalCutData LoadDrawingViewLocalCutData()
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ReadDrawingViewLocalCutData", out var address))
+            throw Unavailable("The native model-history adapter does not expose the local-cut data reader.");
+        return Marshal.GetDelegateForFunctionPointer<ReadDrawingViewLocalCutData>(address);
+    }
+
+    internal static ReadOwnedDrawingViewLocalCutData LoadOwnedDrawingViewLocalCutData()
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ReadOwnedDrawingViewLocalCutData", out var address))
+            throw Unavailable("The native model-history adapter does not expose the view-owned local-cut data reader.");
+        return Marshal.GetDelegateForFunctionPointer<ReadOwnedDrawingViewLocalCutData>(address);
     }
 
     internal static bool Rebuild(Mc3dSolid body)

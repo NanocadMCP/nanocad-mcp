@@ -57,6 +57,8 @@ internal static class ModelManufacturingWriter
             Need(h != null && h.HostSolidID == id && (h.Status.ToString() == "Ok" || ProjectedHistorySources.HealthySuppressed(h) || (edit.Kind == "set_model_hole" && !h.IsSuppressed && h.Status.ToString() == "NeedUpdate")), "PRECONDITION_FAILED", "Select a healthy feature owned by this body; intentional suppression will remain stored.");
             bool valid = edit.Kind switch { "set_model_sketch_frame" or "set_model_sketch_support" => feature.GetObjectOfType<PlanarSketch>() != null, "set_model_extrusion_extent" => feature.GetObjectOfType<ExtrudeFeature>() != null, "set_model_loft" => feature.GetObjectOfType<LoftFeature>() != null, "set_model_sweep" => feature.GetObjectOfType<ExtrudeAlongPathFeature>() != null, "set_model_hole" => feature.GetObjectOfType<HoleFeature>() != null, "set_model_thread" => feature.GetObjectOfType<ThreadFeature>() != null, "set_model_circular_pattern" => feature.GetObjectOfType<CircularPatternFeature>() != null, _ => feature.GetObjectOfType<MirrorFeature>() != null };
             Need(valid, "INVALID_ARGUMENT", "Feature type differs from requested editor.");
+            if (edit.Kind is "set_model_sketch_frame" or "set_model_sketch_support")
+                DrawingViewSketchWriteScope282.RequireSupported(feature.GetObjectOfType<PlanarSketch>()!);
             if (edit.Kind == "set_model_circular_pattern")
             {
                 var p = feature.GetObjectOfType<CircularPatternFeature>()!;

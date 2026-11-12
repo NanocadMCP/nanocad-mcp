@@ -364,15 +364,17 @@ internal static class DrawingViewsReader
         }
     }
 
-    private static object ReadGeometry(Multicad.Mc3D.DrawingView view, Entity entity, string instance, string document, int start, int pageSize,
+    private static object ReadGeometry(Multicad.Mc3D.DrawingView view, Entity entity, DocumentState state, string instance, string document, int start, int pageSize,
         bool includeSources, LocalSource? source, Action budget)
     {
         budget();
         var geometry = view.GetViewGeometry(true, 0);
-        if (geometry == null || geometry.Count == 0)
+        if (geometry == null)
             throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Selected native drawing view has no projected geometry.");
         try
         {
+            if (geometry.Count == 0 && !CadDrawingViewGeometry280.AllowsEmptyOuterProjection(view, state, budget))
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Selected native drawing view has no projected geometry or proven closed outer-cut contour.");
             if (start > geometry.Count) throw new DomainException("INVALID_ARGUMENT", "geometry_start_index exceeds the selected projection inventory; refresh the current view/revision.");
             var items = new List<object>(); bool complete = true; long bytes = 2048;
             int end = start + Math.Min(pageSize, geometry.Count - start);
@@ -561,6 +563,7 @@ internal static class DrawingViewsReader
                 is_root_section_view = view.IsRootSectionView,
                 depends_on_slice = view.DependsOnSlice,
                 auto_update_enabled = view.EnableAutoUpdate,
+                preview_mode = view.PreviewMode,
                 align_on_parent = view.AlignOnParent,
                 attached_local_cut_ids = view.AttachedLocalCuts?.Select(cut => cut.ToString()).ToArray(),
                 outer_cut_sketch_id = Id(view.OuterCutSketch),
@@ -574,7 +577,7 @@ internal static class DrawingViewsReader
         {
             var selected = found.SingleOrDefault(x => Validation.NormalizeHandle(x.Entity.Handle.ToString()) == args.GeometryViewHandle);
             if (selected.View == null) throw new DomainException("OUT_OF_SCOPE", "geometry_view_handle is not a native drawing view in the requested layout.");
-            selectedGeometry = ReadGeometry(selected.View, selected.Entity, instance, state.Id, args.GeometryStartIndex, args.GeometryPageSize,
+            selectedGeometry = ReadGeometry(selected.View, selected.Entity, state, instance, state.Id, args.GeometryStartIndex, args.GeometryPageSize,
                 args.IncludeGeometrySources, selectedSource, Budget);
         }
         Budget();

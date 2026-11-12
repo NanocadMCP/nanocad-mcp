@@ -6,4 +6,5 @@
   <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelSketchBodyStorage364.cs" Link="ModelSketchBodyStorage364.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/NanoCADBridge/CadCurveCopyGeometry417.cs" Link="CadCurveCopyGeometry417.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelPatternAxisOrder439.cs" Link="ModelPatternAxisOrder439.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/NanoCADBridge/NativeSolidReplacement409.cs" Link="NativeSolidReplacement409.cs" /></ItemGroup>
 </Project>

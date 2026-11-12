@@ -42,7 +42,7 @@ internal static class LibraryBlockDwgSchema
                 ["additionalProperties"] = false,
                 ["properties"] = properties,
                 ["required"] = required,
-                ["description"] = "Released builds provide read-only validate_only for this route; native writes are unavailable while clone metadata preservation is being repaired. " + (import
+                ["description"] = (import
                     ? "Import the saved DWG's supported ordinary static Model Space geometry as one new reusable local block definition; the name must not exist. The source INSBASE establishes the new block origin. "
                     : "Redefine the actual existing local static block from the saved DWG's supported Model Space geometry. Preserve the target definition ID and origin, its existing AttributeDefinition objects/defaults, all actual Model/Paper/nested insertions and their placement/owned attribute values. Replace only the target's non-attribute direct members; this is a shared change to every insertion. ") +
                     "Use source and target Millimeters without implicit conversion. Import can retain supported ordinary single-line root AttributeDefinitions; redefinition requires a source without root AttributeDefinitions and retains the target's existing attributes. Attribute synchronization is outside this route. Native cloning preserves supported static geometry and uses MangleName for incoming symbol conflicts rather than silently using or replacing unrelated destination records. " +

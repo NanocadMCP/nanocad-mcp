@@ -22,7 +22,7 @@ Download the installer or release ZIP from the [download section](../../README.m
 ## Install with the Windows installer
 
 1. Save **all** open drawings and close nanoCAD. Close the assistant you want to connect.
-2. Run `NanoCAD-MCP-Setup-452.exe` from [release 452](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/452).
+2. Run `NanoCAD-MCP-Setup-453.exe` from [release 453](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/453).
 3. Check the nanoCAD 26 installation folder. It must contain `nCad.exe` and `nCad.ini`.
 4. Select **Codex**, **Claude Desktop**, or both, then click **Install**. For an update, select every assistant connected by the previous installation.
 5. Approve the Windows permission request if it appears.
@@ -32,7 +32,7 @@ Download the installer or release ZIP from the [download section](../../README.m
 
 The installer places the program in `%LOCALAPPDATA%\Programs\NanoCADMCP`, registers the bridge for automatic loading and adds the `nanocad` MCP entry to the selected assistant's settings. It backs up changed settings and retains the previous `nanocad` entry for removal. Other MCP entries are preserved. No manual DLL loading is required after normal installation.
 
-The installed documentation starts at `%LOCALAPPDATA%\Programs\NanoCADMCP\versions\452\server\README.md`. Keep the accompanying `docs` and `licenses` folders so their links work offline.
+For build 453, installed documentation starts at `%LOCALAPPDATA%\Programs\NanoCADMCP\versions\453\server\README.md`. Keep the accompanying `docs` and `licenses` folders so their links work offline.
 
 ## Manual ZIP setup
 

@@ -6,6 +6,9 @@ nanoCAD MCP connects an AI assistant to a running nanoCAD session. You describe 
 
 See [installation](installation.md) for requirements and connection instructions, and the [user guide](user-guide.md) for the working process.
 
+This page describes the scope of interim build 453. Earlier published
+packages retain the limits recorded in their release notes.
+
 ## Drawings
 
 | Area | Available work |
@@ -38,6 +41,19 @@ retain their native units and coordinate frame. Point2d, Point3d, Int32 and
 wider lookup, attribute-effect and dependency combinations remain unassessed;
 the hidden Origin property's meaning is not inferred.
 
+## Reuse DWG components
+
+Eligible saved local millimetre DWGs can supply supported static 2D content
+from Model Space as a new independent block definition. Definition replacement
+can update an existing eligible static block while retaining its definition
+identity, origin, insertion placements, attribute definitions and insertion
+attribute values.
+
+These routes check supported entity data, symbol references and destination
+metadata. They do not author or synchronise source Model Space attribute
+definitions, create dynamic blocks or import arbitrary foreign/custom objects.
+The assistant reads eligibility before writing and checks the actual result.
+
 ## Individual 3D parts
 
 Direct modeling includes supported primitives, extrusion, revolution, Sweep, Loft, Boolean operations, splitting, fillets, chamfers, shells and selected face edits.
@@ -56,7 +72,29 @@ Supported extrusion, revolution and Sweep operations can use existing native pro
 
 Selected profile replacement, sketch support reassignment, feature suppression/restoration and feature deletion are available within their declared dependency scope. These operations do not provide automatic repair of arbitrary broken model history.
 
+Eligible direct-solid geometry can be replaced from another existing solid
+while retaining the target identity, supported data and documented view links.
+The source stays independent. Native owning cleanup is part of this route;
+it does not transplant an arbitrary parametric feature history.
+
 A physical thread can be constructed from a real section, helical path and supported sweep/cut operations. A thread feature or annotation alone does not establish physical helical geometry or compliance with a thread standard.
+
+## Editable DWG documentation
+
+Native view preview can be read and explicitly switched between its bounding
+frame and full view graphics. Selected ordinary views can be refreshed while
+retaining their sources, placement and supported relationships.
+
+Explicit ordinary view subtrees, supported Linear/Curved Break2d objects and
+independent non-live Plane Sections can be retired through their native owners.
+All associated views must be selected when retiring a Section. Model sources
+and unrelated views remain. Once supported documentation dependencies have
+been removed, an eligible standalone direct source can be erased through its
+native owning body and verified owned data.
+
+Views carrying local/outer cuts and their cut sketches are read-only through
+MCP, including property, refresh, rename and deletion routes. Their metadata
+and dependency protection remain available.
 
 ## Point clouds
 
@@ -71,7 +109,7 @@ Cloud source points and storage remain read-only. The integration does not impor
 - **Parameters:** named Shell-thickness formulas are unavailable because native updates can lose the formula and dependency; supported literal Shell edits remain. Hole formulas have the selected-control scope described above. Depth, seat and other Hole families remain unassessed.
 - **Dimensions:** annotation dimensions and driving sketch dimensions differ. Display of native driving annotations outside the sketch editor is not assured in every context. General parameter links to arbitrary text, table cells and properties are unavailable.
 - **Blocks and rich content:** dynamic-block authoring and universal editing of Fields, rich text and external data links are unavailable. Existing dynamic-property editing has the assessed scope above. Basic Ray/Xline support does not include every curve-editing operation.
-- **DWG libraries:** library import and definition-replacement writes are refused before changing the drawing pending native acceptance. Their read-only preflight is available; a successful preview does not certify a working import or replacement.
+- **DWG libraries:** import and replacement support eligible static 2D source graphs, not arbitrary DWG contents or dynamic-block authoring. Unsupported ownership, Fields and foreign relationships remain guarded.
 - **Modeling scope:** persistent assembly mates, general surface modeling, additional specialist modules, printing and PDF export are outside this integration. Placing parts together does not create an assembly mate.
 - **Recovery:** some failures after native work starts can leave partial changes. Check the affected drawing state before continuing from an uncertain result.
 

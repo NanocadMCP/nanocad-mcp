@@ -2,6 +2,8 @@
 
 Choose the result identity and retained relationships before selecting a branch. The routes below are navigation, not a guarantee that every source/shape is eligible. Read the exact current variant and relevant source observations before writing. CE means create_entities, ME means modify_entities, and MS means modify_structure; entries in those tools are their exact kind or operation values.
 
+Drawing-view-owned local/outer-cut sketches are read-only through MCP.
+
 | Intended result | Route | First useful read and retained meaning |
 |---|---|---|
 | A new independent shell body | CE Solid3d kind=shell_copy | inspect_solid_topology of the source; new result, source retained, no ShellFeature |

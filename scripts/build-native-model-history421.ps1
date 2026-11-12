@@ -20,6 +20,7 @@ $compiler=Join-Path $msvc 'bin\Hostx64\x64\cl.exe'
 $linker=Join-Path $msvc 'bin\Hostx64\x64\link.exe'
 $modelObject=Join-Path $out 'NativeModelHistory421.obj'
 $transparencyObject=Join-Path $out 'NativeBodyTransparency445.obj'
+$replacementObject=Join-Path $out 'NativeSolidReplacement409.obj'
 # Compile the existing MultiCAD slice and the public NRX headers separately;
 # their interface/header families must not be combined in one translation unit.
 & $compiler /nologo /std:c++17 /utf-8 /EHsc /O2 /MT /W3 /c /DUNICODE /D_UNICODE /DNDEBUG @includes (Join-Path $root 'src\NanoCAD.NativeModelHistory\NativeModelHistory421.cpp') ('/Fo'+$modelObject)
@@ -33,5 +34,7 @@ $nrxIncludes+=('/I'+(Join-Path $root 'NCadSDK_260_EN_7355.4942.259\include\MAPI'
 foreach($part in @('ucrt','shared','um')){$nrxIncludes+=('/I'+(Join-Path $windowsSdk "Include\$version\$part"))}
 & $compiler /nologo /std:c++17 /utf-8 /EHsc /O2 /MT /W3 /c /DUNICODE /D_UNICODE /DNDEBUG @nrxIncludes (Join-Path $root 'src\NanoCAD.NativeModelHistory\NativeBodyTransparency445.cpp') ('/Fo'+$transparencyObject)
 if($LASTEXITCODE -ne 0){throw 'Native body-transparency adapter compilation failed; no CAD action performed.'}
-& $linker /NOLOGO /DLL $modelObject $transparencyObject @libs Kernel32.lib User32.lib nrxdbgate.lib ('/OUT:'+(Join-Path $out 'NanoCAD.NativeModelHistory421.dll')) ('/IMPLIB:'+(Join-Path $out 'NanoCAD.NativeModelHistory421.lib'))
+& $compiler /nologo /std:c++17 /utf-8 /EHsc /O2 /MT /W3 /c /DUNICODE /D_UNICODE /DNDEBUG @nrxIncludes (Join-Path $root 'src\NanoCAD.NativeModelHistory\NativeSolidReplacement409.cpp') ('/Fo'+$replacementObject)
+if($LASTEXITCODE -ne 0){throw 'Native solid-replacement adapter compilation failed; no CAD action performed.'}
+& $linker /NOLOGO /DLL $modelObject $transparencyObject $replacementObject @libs Kernel32.lib User32.lib nrxdbgate.lib ('/OUT:'+(Join-Path $out 'NanoCAD.NativeModelHistory421.dll')) ('/IMPLIB:'+(Join-Path $out 'NanoCAD.NativeModelHistory421.lib'))
 if($LASTEXITCODE -ne 0){throw 'Native model-history adapter link failed; no CAD action performed.'}

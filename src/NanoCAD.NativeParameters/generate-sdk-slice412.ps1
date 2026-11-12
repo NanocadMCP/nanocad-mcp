@@ -12,8 +12,8 @@ $anchors=@{
     'IMcDimension.h'='5CEC267EEB966DE567D53C070069804FEF9D593339DD9A9BA22A9839423EB115'
     'IMcStyles.h'='5151C1191EACF2B0F8C42622F6C634BF231AC7FC7FA9B7BCC7598EC941AD7D9F'
 }
-$coreKeep=@('m3dIPPDef','IMc3dHistoryItem','IMc3dSolid','IMcFeatureEntity','IMc3dHole','IMc3dThicknessFeature','IMcsDocVariablesManager',
-    'IMc3dArrFeatureType','IMc3dCircPatFeature','IMc3dRectPatFeature','IMcSketch','IMcPlanarSketch',
+$coreKeep=@('m3dIPPDef','IMc3dHistoryItem','IMc3dSolid','IMc3dAlienSolid','IMc3dAlienSolidData','IMcFeatureEntity','IMc3dHole','IMc3dThicknessFeature','IMcsDocVariablesManager',
+    'IMc3dArrFeatureType','IMc3dCircPatFeature','IMc3dRectPatFeature','McDrawingViewLocalCutData','IMcSketch','IMcPlanarSketch',
     'IMc3dCoordSysObject','IMc3dWorkPlane','IMc3dDrawingView')
 $required=@{
     'IMcObjects.h'=@('IMcPropertySource','IMcDbObject','IMcDbEntity','IMcEntity','IMc3dConstraintCompatible','IMcObjectsManager','mcsComplexWorkID','McGeometryParam')

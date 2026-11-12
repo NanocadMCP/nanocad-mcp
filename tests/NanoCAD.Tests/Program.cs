@@ -587,6 +587,7 @@ await ContourSize344Tests.Run(Test);
 await NativeStretch345Tests.Run(Test);
 await ModelFeatureReorder345Tests.Run(Test);
 await DrawingViewLifecycle345Tests.Run(Test);
+await DrawingViewSectionRetirementTests.Run(Test);
 await ModelProfileLifecycle340Tests.Run(Test);
 await ModelParametric377Tests.Run(Test);
 await IndependentFilletGeometry349Tests.Run(Test);
@@ -715,12 +716,14 @@ await ModelScaleTests.Run(Test);
 await SolidSliceTests.Run(Test);
 await SectionViewTests.Run(Test);
 await DrawingViewBreakTests.Run(Test, TestHostMetadata);
+await DrawingViewCutExclusionTests.Run(Test, TestHostMetadata);
 await SolidCreateTests.Run(Test);
 await ExtrusionTests.Run(Test);
 await RevolveSweepTests.Run(Test);
 await LoftTests.Run(Test);
 await SolidTransformCopyTests.Run(Test);
 await SolidTopologyTests.Run(Test);
+await NativeSolidReplacementReportTests.Run(Test);
 await DiscoveryRetentionTests.Run(Test);
 await DrilledSolidCopyTests.Run(Test);
 await SolidFinishingCopyTests.Run(Test);
@@ -739,7 +742,12 @@ await LibraryBlockReleaseGuardTests.Run(TestHostMetadata);
 await DynamicBlockPropertiesTests.Run(Test);
 await DynamicBlockPropertiesOutputSchemaTests.Run(Test);
 await NativeMetadataValuesTests.Run(Test);
+await NativeOwnedDataAssociationTests.Run(Test);
+await NativeDrawingViewLocalCutDataTests.Run(Test);
+await DrawingViewPreviewModeTests.Run(Test);
+await DrawingViewRefreshTests.Run(Test);
 await NativeMetadataEqualityTests.Run(Test);
+await LibraryBlockCreationTimeTests.Run(Test);
 
 await Test("descriptor removed on shutdown", () =>
 {

@@ -17,6 +17,69 @@ internal static class ModelSketchLifecycleReader362
     internal static string Key(McObjectId id) => id.ToString();
     internal static PlanarSketch Resolve(string identity, McDocument owner, Action cancel)
         => ModelNativeObjectResolver415.Sketch(identity, owner, cancel);
+    static object HealthFailureDetails(PlanarSketch sketch, McDocument owner, Action cancel)
+    {
+        // Refusal diagnostics only. Do not request geometry, solve, update,
+        // construct a token or relax the existing healthy/active admission.
+        var observed = new Dictionary<string, object?>();
+        var unavailable = new Dictionary<string, string>();
+        void Observe(string field, Func<object?> read)
+        {
+            cancel();
+            try { observed[field] = read(); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            { unavailable[field] = error.GetType().FullName ?? error.GetType().Name; }
+            cancel();
+        }
+        string? Id(McObjectId id) => id.IsNull ? null : Key(id);
+        Observe("sketch_id", () => Key(sketch.ID));
+        Observe("selected_owner_document_id", () => Id(owner.ID));
+        Observe("status", () => sketch.Status.ToString());
+        Observe("suppressed", () => sketch.IsSuppressed);
+        Observe("beyond_end_of_part", () => sketch.IsBeyondEndOfPart);
+        Observe("in_edit_mode", () => sketch.IsInEditMode);
+        Observe("host_solid_id", () => Id(sketch.HostSolidID));
+        Observe("autoerase_included_objects", () => sketch.AutoeraseOfInclObjects);
+        McDbEntity? entity = null;
+        Observe("entity_available", () => (entity = sketch.DbEntity) != null);
+        var parent = McObjectId.Null; bool parentRead = false;
+        if (entity is { } native)
+        {
+            Observe("document_id", () => Id(native.DocumentID));
+            Observe("parent_id", () => { parent = native.ParentId; parentRead = true; return Id(parent); });
+            Observe("child_count", () => native.ChildrenIds?.Count);
+            Observe("status_flags", () => (uint)native.StatusFlags);
+        }
+        if (parentRead && !parent.IsNull)
+        {
+            Observe("parent_metadata", () =>
+            {
+                // Never traverse a foreign or unproved parent document merely
+                // to enrich the original refusal. Use the actual same-owner ID.
+                var host = parent.IdHostDoc;
+                if (host.IsNull || host != owner.ID)
+                    return new { available = false, reason = "parent_not_proved_in_selected_native_owner_document" };
+                var value = parent.GetObject();
+                if (value == null || value.ID != parent)
+                    return new { available = false, reason = "exact_parent_native_object_unavailable" };
+                var databaseEntity = value.Cast<McEntity>(false)?.DbEntity;
+                if (databaseEntity == null)
+                    return new { available = false, reason = "parent_entity_interface_unavailable" };
+                var children = databaseEntity.ChildrenIds;
+                return new
+                {
+                    available = true,
+                    native_id = Key(value.ID),
+                    runtime_type = value.GetType().FullName,
+                    document_id = Id(databaseEntity.DocumentID),
+                    child_count = children?.Count,
+                    children_contains_sketch = children == null ? (bool?)null : children.Contains(sketch.ID)
+                };
+            });
+        }
+        return new { component = "native_sketch_health_admission", scope = "metadata_only_no_geometry_or_evaluation", observed, unavailable_fields = unavailable };
+    }
     static Point3 Point(JsonElement value) => new(value[0].GetDouble(), value[1].GetDouble(), value[2].GetDouble());
     internal static JsonElement Metadata(McObjectId identity, McDbObject native, McDocument owner, DocumentState state, Db.Transaction tx, Action cancel, bool observeResidentIdentity = false)
     {
@@ -60,7 +123,9 @@ internal static class ModelSketchLifecycleReader362
     {
         var owner = ModelProfileDiscovery348.OwnerDocument(body, state); Resolve(Key(sketch.ID), owner, cancel); var contents = ModelInventoryBudget.History(body, cancel);
         Need(sketch.HostSolidID.IsNull || sketch.HostSolidID == body.ID && contents.Contains(sketch.ID), "SKETCH_OWNERSHIP_MISMATCH", "The sketch has native affinity outside the selected part or lacks actual body composition.");
-        Need(sketch.Status.ToString() == "Ok" && !sketch.IsSuppressed && !sketch.IsBeyondEndOfPart && !sketch.IsInEditMode, "MODEL_STATE_UNAVAILABLE", "The exact sketch must be healthy and active without native edit mode.");
+        if (!(sketch.Status.ToString() == "Ok" && !sketch.IsSuppressed && !sketch.IsBeyondEndOfPart && !sketch.IsInEditMode))
+            throw new DomainException("MODEL_STATE_UNAVAILABLE", "The exact sketch must be healthy and active without native edit mode.", false,
+                HealthFailureDetails(sketch, owner, cancel));
         var bytes = new ModelInventoryBudget(cancel); var geometry = Wire.Element(SketchGeometryReader.Read(sketch, cancel, bytes.Add));
         Need(geometry.GetProperty("geometry_details_complete").GetBoolean() && geometry.GetProperty("elements").EnumerateArray().All(item => item.GetProperty("status").GetString() == "read" && item.GetProperty("geometry").GetProperty("kind").GetString() is "line" or "circular_arc" or "polyline" or "spline" or "elliptical_arc"),
             "OUT_OF_SCOPE", "This sketch lifecycle reads complete native Line/Arc/Circle and polyline-segment geometry.");

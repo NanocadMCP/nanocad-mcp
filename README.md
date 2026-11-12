@@ -9,12 +9,14 @@ You describe the result, dimensions and constraints. The assistant reads the dra
 ## What you can do
 
 - Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks; adjust supported properties of existing dynamic blocks.
+- Reuse eligible local DWG content as static blocks, and update shared definitions while retaining insertion placement and attribute values.
 - Build solids with extrusion, revolution, sweep, loft, Boolean operations and finishing tools.
 - Use supported native sketches, constraints, parameters and dependent features to build editable individual parts.
 - Prepare editable DWG documentation with dimensions linked to supported drawing views, and work with local drawing and raster references.
+- Revise eligible documented solids while keeping supported view links, or explicitly retire supported documentation before removing its source.
 - Measure and section loaded point clouds, and move or rotate their insertion without changing source points.
 
-Each operation has its own requirements. Read [capabilities and limits](docs/en/capabilities.md) before relying on a workflow. Persistent assembly mates, printing and PDF export are outside this integration.
+Each operation has its own requirements. Read [capabilities and limits](docs/en/capabilities.md) before relying on a workflow. Views carrying local/outer cuts and their cut sketches are read-only. Persistent assembly mates, printing and PDF export are outside this integration.
 
 ## Requirements
 
@@ -26,14 +28,14 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Download the installer or ready-to-run ZIP from [release 452](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/452).
+Get the installer or ready-to-run ZIP from [release 453](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/453).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-452.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-452.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-453.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-453.zip` | Manual setup, or installation from an extracted folder |
 
-The release page also provides `SHA256SUMS-452.txt` and archives of the source and documentation from the tagged build.
+Use the matching `SHA256SUMS-453.txt` and source/documentation archives from the same release. See [what changes in 453](RELEASE-NOTES.md#build-453).
 
 ## Get started
 

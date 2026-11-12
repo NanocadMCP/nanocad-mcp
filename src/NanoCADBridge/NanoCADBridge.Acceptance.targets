@@ -1,8 +1,5 @@
 <Project>
   <!-- Opt-in acceptance instrumentation only; ordinary builds enable none of these flags. -->
-  <PropertyGroup Condition="'$(LibraryDwgNativeAssessment)' == 'true'">
-    <DefineConstants>$(DefineConstants);LIBRARY_DWG_NATIVE_ASSESSMENT</DefineConstants>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(ReadAcceptanceAudit)' == 'true'">
     <DefineConstants>$(DefineConstants);READ_ACCEPTANCE_AUDIT</DefineConstants>
   </PropertyGroup>

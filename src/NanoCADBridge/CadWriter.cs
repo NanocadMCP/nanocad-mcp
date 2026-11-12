@@ -398,6 +398,8 @@ internal sealed class CadWriter
             if (referenceStages) Trace("reference_context_preflight_before");
             var state = Preflight(args, true, bound, job.CheckCancellation, libraryAdmissionOnly: true); context = Context(state);
             if (referenceStages) Trace("reference_context_preflight_returned");
+            if (args is ModifyArguments replacementArgs && CadSolidReplacement409.Handles(replacementArgs))
+                return CadSolidReplacement409.Execute(replacementArgs, state, job, context, _log);
             if (args is ModifyArguments rangeArgs && CadTableFormulaRange350.Handles(rangeArgs))
             {
                 // Keep job.Arguments as the original request/replay payload;
@@ -572,11 +574,6 @@ internal sealed class CadWriter
                         .ToHashSet(StringComparer.Ordinal);
                     rollbackNotGuaranteed = true;
                     verifyAfterCommit = () => DirectSolidDocumentation.RefreshAndVerify(state.Document, documentation, documentationAdditions, documentationErasures, erasableBodies);
-                }
-                if (resolved.SolidReplacement is { } replacementPlan)
-                {
-                    rollbackNotGuaranteed = true; var prior = verifyAfterCommit;
-                    verifyAfterCommit = () => { CadSolidReplacement409.Verify(replacementPlan, state.Document.Database, job.CheckCancellation); prior?.Invoke(); };
                 }
                 rollbackNotGuaranteed |= resolved.Blocks.Any(pair => pair.Value.Attributes.Length > 0 && modify.Operations.Any(op => (op is MoveSpec or RotateSpec or ScaleSpec) && op.Handles.Contains(pair.Key)));
                 foreach (var source in resolved.Sources.Values)

@@ -39,6 +39,51 @@ internal static class LibraryBlockDwgTests
 
     internal static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("library auxiliary registrations cannot leak into native ID handle or XData application consumers", () =>
+        {
+            var identifiers = new Dictionary<int, int> { [7] = 70, [8] = 80 };
+            var handles = new Dictionary<string, string>(StringComparer.Ordinal)
+            { ["FFFFFFFFFFFFFFFF"] = "8000000000000000", ["AD"] = "AF" };
+            var applications = new Dictionary<string, string>(StringComparer.Ordinal)
+            { ["ContextApp"] = "ContextApp", ["ConsumedApp"] = "$0$ConsumedApp" };
+            var sourceHandle = Wire.Element(new { code = 1005, value = NativeMetadataValues.Handle(-1) });
+            var sourceApplication = Wire.Element(new { code = 1001, value = "ContextApp", retained = "Original" });
+            LibraryBlockMetadataReferences.ExcludeAuxiliaryCorrespondence(identifiers, handles, applications,
+                7, "ffffffffffffffff", "ContextApp");
+            Need(!identifiers.ContainsKey(7) && identifiers[8] == 80 && !handles.ContainsKey("FFFFFFFFFFFFFFFF") &&
+                handles["AD"] == "AF" && !applications.ContainsKey("ContextApp") && applications["ConsumedApp"] == "$0$ConsumedApp",
+                "An auxiliary native row remained a semantic correspondence or removed an independent consumed mapping.");
+            Reject(() => LibraryBlockMetadataReferences.MapHandleReference(sourceHandle, handles), "NATIVE_BLOCK_LIBRARY_MISMATCH");
+            var error = Reject(() => LibraryBlockMetadataReferences.MapApplicationReference(sourceApplication, applications), "NATIVE_BLOCK_LIBRARY_MISMATCH");
+            Need(Wire.Element(error.Error.details!).GetProperty("source_application").GetString() == "ContextApp" &&
+                sourceApplication.GetProperty("value").GetString() == "ContextApp" &&
+                sourceHandle.GetProperty("value").GetProperty("handle").GetString() == "FFFFFFFFFFFFFFFF",
+                "A missing auxiliary correspondence was omitted, retargeted or changed original metadata.");
+            Need(LibraryBlockMetadataReferences.MapApplicationReference(Wire.Element(new { code = 1001, value = "ConsumedApp" }), applications)
+                    .GetProperty("value").GetString() == "$0$ConsumedApp" &&
+                LibraryBlockMetadataReferences.MapHandleReference(Wire.Element(new { code = 1005, value = "AD" }), handles)
+                    .GetProperty("value").GetString() == "AF",
+                "Excluding native context changed actual consumed application or handle translation.");
+            return Task.CompletedTask;
+        });
+        await test("library application translation preserves literals and nonregistration auxiliary context", () =>
+        {
+            var identifiers = new Dictionary<int, int> { [1] = 10 };
+            var handles = new Dictionary<string, string>(StringComparer.Ordinal) { ["A"] = "B" };
+            var applications = new Dictionary<string, string>(StringComparer.Ordinal) { ["LiteralName"] = "$1$LiteralName" };
+            LibraryBlockMetadataReferences.ExcludeAuxiliaryCorrespondence(identifiers, handles, applications, 1, "A");
+            Need(identifiers.Count == 0 && handles.Count == 0 && applications["LiteralName"] == "$1$LiteralName",
+                "An ordinary auxiliary symbol removed an unrelated application-name correspondence.");
+            var literal = Wire.Element(new { code = 1000, value = "LiteralName" });
+            Need(NativeMetadataEquality.Same(literal, LibraryBlockMetadataReferences.MapApplicationReference(literal, applications)),
+                "Literal DXF1000 text became an application reference.");
+            var application = Wire.Element(new { code = 1001, value = "LiteralName", annotation = "Keep" });
+            var translated = LibraryBlockMetadataReferences.MapApplicationReference(application, applications);
+            Need(translated.GetProperty("value").GetString() == "$1$LiteralName" && translated.GetProperty("annotation").GetString() == "Keep" &&
+                application.GetProperty("value").GetString() == "LiteralName",
+                "A real application record lost independent metadata or mutated its source.");
+            return Task.CompletedTask;
+        });
         await test("library metadata difference identifies the actual nested field and preserves missing versus null", () =>
         {
             var expected = Wire.Element(new { rounding = 1d, owned = new[] { new { common = new { owner_handle = "AD" } } } });

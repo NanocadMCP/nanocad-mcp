@@ -20,9 +20,15 @@ public sealed record LibraryBlockDwgEdit(string Action, string SourcePath, strin
 }
 
 public sealed record BlockLibrarySymbolMapping(string source_handle, string source_name, EntityRef target_ref, string target_name);
+public sealed record BlockLibraryNativeCreationTime(string source_handle, EntityRef target_ref, EntityRef owner_ref,
+    EntityRef registered_application_ref, string native_value_hex16, JsonElement raw_records, bool source_application_absent, string corroboration);
 public sealed record BlockLibraryDwgResult(string source_path, string source_sha256, double[] source_base_point,
     double[] target_base_point, int source_root_count, BlockLibrarySymbolMapping[] renamed_symbols,
-    EntityRef[] retained_attribute_definitions, EntityRef[] referring_insertions);
+    EntityRef[] retained_attribute_definitions, EntityRef[] referring_insertions)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public BlockLibraryNativeCreationTime[]? native_creation_times { get; init; }
+}
 
 public static class LibraryBlockDwgValidation
 {

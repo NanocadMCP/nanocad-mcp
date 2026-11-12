@@ -2,6 +2,42 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 453
+
+- Reuse eligible local millimetre DWG Model Space content as independent static
+  block definitions. Replace an eligible shared definition while retaining its
+  identity, insertion placements and existing attribute values. Supported
+  metadata and native symbol references are checked through the actual clone
+  and readback.
+
+- Replace eligible direct-solid geometry while retaining the target identity,
+  supported data and documentation links. The production route includes native
+  owning cleanup; the source remains independent.
+
+- Retire explicit ordinary view subtrees, supported Linear/Curved Break2d
+  objects and independent non-live Plane Sections while retaining model
+  sources and unrelated views. An eligible standalone direct source can then
+  be removed through its native owner and verified owned data.
+
+- Read and explicitly control native DrawingView preview mode, or request a
+  selected-view refresh. Preview control was checked against actual graphics
+  and a saved DWG. Existing sources, placement and supported links remain.
+
+The accepted Simple Hole formula, existing dynamic-property, geometry-snap
+and projected-dimension workflows from 452 remain. Their previous supported
+contexts and unassessed combinations are unchanged.
+
+Local/outer-cut functionality is excluded: views carrying these cuts and their
+cut sketches are read-only, with dependency protection retained. Named
+Shell-thickness formulas remain guarded because native updates can lose the
+formula and dependency; supported literal Shell edits remain available.
+
+This package uses server 0.282.0, bridge 0.238.0 and IPC protocol 0.144.
+The installer is unsigned. Use the matching installer, ready-to-run ZIP,
+source/documentation archives and `SHA256SUMS-453.txt` from
+[release 453](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/453).
+Read [capabilities and limits](docs/en/capabilities.md) for eligibility and scope.
+
 ## Build 452
 
 - Snaps to existing geometry now include Circle/Arc centers and the point roles

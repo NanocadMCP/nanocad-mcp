@@ -60,10 +60,15 @@ internal static class OutputSchemas
             ("parent_view_id", Nullable(Text())), ("root_view_id", Nullable(Text())), ("child_view_ids", Array(Text()))));
         data["properties"]!["section_cut_changes"] = Array(SectionCutSchema351.Change(Ref("ref")));
         data["properties"]!["drawing_view_creation_results"] = Array(PaperDrawingViewsSchema356.Creation(Ref("ref")));
-        data["properties"]!["block_library_results"] = Array(Object(("source_path", Text()), ("source_sha256", Text()),
+        var libraryResult = Object(("source_path", Text()), ("source_sha256", Text()),
             ("source_base_point", Point()), ("target_base_point", Point()), ("source_root_count", Integer()),
             ("renamed_symbols", Array(Object(("source_handle", Text()), ("source_name", Text()), ("target_ref", Ref("ref")), ("target_name", Text())))),
-            ("retained_attribute_definitions", Array(Ref("ref"))), ("referring_insertions", Array(Ref("ref")))));
+            ("retained_attribute_definitions", Array(Ref("ref"))), ("referring_insertions", Array(Ref("ref"))));
+        libraryResult["properties"]!["native_creation_times"] = Array(Object(("source_handle", Text()), ("target_ref", Ref("ref")),
+            ("owner_ref", Ref("ref")), ("registered_application_ref", Ref("ref")), ("native_value_hex16", Text()),
+            ("raw_records", Array(Object(("code", Integer()), ("value", new JsonObject { ["anyOf"] = new JsonArray(Text(), Integer()) })))),
+            ("source_application_absent", Bool()), ("corroboration", Text())));
+        data["properties"]!["block_library_results"] = Array(libraryResult);
         return data;
     }
     private static JsonObject ModelParameterData()
@@ -284,7 +289,7 @@ internal static class OutputSchemas
                 ("attached_break_ids", Array(Text())), ("breaks", Nullable(Array(Break()))), ("breaks_unavailable_reason", Nullable(Text())),
                 ("top_source_ids", Nullable(Array(Text()))), ("source_inventory_available", Bool()), ("view_plane", Plane()), ("projection_plane", Plane()),
                 ("model_scale", Number()), ("design_scale", Number()), ("is_slice", Bool()), ("is_based_on_section", Bool()), ("is_root_section_view", Bool()),
-                ("depends_on_slice", Bool()), ("auto_update_enabled", Bool()), ("show_hidden_lines", Bool()), ("show_hatches", Bool()), ("show_tangent_edges", Bool())))));
+                ("depends_on_slice", Bool()), ("auto_update_enabled", Bool()), ("show_hidden_lines", Bool()), ("show_hatches", Bool()), ("show_tangent_edges", Bool()), ("preview_mode", Bool())))));
         var item = result["properties"]!["items"]!["items"]!.AsObject();
         AddOptional(item, "native_owner_document_id", Nullable(Text()));
         AddOptional(result, "selected_source_identity", PaperDrawingViewsSchema356.SelectedSources(Ref("ref")));
