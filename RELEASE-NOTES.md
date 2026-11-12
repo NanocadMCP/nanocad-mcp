@@ -2,6 +2,24 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 454
+
+- Setup checks the full nanoCAD version and required API libraries before
+  installing runtime files, registering the bridge or changing client settings.
+  The minimum tested executable is `nCad.exe` version `26.0.7476.4950` in the
+  nanoCAD 26.0 series; required libraries have individual version checks.
+
+- Older, incomplete or unreadable installations receive the detected and
+  required versions with instructions to update nanoCAD manually. Direct and
+  elevated bridge registration use the same check. Removal remains available.
+
+- This installer update retains the exact server, bridge and native runtime
+  products from453. No CAD modeling behavior or runtime component version changes.
+
+Use the matching installer, runtime ZIP, source/documentation archives and
+`SHA256SUMS-454.txt` from
+[release454](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/454).
+
 ## Build 453
 
 - Reuse eligible local millimetre DWG Model Space content as independent static

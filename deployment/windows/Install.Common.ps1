@@ -45,6 +45,7 @@ function Edit-NetModules([string]$Text,[string]$BridgePath,[bool]$Remove) {
 }
 function Set-BridgeRegistration([string]$IniPath,[string]$BridgePath,[bool]$Remove) {
     if(!(Test-Path -LiteralPath $IniPath -PathType Leaf) -or [IO.Path]::GetFileName($IniPath) -ine 'ncad.ini'){throw 'Existing nCad.ini required.'}
+    if(!$Remove){[void](Assert-NanoCadCompatibility (Split-Path -Parent ([IO.Path]::GetFullPath($IniPath))))}
     if(!$Remove -and !(Test-Path -LiteralPath $BridgePath -PathType Leaf)){throw 'Bridge DLL missing.'}
     $current=Read-PreservedText $IniPath
     $changed=Edit-NetModules $current.Text $BridgePath $Remove
@@ -88,6 +89,71 @@ function Assert-Package([string]$Root) {
     }
     return $manifest
 }
+function Get-NanoCadCompatibility([string]$Path) {
+    # Minimum tested file-resource composition. Managed host files legitimately
+    # use an earlier build than the executable and the MultiCAD/native runtime.
+    $requirements=@(
+        @{path='nCad.exe';minimum='26.0.7476.4950'},
+        @{path='bin\hostmgd.dll';minimum='26.0.7476.3867'},
+        @{path='bin\hostdbmgd.dll';minimum='26.0.7476.3867'},
+        @{path='bin\hostPointCloudsMgd.dll';minimum='26.0.7476.3867'},
+        @{path='bin\NrxDbGate.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\mapimgd.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\MapiBaseTypes.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\MapiBaseTypes2.dll';minimum='26.0.7476.4950';explicit_zero_resource=$true},
+        @{path='bin_nPlat\mapinet.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\M3D.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\mt.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\McTyp.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\McGeL.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\MapiSwigCpp.dll';minimum='26.0.7476.4950'},
+        @{path='bin_nPlat\McDDGate3.dll';minimum='26.0.7476.4950'}
+    )
+    $root=[IO.Path]::GetFullPath($Path)
+    $files=New-Object 'Collections.Generic.List[object]'
+    foreach($required in $requirements){
+        $file=Join-Path $root $required.path
+        $found=$null;$status='missing';$supported=$false
+        if(Test-Path -LiteralPath $file -PathType Leaf){
+            try {
+                $info=[Diagnostics.FileVersionInfo]::GetVersionInfo($file)
+                # Never parse display/product/assembly version text or load a DLL.
+                $version=[version]('{0}.{1}.{2}.{3}' -f $info.FileMajorPart,$info.FileMinorPart,$info.FileBuildPart,$info.FilePrivatePart)
+                $found=$version.ToString()
+                if([string]::IsNullOrWhiteSpace($info.FileVersion)){$status='unknown_version'}
+                elseif($version -eq [version]'0.0.0.0'){
+                    # This mandatory SWIG assembly has an explicitly zero-valued
+                    # version resource in the tested vendor installation.
+                    $supported=$required.ContainsKey('explicit_zero_resource') -and $required.explicit_zero_resource
+                    $status='unknown_version';if($supported){$status='known_unversioned_resource'}
+                }
+                elseif($version.Major -ne 26 -or $version.Minor -ne 0){$status='unsupported_series'}
+                elseif($version -lt [version]$required.minimum){$status='older_version'}
+                else{$status='supported';$supported=$true}
+            } catch {$status='unreadable_version'}
+        }
+        $minimum=[string]$required.minimum
+        if($required.ContainsKey('explicit_zero_resource')){$minimum+=' or the vendor explicit 0.0.0.0 resource'}
+        [void]$files.Add([pscustomobject]@{path=$required.path;found_version=$found;required_version=$minimum;status=$status;compatible=$supported})
+    }
+    $iniExists=Test-Path -LiteralPath (Join-Path $root 'nCad.ini') -PathType Leaf
+    [void]$files.Add([pscustomobject]@{path='nCad.ini';found_version=$null;required_version='existing configuration';status=$(if($iniExists){'present'}else{'missing'});compatible=$iniExists})
+    $failed=@($files|Where-Object {!$_.compatible})
+    $message='nanoCAD compatibility check passed.'
+    if($failed.Count){
+        $details=@($failed|ForEach-Object {
+            $found=$_.found_version;if(!$found){$found=$_.status}
+            $_.path+': found '+$found+'; required '+$_.required_version+' ('+$_.status+').'
+        }) -join "`r`n"
+        $message="nanoCAD compatibility check failed.`r`nFolder: $root`r`n$details`r`n`r`nRequired: nanoCAD 26.0 with nCad.exe 26.0.7476.4950 or later and the matching updated runtime files listed above. Earlier builds have not been supported by this installer. Install the latest nanoCAD 26.0 updates manually from Nanosoft (automatic updates may be disabled), or select an updated installation. Close nanoCAD after saving your work, then run setup again."
+    }
+    return [pscustomobject]@{cad_path=$root;compatible=($failed.Count -eq 0);supported_series='26.0';minimum_executable_version='26.0.7476.4950';files=$files.ToArray();message=$message}
+}
+function Assert-NanoCadCompatibility([string]$Path) {
+    $report=Get-NanoCadCompatibility $Path
+    if(!$report.compatible){throw $report.message}
+    return $report
+}
 function Find-NanoCad {
     $paths=New-Object 'Collections.Generic.List[string]'
     foreach($root in @('HKLM:\SOFTWARE\Nanosoft','HKLM:\SOFTWARE\Nanosoft AS','HKCU:\SOFTWARE\Nanosoft')){
@@ -102,7 +168,7 @@ function Find-NanoCad {
     }
     return @($paths|ForEach-Object{[IO.Path]::GetFullPath($_).TrimEnd('\')}|Sort-Object -Unique|Where-Object{
         $exe=Join-Path $_ 'nCad.exe';$ini=Join-Path $_ 'nCad.ini'
-        (Test-Path -LiteralPath $exe) -and (Test-Path -LiteralPath $ini) -and [Diagnostics.FileVersionInfo]::GetVersionInfo($exe).FileMajorPart -eq 26
+        (Test-Path -LiteralPath $exe -PathType Leaf) -and (Test-Path -LiteralPath $ini -PathType Leaf)
     })
 }
 
@@ -110,6 +176,7 @@ function Get-SetupErrorText($Failure) {
     # Keep diagnostic details available without exposing implementation errors in the UI.
     $raw=[string]$Failure.Exception.Message
     $message=switch -Regex ($raw) {
+        '^nanoCAD compatibility check failed' {$raw;break}
         '^Close nanoCAD|^Run the latest installer' {$raw;break}
         'Uninstall path validation' {'The installation location has changed. Contact support to remove it safely.';break}
         'Choose.*nanoCAD|Select nanoCAD|Existing nCad.ini' {'Select the folder where nanoCAD 26 is installed, then try again.';break}

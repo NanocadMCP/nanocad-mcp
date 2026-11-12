@@ -20,7 +20,7 @@ Each operation has its own requirements. Read [capabilities and limits](docs/en/
 
 ## Requirements
 
-- 64-bit Windows and nanoCAD 26, with the modules and licenses needed for your operations.
+- 64-bit Windows and nanoCAD 26.0 with `nCad.exe` file version **26.0.7476.4950 or newer**, with the modules and licenses needed for your operations. Setup also checks the required API library versions.
 - Codex or Claude Desktop with local MCP support, installed and signed in.
 - A Windows account allowed to use nanoCAD and configure the chosen assistant.
 
@@ -28,14 +28,14 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 453](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/453).
+Get the installer or ready-to-run ZIP from [release 454](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/454).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-453.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-453.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-454.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-454.zip` | Manual setup, or installation from an extracted folder |
 
-Use the matching `SHA256SUMS-453.txt` and source/documentation archives from the same release. See [what changes in 453](RELEASE-NOTES.md#build-453).
+Use the matching `SHA256SUMS-454.txt` and source/documentation archives from the same release. See [what changes in 454](RELEASE-NOTES.md#build-454).
 
 ## Get started
 

@@ -9,11 +9,13 @@ Choose **the Windows installer** for normal use. Choose **manual ZIP setup** if 
 You need:
 
 - A 64-bit Windows installation supported by nanoCAD 26.
-- nanoCAD 26 installed and working. The functions you request must be available in your installed, licensed nanoCAD configuration.
+- nanoCAD 26.0 installed and working, with `nCad.exe` file version **26.0.7476.4950 or newer**. The functions you request must be available in your installed, licensed nanoCAD configuration.
 - Codex desktop or Claude Desktop installed and signed in, with permission to use local MCP servers.
 - Access to change nanoCAD's `nCad.ini`. Windows may require administrator approval for that file.
 
 The release includes the MCP server runtime. You do not need Python, Node.js, a .NET SDK or the nanoCAD SDK to use it. Building from source is a separate [developer workflow](development.md).
+
+Setup checks the complete executable version and the required API files before installing files or changing registration and assistant settings. Some host API libraries legitimately use version `26.0.7476.3867`, while the platform and MultiCAD files require `26.0.7476.4950`; these components are checked separately. An older, missing or unreadable required component stops installation with the detected and required versions. Install the nanoCAD 26.0 updates manually from Nanosoft, then run setup again. Later major versions of nanoCAD require separate compatibility support.
 
 Run nanoCAD and the assistant as the **same Windows user, in the same desktop session, at the same elevation level**. Normally, start both without **Run as administrator**. Installation can request administrator approval without requiring either application to run elevated afterward.
 
@@ -22,7 +24,7 @@ Download the installer or release ZIP from the [download section](../../README.m
 ## Install with the Windows installer
 
 1. Save **all** open drawings and close nanoCAD. Close the assistant you want to connect.
-2. Run `NanoCAD-MCP-Setup-453.exe` from [release 453](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/453).
+2. Run `NanoCAD-MCP-Setup-454.exe` from [release 454](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/454).
 3. Check the nanoCAD 26 installation folder. It must contain `nCad.exe` and `nCad.ini`.
 4. Select **Codex**, **Claude Desktop**, or both, then click **Install**. For an update, select every assistant connected by the previous installation.
 5. Approve the Windows permission request if it appears.
@@ -32,7 +34,7 @@ Download the installer or release ZIP from the [download section](../../README.m
 
 The installer places the program in `%LOCALAPPDATA%\Programs\NanoCADMCP`, registers the bridge for automatic loading and adds the `nanocad` MCP entry to the selected assistant's settings. It backs up changed settings and retains the previous `nanocad` entry for removal. Other MCP entries are preserved. No manual DLL loading is required after normal installation.
 
-For build 453, installed documentation starts at `%LOCALAPPDATA%\Programs\NanoCADMCP\versions\453\server\README.md`. Keep the accompanying `docs` and `licenses` folders so their links work offline.
+For build 454, installed documentation starts at `%LOCALAPPDATA%\Programs\NanoCADMCP\versions\454\server\README.md`. Keep the accompanying `docs` and `licenses` folders so their links work offline.
 
 ## Manual ZIP setup
 
@@ -54,19 +56,13 @@ C:\Tools\nanoCAD-MCP\manifest.json
 
 ### 2. Register the bridge in nanoCAD
 
-1. Locate the `nCad.ini` **beside `nCad.exe` in your nanoCAD installation folder**. A common folder is `C:\Program Files\Nanosoft AS\nanoCAD x64 26.0`; use your actual installation path.
-2. Make a backup copy of `nCad.ini`.
-3. Open it in a text editor. Administrator approval may be needed to save this file.
-4. Find the existing `[\NetModules]` section. Add the absolute DLL path on its own line. If the section does not exist, add it once:
+Use the package's registration helper so the same compatibility check runs before `nCad.ini` is changed. Replace the example paths with your extracted package and nanoCAD installation folders:
 
-```ini
-[\NetModules]
-C:\Tools\nanoCAD-MCP\bridge\NanoCADBridge.dll
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Tools\nanoCAD-MCP\Register-Bridge.ps1" -IniPath "C:\Program Files\Nanosoft AS\nanoCAD x64 26.0\nCad.ini" -BridgePath "C:\Tools\nanoCAD-MCP\bridge\NanoCADBridge.dll" -Mode Add
 ```
 
-Keep other entries in the section. Do not put quotes around the DLL path or create a duplicate section. Remove any previous **nanoCAD MCP bridge** path you are replacing, after making the backup; only one version of this bridge should load. Leave unrelated plugins alone.
-
-5. Save the file. Close an elevated text editor when finished. Start nanoCAD normally; the bridge loads at startup.
+If the configuration folder requires administrator permission, run only this registration command from an administrator PowerShell window, then close that window. Start nanoCAD and your assistant normally. The helper checks installed versions, backs up the configuration and preserves unrelated plugin entries. For an update, remove the previous nanoCAD MCP registration before adding the new path; the same helper's `-Mode Remove` does not require a compatible nanoCAD version. Keep only one nanoCAD MCP bridge registered.
 
 The server setting in the next step does not load a DLL into nanoCAD by itself. Both parts of setup are required.
 

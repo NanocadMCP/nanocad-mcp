@@ -24,6 +24,12 @@ jobs:
           python-version: '3.12'
       - name: Check component versions
         run: python scripts/check-component-versions.py
+      - name: Check installer compatibility guard in Windows PowerShell
+        shell: powershell
+        run: ./tests/installer/Test-NanoCadCompatibility.ps1
+      - name: Check installer compatibility guard in PowerShell 7
+        shell: pwsh
+        run: ./tests/installer/Test-NanoCadCompatibility.ps1
       - name: Restore managed dependency graph
         run: dotnet restore tests/NanoCAD.Tests/NanoCAD.Tests.csproj
       - name: Build contracts, IPC, server and managed tests
@@ -50,4 +56,5 @@ jobs:
             artifacts/managed-tests.json
             artifacts/elevated-ipc.xml
             artifacts/elevated-ipc.json
+            artifacts/installer-compatibility-*/report.json
           if-no-files-found: warn

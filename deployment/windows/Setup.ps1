@@ -20,8 +20,8 @@ function Install-LocalPackage {
     $manifest=Assert-Package $PSScriptRoot
     if(![Environment]::Is64BitOperatingSystem){throw 'Windows x64 required.'}
     if(!$NanoCadPath){$found=@(Find-NanoCad);if($found.Count -ne 1){throw 'Choose the nanoCAD26 installation folder.'};$script:NanoCadPath=$found[0]}
-    $cadExe=Join-Path $NanoCadPath 'nCad.exe';$ini=Join-Path $NanoCadPath 'nCad.ini'
-    if(!(Test-Path -LiteralPath $cadExe) -or !(Test-Path -LiteralPath $ini) -or [Diagnostics.FileVersionInfo]::GetVersionInfo($cadExe).FileMajorPart -ne 26){throw 'Select nanoCAD26 with nCad.exe and nCad.ini.'}
+    [void](Assert-NanoCadCompatibility $NanoCadPath)
+    $ini=Join-Path $NanoCadPath 'nCad.ini'
     foreach($client in $Clients){if($client -notin @('Codex','ClaudeDesktop')){throw ('Unsupported client: '+$client)}}
     if(!$Clients.Count){throw 'Choose at least one client.'}
     $version=[string]$manifest.package_build
@@ -165,6 +165,6 @@ try{
         'Install'{Install-LocalPackage}
         'Remove'{Remove-LocalPackage}
         'UninstallGui'{Show-Uninstaller}
-        'Plan'{$manifest=Assert-Package $PSScriptRoot;[pscustomobject]@{package=$manifest.package_build;cad_candidates=@(Find-NanoCad);install_root=$productRoot;clients=$Clients;changes_applied=$false}|ConvertTo-Json -Depth 5}
+        'Plan'{$manifest=Assert-Package $PSScriptRoot;$candidates=@(Find-NanoCad);if($NanoCadPath){$candidates=@($NanoCadPath)};[pscustomobject]@{package=$manifest.package_build;cad_candidates=$candidates;cad_compatibility=@($candidates|ForEach-Object {Get-NanoCadCompatibility $_});install_root=$productRoot;clients=$Clients;changes_applied=$false}|ConvertTo-Json -Depth 7}
     }
 }catch{Write-Error $_;exit 1}
