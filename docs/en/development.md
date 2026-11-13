@@ -16,6 +16,7 @@ The assistant launches `NanoCAD.McpServer.exe` as a local process and exchanges 
 | `src/NanoCADBridge` | Managed nanoCAD integration and native operations |
 | `src/NanoCAD.NativeParameters` | Native parameter access and SDK compatibility declarations |
 | `src/NanoCAD.NativeModelHistory` | Native feature-history and body-property adapters |
+| `src/NanoCAD.NativeAccessibility` | Native MFC tab accessibility compatibility guard |
 | `src/NanoCAD.VisualWorker` | Capture of the nanoCAD window for visual verification |
 | `deployment` | Windows setup, connection and removal scripts, and installer launcher |
 | `tests/NanoCAD.Tests` | Managed tests, including schema and contract checks |
@@ -31,13 +32,15 @@ The in-process bridge targets `net6.0-windows` to match the nanoCAD 26 managed h
 For a full build on Windows x64, install:
 
 1. The .NET SDK version specified by `global.json` (currently `10.0.400`, with patch roll-forward allowed).
-2. Visual Studio or Build Tools with the MSVC x64/x86 C++ tools. The build scripts locate them with `vswhere.exe` in the standard Visual Studio Installer directory.
+2. Visual Studio or Build Tools with the MSVC x64/x86 C++ tools and matching x64 MFC/ATL development components. The build scripts locate them with `vswhere.exe` in the standard Visual Studio Installer directory. The accessibility guard uses shared release MFC/CRT (`/MD`), including for a Debug build. To use a separate authorized MFC development directory, pass `-MfcDirectory` to `scripts/build-native-accessibility.ps1`, or `-p:MfcDirectory=...` to the bridge MSBuild invocation. Do not distribute those headers or import libraries with the project source.
 3. Windows SDK `10.0.26100.0`, which the visual-worker build script explicitly selects.
 4. nanoCAD 26 and the modules needed by the features you will test. Managed references are read from the installed nanoCAD `bin` directory.
 5. An authorized copy of nanoCAD SDK `NCadSDK_260_EN_7355.4942.259`, extracted to a directory of that name at the checkout root. The native build scripts use this exact directory and verify selected SDK headers.
 6. Network access to download the .NET SDK and restore NuGet packages, unless those dependencies are already available locally.
 
 Obtain nanoCAD and its SDK from their vendor under the applicable terms. They are not included in this source checkout. Generated SDK compatibility files also remain vendor-derived material; generate them locally from your authorized SDK rather than treating them as MIT-licensed project code.
+
+The accessibility helper is built with the bridge using these MFC/ATL inputs. It does not replace nanoCAD or the installed MFC runtime; its assessed scope is the reported tab accessibility read failure.
 
 ## Full build
 

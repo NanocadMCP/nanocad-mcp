@@ -47,4 +47,18 @@
   <ItemGroup>
     <None Include="$(NativeModelHistory421Output)" Link="NanoCAD.NativeModelHistory421.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <PropertyGroup>
+    <NativeAccessibilityOutput>$(MSBuildProjectDirectory)\..\..\artifacts\native-accessibility\$(Configuration)\NanoCAD.NativeAccessibility.dll</NativeAccessibilityOutput>
+    <NativeAccessibilityMfcArgument Condition="'$(MfcDirectory)' != ''">-MfcDirectory &quot;$(MfcDirectory)&quot;</NativeAccessibilityMfcArgument>
+  </PropertyGroup>
+  <ItemGroup>
+    <NativeAccessibilityBuildInput Include="$(MSBuildProjectDirectory)\..\NanoCAD.NativeAccessibility\*.cpp;$(MSBuildProjectDirectory)\..\NanoCAD.NativeAccessibility\*.h;$(MSBuildProjectDirectory)\..\..\scripts\build-native-accessibility.ps1" />
+    <None Include="$(NativeAccessibilityOutput)" Link="NanoCAD.NativeAccessibility.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildNativeAccessibility" BeforeTargets="PrepareForBuild"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(NativeAccessibilityBuildInput)"
+          Outputs="$(NativeAccessibilityOutput)">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\build-native-accessibility.ps1&quot; -Configuration $(Configuration) $(NativeAccessibilityMfcArgument)" />
+  </Target>
 </Project>

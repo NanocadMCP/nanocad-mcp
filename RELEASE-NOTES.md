@@ -2,6 +2,25 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 455
+
+- Addresses the confirmed native tab accessibility crash observed when Codex
+  Computer Use queried an empty nanoCAD tab control. The assessed repair covers
+  both an existing control and a newly created one, while normal tab queries
+  continue to use the native provider.
+
+- Works alongside Codex Computer Use without disabling its helper or changing
+  its app permissions. Existing drawing and modeling capabilities and the
+  nanoCAD version checks introduced in 454 are retained.
+
+The reported failure was assessed on nanoCAD 26.0.7476.4950. Protection begins
+when the bridge loads; this does not establish a fix for unrelated crashes.
+The connection reports server 0.282.0 and bridge 0.240.0.
+
+Use the matching installer, runtime ZIP, source/documentation archives and
+`SHA256SUMS-455.txt` from
+[release 455](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/455).
+
 ## Build 454
 
 - Setup checks the full nanoCAD version and required API libraries before

@@ -28,14 +28,16 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 454](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/454).
+Get the installer or ready-to-run ZIP from [release 455](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/455).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-454.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-454.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-455.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-455.zip` | Manual setup, or installation from an extracted folder |
 
-Use the matching `SHA256SUMS-454.txt` and source/documentation archives from the same release. See [what changes in 454](RELEASE-NOTES.md#build-454).
+Use the matching `SHA256SUMS-455.txt` and source/documentation archives from the same release. See [what changes in 455](RELEASE-NOTES.md#build-455).
+
+This release addresses the confirmed nanoCAD tab accessibility crash observed with Codex Computer Use on nanoCAD 26.0.7476.4950. Computer Use can remain enabled.
 
 ## Get started
 

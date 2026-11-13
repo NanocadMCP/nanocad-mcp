@@ -20,6 +20,7 @@ public sealed class Entry : IExtensionApplication
     private DocumentRegistry? _documents;
     private CadReader? _reader;
     private JsonLog? _log;
+    private NativeAccessibilityGuard? _accessibilityGuard;
     private Descriptor? _descriptor;
     private bool _pumping;
     private long _heartbeat;
@@ -35,6 +36,7 @@ public sealed class Entry : IExtensionApplication
             _uiThread = Environment.CurrentManagedThreadId;
             _current = this;
             _log = new("bridge");
+            _accessibilityGuard = new(_log);
             _log.Write("initialize", "", "describe_before");
             var instance = Guid.NewGuid().ToString("D");
             _descriptor = Discovery.Describe(instance, FileVersionInfo.GetVersionInfo(typeof(Document).Assembly.Location).FileVersion ?? "unknown");
@@ -205,6 +207,7 @@ public sealed class Entry : IExtensionApplication
                 return;
             }
             _uiVerified = true;
+            _accessibilityGuard?.RetryPending();
             Interlocked.Exchange(ref _heartbeat, DateTime.UtcNow.Ticks);
             // Check the native frame before touching document state while a
             // modal dialog is open. Pump still runs so queued reads fail busy.
@@ -335,6 +338,7 @@ public sealed class Entry : IExtensionApplication
         _queue?.Dispose(); _queue = null;
         _documents?.Dispose(); _documents = null;
         _reader = null;
+        _accessibilityGuard?.Dispose(); _accessibilityGuard = null;
         if (_current == this) _current = null;
     }
 }
