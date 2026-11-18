@@ -6,15 +6,21 @@ nanoCAD MCP connects an AI assistant to a running nanoCAD session. You describe 
 
 See [installation](installation.md) for requirements and connection instructions, and the [user guide](user-guide.md) for the working process.
 
-This page describes the scope of build 458. Earlier published
+This page describes the scope of build 459. Earlier published
 packages retain the limits recorded in their release notes.
 
 
-Find imported parts by a label stored in the DWG. Choose a solid edge for an editable fillet or chamfer and frame it to inspect its profile. Attach a dimension to two projected hole centers and read the updated spacing on the saved drawing. On a sheet with protected native dimension containers, current_drawing stops before cloning. Save the DWG and use saved_drawing to see its dimensions. On a floor plan linked by a relative path, both drawing sources showed the raster flipped vertically and reported an orientation warning. Before tracing or measuring a raster, check its original pixels and placement in the drawing.
+Find an imported part by its DWG label, move it or drill a blind hole, then find the same part again by name. Choose a solid edge for an editable fillet or chamfer and frame it to inspect its profile. Attach a dimension to two projected hole centers and read the updated spacing on the saved drawing. On a sheet with protected native dimension containers, current_drawing stops before cloning. Save the DWG and use saved_drawing to see its dimensions. On a floor plan linked by a relative path, both drawing sources showed the raster flipped vertically and reported an orientation warning. Before tracing or measuring a raster, check its original pixels and placement in the drawing.
 
 ## Working with named parts and drawing revisions
 
 Eligible modeled solids have an editable name on their native modeling-tree owner. A name search returns separate object references for duplicate labels. A bushing and a pin retained their names after a bore edit and DWG reopening. The operation also accepted a direct box with an existing native body owner. An eligible imported ACIS solid uses a single-member native DWG group. For example, the label `Inspection block 10 x 20 x 30` produced the group `INSPECTION_BLOCK_10_X_20_X_30` and retained the exact text in its Description after reopening. You can inspect or edit that description in nanoCAD's Group Manager (`CLASSICGROUP`). Read `body_name_group` for the actual group key, including any suffix needed to distinguish duplicate names. `body_name_source` and `native_tree_name` distinguish the group label from the construction-tree name.
+
+A labeled 10 × 20 × 30 mm block moved 3 mm along X, from 100–110 mm to 103–113 mm. On another copy, a 2 mm diameter blind hole cut 3 mm into the top face and left 27 mm of material under its floor. Both edits kept the original solid, group and label. The neighboring solid stayed in place.
+
+On a separate copy, an R1 edge fillet produced a cylindrical face. Rotating, scaling, moving and recoloring the finished block preserved its label. Subtracting a cylinder from another copy kept the cutting tool available for reuse. Pulling one side face of that block outward by 1 mm added 600 mm³ while retaining its name and group.
+
+Native group membership is checked during in-place edits. Direct translation of a parametric guide bushing was refused before changing the sketch, extrusion or hole that drives it.
 
 For a selected part, the assistant can filter planar and cylindrical faces by geometry, follow verified native feature links and inspect the inputs of a single feature. It can also inspect a planar section and the material intercepted by a finite segment. In a mounting plate, a length edit from 80 to 100 mm moved the two far holes by 20 mm and kept the four end offsets at 10 mm.
 

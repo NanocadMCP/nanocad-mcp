@@ -2,6 +2,16 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 459
+
+Find an imported part by its DWG label, move it or drill a blind hole, then find the same part again by name.
+
+A labeled 10 × 20 × 30 mm block moved 3 mm along X, from 100–110 mm to 103–113 mm. On another copy, a 2 mm diameter blind hole cut 3 mm into the top face and left 27 mm of material under its floor. Both edits kept the original solid, group and label. The neighboring solid stayed in place.
+
+On a separate copy, an R1 edge fillet produced a cylindrical face. Rotating, scaling, moving and recoloring the finished block preserved its label. Subtracting a cylinder from another copy kept the cutting tool available for reuse. Pulling one side face of that block outward by 1 mm added 600 mm³ while retaining its name and group.
+
+Native group membership is checked during in-place edits. Direct translation of a parametric guide bushing was refused before changing the sketch, extrusion or hole that drives it.
+
 ## Build 458
 
 - Give an imported ACIS solid a label and find it again with MCP or in nanoCAD's Group Manager (`CLASSICGROUP`). The native DWG group has a readable name and keeps your exact label in its Description. Renaming an inspection block, editing its group description and reopening the DWG preserved the final label, both solids' geometry and an unrelated group. Parametric parts use their construction-tree names.

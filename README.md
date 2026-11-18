@@ -29,16 +29,16 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 458](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/458).
+Get the installer or ready-to-run ZIP from [release 459](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/459).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-458.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-458.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-459.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-459.zip` | Manual setup, or installation from an extracted folder |
 
-Use the matching `SHA256SUMS-458.txt` and source/documentation archives from the same release. See [what changes in 458](RELEASE-NOTES.md#build-458).
+Use the matching `SHA256SUMS-459.txt` and source/documentation archives from the same release. See [what changes in 459](RELEASE-NOTES.md#build-459).
 
-Find imported parts by a label stored in the DWG. Choose a solid edge for an editable fillet or chamfer and frame it to inspect its profile. Attach a dimension to two projected hole centers and read the updated spacing on the saved drawing.
+Find an imported part by its DWG label, move it or drill a blind hole, then find the same part again by name. Choose a solid edge for an editable fillet or chamfer and frame it to inspect its profile. Attach a dimension to two projected hole centers and read the updated spacing on the saved drawing.
 
 ## Get started
 

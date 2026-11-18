@@ -10,7 +10,8 @@ internal static class CadModifier
 {
     internal sealed record PropertyIds(ObjectId Layer, ObjectId Linetype);
     internal sealed record Resolved(ObjectId Model, Dictionary<string, ObjectId> Sources, Dictionary<int, PropertyIds> Properties,
-        Dictionary<string, CadBlockMover.Resolved> Blocks, HashSet<string> DocumentedSolids, HashSet<string> PointClouds, Dictionary<string, ObjectId> AssociatedDiameterLabels)
+        Dictionary<string, CadBlockMover.Resolved> Blocks, HashSet<string> DocumentedSolids, HashSet<string> PointClouds, Dictionary<string, ObjectId> AssociatedDiameterLabels,
+        CadSolidGroupMembership SolidGroups)
     {
         internal CadLegacyPolyline408.Plan? LegacyPolyline { get; init; }
         internal CadSolidReplacement409.Plan? SolidReplacement { get; init; }
@@ -26,6 +27,8 @@ internal static class CadModifier
         var curveBytes = new CadContourBudget344(cancel); var blockBytes = new SerializedCapacity357(cancel: cancel);
         var blockSources = new Dictionary<string, CadBlockMover.Resolved>(StringComparer.Ordinal);
         var solids = new HashSet<string>(StringComparer.Ordinal);
+        var solidGroups = new CadSolidGroupMembership();
+        var strictSolidSources = args.Operations.SelectMany(CadSolidGroupMembership.StrictSources).ToHashSet(StringComparer.Ordinal);
         var documentedSolids = new HashSet<string>(StringComparer.Ordinal);
         var pointClouds = new HashSet<string>(StringComparer.Ordinal);
         var associatedLabels = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
@@ -210,7 +213,9 @@ internal static class CadModifier
             {
 
                 solids.Add(handle);
-                if (CadSolidEditor.CheckSource((Solid3d)entity, db, cancel)) documentedSolids.Add(handle);
+                var solid = (Solid3d)entity;
+                var retainedGroups = strictSolidSources.Contains(handle) ? null : solidGroups.Capture(solid, tr, cancel);
+                if (CadSolidEditor.CheckSource(solid, db, cancel, retainedGroups)) documentedSolids.Add(handle);
             }
             else if (leaderInstanceOnly) CadMLeaderInstance442.CheckSource(entity, (SetMLeaderInstance442)args.Operations[0], tr, cancel);
             else if (leaderTopologyOnly) CadMLeaderTopology431.CheckSource(entity, (MLeaderTopologyEdit431)args.Operations[0], tr, cancel);
@@ -341,7 +346,7 @@ internal static class CadModifier
         }
         if (documentedSolids.Count > 0 && args.Operations.Any(op => op is CopySpec or EraseSpec && op.Handles.Any(documentedSolids.Contains)))
             throw new DomainException("UNSUPPORTED_SOLID_DEPENDENCIES", "A documented-body edit cannot copy or delete sources implicitly. Separate those ownership changes from in-place machining.");
-        var resolved = new Resolved(model, sources, properties, blockSources, documentedSolids, pointClouds, associatedLabels);
+        var resolved = new Resolved(model, sources, properties, blockSources, documentedSolids, pointClouds, associatedLabels, solidGroups);
         if (args.Operations.OfType<SolidReplacement409>().SingleOrDefault() is { } replacement)
             resolved = resolved with { SolidReplacement = CadSolidReplacement409.Prepare(replacement, db, tr, sources[replacement.Handles[0]], sources[replacement.SourceHandle], cancel) };
         return legacyStates.Count == 0 ? resolved : resolved with { LegacyPolyline = CadLegacyPolyline408.Prepare(args, resolved, tr, cancel, legacyStates) };
@@ -604,6 +609,7 @@ internal static class CadModifier
             CadPlaneCurveTransforms394.VerifySources(planeSources, tr, cancel);
             if (cleanup != null) throw new InvalidOperationException("Detached preview cleanup failed.", cleanup);
         }
+        resolved.SolidGroups.Verify(tr, cancel);
     }
     public static ModifiedEntities Apply(ModifyArguments args, Resolved resolved, Transaction tr, List<Entity> ownedCopies, WriteJob job, List<string>? nativeFormatWarnings = null)
     {
@@ -940,6 +946,7 @@ internal static class CadModifier
                 }
             }
         }
+        resolved.SolidGroups.Verify(tr, job.CheckCancellation);
         if (resolved.LegacyPolyline is { } legacyPlan) CadLegacyPolyline408.Complete(legacyPlan, tr, job.CheckCancellation, nativeFormatWarnings);
         var repetitions = args.Operations.Select((op, index) => (op, index)).Where(pair => CopyTransforms2d407.Handles(pair.op))
             .Select(pair => new RepetitionResult407(pair.index, pair.op.Operation, false, pair.op is PolarRepeat2d407 polar ? polar.Count : 2,

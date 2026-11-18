@@ -8,18 +8,19 @@ namespace NanoCADBridge;
 // Direct bodies only. A MultiCAD representation must be changed through its model adapter.
 internal static class CadSolidEditor
 {
-    internal static bool CheckSource(Solid3d solid, Database db, Action cancel)
+    internal static bool CheckSource(Solid3d solid, Database db, Action cancel, IReadOnlySet<ObjectId>? retainedGroups = null)
     {
         cancel();
         if (solid.GetType() != typeof(Solid3d) || solid.RecordHistory || solid.ShowHistory || solid.HasFields)
             throw new DomainException("UNSUPPORTED_SOLID_HISTORY", "Direct solid editing requires an exact native Solid3d without enabled history or fields.");
         using var reactors = solid.GetPersistentReactorIds();
         var loaded = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        bool documented=false;
-        if (loaded.Contains("mapimgd") && loaded.Contains("MapiBaseTypes")) documented=RequireDirect(solid, db);
-        if(reactors.Count!=0 && !documented)
+        bool documented = false;
+        if (loaded.Contains("mapimgd") && loaded.Contains("MapiBaseTypes")) documented = RequireDirect(solid, db);
+        var dependencies = reactors.Cast<ObjectId>().Where(id => retainedGroups?.Contains(id) != true);
+        if (!documented && dependencies.Any())
             throw new DomainException("UNSUPPORTED_SOLID_DEPENDENCIES", "This solid has unclassified persistent dependencies.");
-        if(documented)DirectSolidDocumentation.CheckReactors(solid,reactors);
+        if (documented) DirectSolidDocumentation.CheckReactors(solid, dependencies);
         CheckGeometry(solid, cancel);
         return documented;
     }
@@ -33,25 +34,25 @@ internal static class CadSolidEditor
         if (!string.IsNullOrEmpty(db.Filename) && !string.Equals(Path.GetFullPath(db.Filename), Path.GetFullPath(document.Path), StringComparison.OrdinalIgnoreCase))
             throw new DomainException("DOCUMENT_CONTEXT_MISMATCH", "MultiCAD context differs from the requested database.");
         var id = Multicad.McObjectId.FromHandle(solid.Handle.Value, document.ID);
-        if(id.IsNull)return false;
-        var model=id.GetObjectOfType<Multicad.Mc3D.Mc3dSolid>();
-        if(model==null)return false;
+        if (id.IsNull) return false;
+        var model = id.GetObjectOfType<Multicad.Mc3D.Mc3dSolid>();
+        if (model == null) return false;
         // Native box/sphere creation is exposed by MultiCAD as Mc3dAlienSolid:
         // one non-parametric self item, not a sketch/feature history. Preserve
         // protection for actual models and for unknown/external dependencies.
-        if(id.QueryObjectType()!=typeof(Multicad.Mc3D.Mc3dAlienSolid)||model.ID!=id)
+        if (id.QueryObjectType() != typeof(Multicad.Mc3D.Mc3dAlienSolid) || model.ID != id)
             throw new DomainException("UNSUPPORTED_SOLID_HISTORY", "This solid has native model history; use its model adapter.");
-        var contents=model.GetPartContents(false);var item=id.GetObjectOfType<Multicad.Mc3D.HistoryItem>();
-        if(contents==null||!contents.Contains(id)||item==null||item.IsSuppressed||item.Status.ToString()!="Ok")
+        var contents = model.GetPartContents(false); var item = id.GetObjectOfType<Multicad.Mc3D.HistoryItem>();
+        if (contents == null || !contents.Contains(id) || item == null || item.IsSuppressed || item.Status.ToString() != "Ok")
             throw new DomainException("UNSUPPORTED_SOLID_HISTORY", "A direct body requires its healthy non-parametric self item.");
-        foreach(var child in contents.Where(c=>c!=id))DirectSolidDocumentation.RequireDependency(child,id);
-        var inputs=item.GetDependsOn(false,false);var dependents=item.GetDependent();
-        if(inputs==null||inputs.Count!=0||dependents==null)
+        foreach (var child in contents.Where(c => c != id)) DirectSolidDocumentation.RequireDependency(child, id);
+        var inputs = item.GetDependsOn(false, false); var dependents = item.GetDependent();
+        if (inputs == null || inputs.Count != 0 || dependents == null)
             throw new DomainException("UNSUPPORTED_SOLID_DEPENDENCIES", "The non-parametric body has unknown or existing model dependencies.");
-        foreach(var dependent in dependents)DirectSolidDocumentation.RequireDependency(dependent,id);
-        bool documented=contents.Count>1||dependents.Count>0;
-        if(!documented&&model.LastPartItemID!=id)
-            throw new DomainException("UNSUPPORTED_SOLID_HISTORY","Non-parametric body has an unclassified history tail.");
+        foreach (var dependent in dependents) DirectSolidDocumentation.RequireDependency(dependent, id);
+        bool documented = contents.Count > 1 || dependents.Count > 0;
+        if (!documented && model.LastPartItemID != id)
+            throw new DomainException("UNSUPPORTED_SOLID_HISTORY", "Non-parametric body has an unclassified history tail.");
         return documented;
     }
 
