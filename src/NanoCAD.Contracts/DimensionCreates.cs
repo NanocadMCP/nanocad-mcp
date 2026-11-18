@@ -29,22 +29,24 @@ public sealed record ProjectedCornerGeometry(int FirstVertex, int SecondVertex, 
     public static ProjectedCornerGeometry Resolve(Point2 a, Point2 b, Point2 c, Point2 d, Point2 placement)
     {
         const string error = "INVALID_GEOMETRY";
-        var first = new[]{a,b}; var second = new[]{c,d};
-        if (AngularDimensionGeometry.Length(a,b) < .001 || AngularDimensionGeometry.Length(c,d) < .001)
-            throw new DomainException(error,"Both projected rays must have nonzero length.");
-        var shared = (from i in new[]{0,1} from j in new[]{0,1}
-                      where AngularDimensionGeometry.Length(first[i],second[j]) <= 1e-7 select (i,j)).ToArray();
-        if (shared.Length != 1) throw new DomainException(error,"Select two projected lines with one shared native endpoint.");
-        var (i1,i2)=shared[0]; var vertex=first[i1];
-        var ray1=AngularDimensionGeometry.Difference(first[1-i1],vertex);
-        var ray2=AngularDimensionGeometry.Difference(second[1-i2],vertex);
-        var turn=AngularDimensionGeometry.Turn(ray1,ray2);
-        if (AngularDimensionGeometry.Length(vertex,placement)<.001 || !double.IsFinite(turn) || Math.Abs(Math.Sin(turn))<AngularDimensionGeometry.MinimumAngle)
-            throw new DomainException(error,"Select two non-collinear projected rays and place the dimension away from their vertex.");
-        if (AngularDimensionGeometry.InSector(vertex,ray1,placement,turn)) return new(i1,i2,false,turn);
-        double reverse=2*Math.PI-turn;
-        if (AngularDimensionGeometry.InSector(vertex,ray2,placement,reverse)) return new(i1,i2,true,reverse);
-        throw new DomainException(error,"Place dimline_point strictly inside the desired angular sector.");
+        var first = new[] { a, b }; var second = new[] { c, d };
+        if (AngularDimensionGeometry.Length(a, b) < .001 || AngularDimensionGeometry.Length(c, d) < .001)
+            throw new DomainException(error, "Both projected rays must have nonzero length.");
+        var shared = (from i in new[] { 0, 1 }
+                      from j in new[] { 0, 1 }
+                      where AngularDimensionGeometry.Length(first[i], second[j]) <= 1e-7
+                      select (i, j)).ToArray();
+        if (shared.Length != 1) throw new DomainException(error, "Select two projected lines with one shared native endpoint.");
+        var (i1, i2) = shared[0]; var vertex = first[i1];
+        var ray1 = AngularDimensionGeometry.Difference(first[1 - i1], vertex);
+        var ray2 = AngularDimensionGeometry.Difference(second[1 - i2], vertex);
+        var turn = AngularDimensionGeometry.Turn(ray1, ray2);
+        if (AngularDimensionGeometry.Length(vertex, placement) < .001 || !double.IsFinite(turn) || Math.Abs(Math.Sin(turn)) < AngularDimensionGeometry.MinimumAngle)
+            throw new DomainException(error, "Select two non-collinear projected rays and place the dimension away from their vertex.");
+        if (AngularDimensionGeometry.InSector(vertex, ray1, placement, turn)) return new(i1, i2, false, turn);
+        double reverse = 2 * Math.PI - turn;
+        if (AngularDimensionGeometry.InSector(vertex, ray2, placement, reverse)) return new(i1, i2, true, reverse);
+        throw new DomainException(error, "Place dimline_point strictly inside the desired angular sector.");
     }
 }
 
@@ -57,12 +59,12 @@ public static partial class CreateValidation
         {
             if (kind == "projected_angular" && item.TryGetProperty("line_indices", out var pair))
             {
-                Shape(item,path,"type","kind","layer","view_handle","line_indices","dimline_point");
+                Shape(item, path, "type", "kind", "layer", "view_handle", "line_indices", "dimline_point");
                 if (pair.ValueKind != JsonValueKind.Array || pair.GetArrayLength() != 2 ||
                     pair[0].ValueKind != JsonValueKind.Number || !pair[0].TryGetInt32(out int a) || a < 0 ||
                     pair[1].ValueKind != JsonValueKind.Number || !pair[1].TryGetInt32(out int b) || b < 0 || a == b)
                     throw Invalid(path + ".line_indices", "Select two distinct nonnegative current view line indices.");
-                return new ProjectedCornerDimensionSpec(Validation.NormalizeHandle(Text(item,"view_handle",path,16)), a, b, Point(item,"dimline_point",path), layer);
+                return new ProjectedCornerDimensionSpec(Validation.NormalizeHandle(Text(item, "view_handle", path, 16)), a, b, Point(item, "dimline_point", path), layer);
             }
             string indexField = kind == "projected_aligned" ? "line_index" : "arc_index";
             Shape(item, path, "type", "kind", "layer", "view_handle", indexField, "dimline_point");

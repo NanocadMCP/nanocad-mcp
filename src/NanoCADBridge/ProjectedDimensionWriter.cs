@@ -109,25 +109,25 @@ internal static class ProjectedDimensionWriter
             else if (spec is ProjectedCornerDimensionSpec cornerSpec)
             {
                 Need(paper, "OUT_OF_SCOPE", "Projected angular dimensions require an active Paper sheet.");
-                var first = DrawingViewsReader.ResolveProjectedLine(entity,state,tx,args.BridgeId,cornerSpec.FirstLineIndex,cancel);
-                var second = DrawingViewsReader.ResolveProjectedLine(entity,state,tx,args.BridgeId,cornerSpec.SecondLineIndex,cancel);
+                var first = DrawingViewsReader.ResolveProjectedLine(entity, state, tx, args.BridgeId, cornerSpec.FirstLineIndex, cancel);
+                var second = DrawingViewsReader.ResolveProjectedLine(entity, state, tx, args.BridgeId, cornerSpec.SecondLineIndex, cancel);
                 Need(first.ViewId == second.ViewId && first.Marker != second.Marker &&
                     first.Start.Z == 0 && first.End.Z == 0 && second.Start.Z == 0 && second.End.Z == 0,
                     "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "Select two distinct visible straight primitives on the same XY projection.");
-                Point2 XY(Point3d p) => new(p.X,p.Y);
-                var corner=ProjectedCornerGeometry.Resolve(XY(first.Start),XY(first.End),XY(second.Start),XY(second.End),point);
-                var f=Anchors(new(first.ViewId,first.Marker,first.Start,first.End),owner);
-                var s=Anchors(new(second.ViewId,second.Marker,second.Start,second.End),owner);
-                _=NativeModelHistory421.LoadProjectedDimensionAssociation();
-                var a=corner.FirstVertex==0 ? first.End : first.Start;
-                var b=corner.SecondVertex==0 ? second.End : second.Start;
-                var vertex=corner.FirstVertex==0 ? first.Start : first.End;
-                var aSnap=f[1-corner.FirstVertex]; var bSnap=s[1-corner.SecondVertex];
+                Point2 XY(Point3d p) => new(p.X, p.Y);
+                var corner = ProjectedCornerGeometry.Resolve(XY(first.Start), XY(first.End), XY(second.Start), XY(second.End), point);
+                var f = Anchors(new(first.ViewId, first.Marker, first.Start, first.End), owner);
+                var s = Anchors(new(second.ViewId, second.Marker, second.Start, second.End), owner);
+                _ = NativeModelHistory421.LoadProjectedDimensionAssociation();
+                var a = corner.FirstVertex == 0 ? first.End : first.Start;
+                var b = corner.SecondVertex == 0 ? second.End : second.Start;
+                var vertex = corner.FirstVertex == 0 ? first.Start : first.End;
+                var aSnap = f[1 - corner.FirstVertex]; var bSnap = s[1 - corner.SecondVertex];
                 // McDimensionData has three point slots. Both native curves
                 // independently evaluated the shared tip. The vertex stays
                 // attached to the first named curve, in either sector.
-                cornerAnchors=corner.ReverseRays ? [bSnap,aSnap,f[corner.FirstVertex]] : [aSnap,bSnap,f[corner.FirstVertex]];
-                projection=new(first.ViewId,first.Marker,corner.ReverseRays ? b : a,corner.ReverseRays ? a : b,vertex,"angular",Sweep:corner.Sweep);
+                cornerAnchors = corner.ReverseRays ? [bSnap, aSnap, f[corner.FirstVertex]] : [aSnap, bSnap, f[corner.FirstVertex]];
+                projection = new(first.ViewId, first.Marker, corner.ReverseRays ? b : a, corner.ReverseRays ? a : b, vertex, "angular", Sweep: corner.Sweep);
             }
             else if (spec is ProjectedDiametricDimensionSpec diametric)
             {
@@ -238,9 +238,9 @@ internal static class ProjectedDimensionWriter
             Need(angular.SetPosition(0, Native(projection.First)).IsSuccess() && angular.SetPosition(1, Native(projection.Second)).IsSuccess(),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native angle did not accept its arc endpoint rays.");
             angular.DimensionScale = 1; angular.LinePosition = Native(binding.Placement); angular.TextPosition = Native(binding.Placement);
-            if (binding.Anchors.Length==3)
-                Need(Same(angular.Center,angularCenter) && Same(angular.GetPosition(0),projection.First) &&
-                    Same(angular.GetPosition(1),projection.Second) && Same(angular.LinePosition,binding.Placement),
+            if (binding.Anchors.Length == 3)
+                Need(Same(angular.Center, angularCenter) && Same(angular.GetPosition(0), projection.First) &&
+                    Same(angular.GetPosition(1), projection.Second) && Same(angular.LinePosition, binding.Placement),
                     "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached angular dimension did not retain the two projected rays, vertex and selected sector.");
         }
         else
@@ -375,41 +375,41 @@ internal static class ProjectedDimensionWriter
             using var reactors = dimension.GetPersistentReactorIds();
             Need(reactors.Cast<Db.ObjectId>().Any(link => link.IsValid && !link.IsErased && link.Database == database),
                 "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident dimension did not retain local native dependency storage.");
-            if (binding.Anchors.Length==3)
+            if (binding.Anchors.Length == 3)
             {
-                var table=(Db.BlockTable)tx.GetObject(database.BlockTableId,Db.OpenMode.ForRead);
-                var summary=EntityAdapter.Summary(dimension,table[Db.BlockTableRecord.ModelSpace],args.BridgeId,args.DocumentId,true);
-                var observed=CadProjectedDimensionAssociationReader.ReadLoaded(dimension,summary,cancel);
-                Need(observed!=null,"NATIVE_DIMENSION_ASSOCIATION_MISMATCH","The stored native angular dimension anchor inventory is unavailable.");
-                var actual=Wire.Element(observed);
-                Need(actual.GetProperty("native_associative").ValueKind==System.Text.Json.JsonValueKind.True &&
-                    actual.GetProperty("links_complete").GetBoolean() && actual.GetProperty("links").GetArrayLength()==1 &&
-                    actual.GetProperty("drawing_view_mc_id").GetString()==projection.ViewId.ToString(),
-                    "NATIVE_DIMENSION_ASSOCIATION_MISMATCH","The resident angular dimension did not retain its associative view identity.");
-                var anchors=actual.GetProperty("anchors");
-                var expectedPoints=new[]{projection.First,projection.Second,projection.Center!.Value};
-                Need(anchors.GetArrayLength()==3,"NATIVE_DIMENSION_ASSOCIATION_MISMATCH","Expected three stored angular anchors.");
+                var table = (Db.BlockTable)tx.GetObject(database.BlockTableId, Db.OpenMode.ForRead);
+                var summary = EntityAdapter.Summary(dimension, table[Db.BlockTableRecord.ModelSpace], args.BridgeId, args.DocumentId, true);
+                var observed = CadProjectedDimensionAssociationReader.ReadLoaded(dimension, summary, cancel);
+                Need(observed != null, "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The stored native angular dimension anchor inventory is unavailable.");
+                var actual = Wire.Element(observed);
+                Need(actual.GetProperty("native_associative").ValueKind == System.Text.Json.JsonValueKind.True &&
+                    actual.GetProperty("links_complete").GetBoolean() && actual.GetProperty("links").GetArrayLength() == 1 &&
+                    actual.GetProperty("drawing_view_mc_id").GetString() == projection.ViewId.ToString(),
+                    "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident angular dimension did not retain its associative view identity.");
+                var anchors = actual.GetProperty("anchors");
+                var expectedPoints = new[] { projection.First, projection.Second, projection.Center!.Value };
+                Need(anchors.GetArrayLength() == 3, "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "Expected three stored angular anchors.");
                 bool Matches(JsonElement row, McGeomParam expected, Point3d point)
                 {
-                    var wcs=row.GetProperty("evaluated_point_wcs");
+                    var wcs = row.GetProperty("evaluated_point_wcs");
                     return !row.GetProperty("is_null").GetBoolean() &&
-                        row.GetProperty("source_mc_id").GetString()==expected.ID.ToString() && row.GetProperty("gs_marker").GetInt32()==expected.GSMarker &&
-                        row.GetProperty("parameter").ValueKind==JsonValueKind.Number &&
-                        row.GetProperty("parameter").GetDouble()==expected.Param &&
-                        row.GetProperty("data").GetString()==expected.Data.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
-                        wcs.ValueKind==JsonValueKind.Array && wcs.GetArrayLength()==3 &&
-                        SamePoint(new(wcs[0].GetDouble(),wcs[1].GetDouble(),wcs[2].GetDouble()),point);
+                        row.GetProperty("source_mc_id").GetString() == expected.ID.ToString() && row.GetProperty("gs_marker").GetInt32() == expected.GSMarker &&
+                        row.GetProperty("parameter").ValueKind == JsonValueKind.Number &&
+                        row.GetProperty("parameter").GetDouble() == expected.Param &&
+                        row.GetProperty("data").GetString() == expected.Data.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
+                        wcs.ValueKind == JsonValueKind.Array && wcs.GetArrayLength() == 3 &&
+                        SamePoint(new(wcs[0].GetDouble(), wcs[1].GetDouble(), wcs[2].GetDouble()), point);
                 }
                 // nanoCAD can reorder the two ray anchors to normalize its DWG
                 // angular sector. Each of the three actual parameter identities
                 // must still match exactly one distinct resident storage slot.
-                var usedSlots=new HashSet<int>();
-                for (int role=0;role<expectedPoints.Length;role++)
+                var usedSlots = new HashSet<int>();
+                for (int role = 0; role < expectedPoints.Length; role++)
                 {
-                    var matching=anchors.EnumerateArray().Where(row=>Matches(row,binding.Anchors[role],expectedPoints[role]))
-                        .Select(row=>row.GetProperty("slot").GetInt32()).ToArray();
-                    Need(matching.Length==1 && matching[0] is >=0 and <3 && usedSlots.Add(matching[0]),
-                        "NATIVE_DIMENSION_ASSOCIATION_MISMATCH",$"Angular anchor role {role} has no unique resident slot retaining its original view marker, point and parameter.");
+                    var matching = anchors.EnumerateArray().Where(row => Matches(row, binding.Anchors[role], expectedPoints[role]))
+                        .Select(row => row.GetProperty("slot").GetInt32()).ToArray();
+                    Need(matching.Length == 1 && matching[0] is >= 0 and < 3 && usedSlots.Add(matching[0]),
+                        "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", $"Angular anchor role {role} has no unique resident slot retaining its original view marker, point and parameter.");
                 }
             }
             result = id;

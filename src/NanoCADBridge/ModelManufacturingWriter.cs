@@ -24,22 +24,22 @@ internal static class ModelManufacturingWriter
     static McObjectId ReferencePlane(string name) => McDocumentsManager.GetActiveSheet().Get3dHistory()
         .GetGCSElement(name switch { "XY" => GCSElementType.WPL_XY, "YZ" => GCSElementType.WPL_YZ, _ => GCSElementType.WPL_ZX }).ID;
     sealed record ProfileBinding410(SketchProfile Profile, McDocument Owner, ModelProfileConsumers410.Snapshot Before);
-    sealed record ThreadDrivers(McObjectId Pitch, McObjectId Length,bool ToFullLength);
+    sealed record ThreadDrivers(McObjectId Pitch, McObjectId Length, bool ToFullLength);
     static double IndependentThreadLength(ThreadFeature thread)
     {
-        using var manager=thread.DbEntity.Document.GetDocumentVariablesManager(Constraint2dNetType.MCS);
-        var id=thread.LengthVarID;
-        var info=manager?.GetVariableInfo(id);
-        Need(manager!=null&&info!=null&&manager.GetVariableHostObjectId(id)==thread.ID,"MODEL_STATE_UNAVAILABLE","The native finite length driver has no verified Thread owner.");
-        var details=new{role="thread_length",feature_id=thread.ID.ToString(),variable_id=id.ToString()};
-        if(!double.TryParse(info!.Expression,NumberStyles.Float,CultureInfo.InvariantCulture,out var literal)||!double.IsFinite(literal))
-            throw new DomainException("PARAMETER_HAS_EXPRESSION","Full-length mode can replace the finite length expression with the length of its supporting cylinder. Keep finite mode to retain the formula.",false,details);
-        var variables=manager!.GetDependentOnVariables(id);
-        var objects=manager.GetDependentOn3dObjects(id);
-        if(variables==null||objects==null||variables.Count>0||objects.Any(consumer=>consumer!=thread.ID))
-            throw new DomainException("PARAMETER_HAS_DEPENDENTS","Full-length mode can change this finite length driver. Preserve the current mode while another variable or object depends on the driver, or its consumers are unavailable.",false,details);
-        if(!manager.GetVariableValue(id,out var value)||!double.IsFinite(value)||Math.Abs(value-literal)>1e-8)
-            throw new DomainException("MODEL_STATE_UNAVAILABLE","The native Thread length variable and its literal do not agree.",false,details);
+        using var manager = thread.DbEntity.Document.GetDocumentVariablesManager(Constraint2dNetType.MCS);
+        var id = thread.LengthVarID;
+        var info = manager?.GetVariableInfo(id);
+        Need(manager != null && info != null && manager.GetVariableHostObjectId(id) == thread.ID, "MODEL_STATE_UNAVAILABLE", "The native finite length driver has no verified Thread owner.");
+        var details = new { role = "thread_length", feature_id = thread.ID.ToString(), variable_id = id.ToString() };
+        if (!double.TryParse(info!.Expression, NumberStyles.Float, CultureInfo.InvariantCulture, out var literal) || !double.IsFinite(literal))
+            throw new DomainException("PARAMETER_HAS_EXPRESSION", "Full-length mode can replace the finite length expression with the length of its supporting cylinder. Keep finite mode to retain the formula.", false, details);
+        var variables = manager!.GetDependentOnVariables(id);
+        var objects = manager.GetDependentOn3dObjects(id);
+        if (variables == null || objects == null || variables.Count > 0 || objects.Any(consumer => consumer != thread.ID))
+            throw new DomainException("PARAMETER_HAS_DEPENDENTS", "Full-length mode can change this finite length driver. Preserve the current mode while another variable or object depends on the driver, or its consumers are unavailable.", false, details);
+        if (!manager.GetVariableValue(id, out var value) || !double.IsFinite(value) || Math.Abs(value - literal) > 1e-8)
+            throw new DomainException("MODEL_STATE_UNAVAILABLE", "The native Thread length variable and its literal do not agree.", false, details);
         return value;
     }
     sealed record Binding(Mc3dSolid Body, ObjectId Source, string Layer, McObjectId[] Contents, ModelViewFollowers.Snapshot Views,
@@ -187,7 +187,7 @@ internal static class ModelManufacturingWriter
         }
         var suppression = contents.Where(x => x.GetObjectOfType<HistoryItem>() != null).ToDictionary(x => x, x => x.GetObjectOfType<HistoryItem>()!.IsSuppressed);
         var retained = new Dictionary<McObjectId, string>(); ModelHoleParameter412.NumericEdit? holeOffsets = null;
-        ThreadDrivers? threadDrivers=null;
+        ThreadDrivers? threadDrivers = null;
         if (!add)
         {
             var owner = feature.GetObjectOfType<HistoryItem>()!;
@@ -201,32 +201,32 @@ internal static class ModelManufacturingWriter
             else if (edit.Kind == "set_model_sweep") Keep(feature.GetObjectOfType<ExtrudeAlongPathFeature>()!.TaperAngleParamVarID, N(d, "taper_angle") * 180 / Math.PI);
             else if (edit.Kind == "set_model_thread")
             {
-                var thread=feature.GetObjectOfType<ThreadFeature>()!;
-                bool toFull=!thread.IsFullLength&&B(d,"full_length")&&!thread.LengthVarID.IsNull;
-                threadDrivers=new(thread.PitchVarID,thread.LengthVarID,toFull);
-                void Protect(string role, McObjectId variable,double? requested)
+                var thread = feature.GetObjectOfType<ThreadFeature>()!;
+                bool toFull = !thread.IsFullLength && B(d, "full_length") && !thread.LengthVarID.IsNull;
+                threadDrivers = new(thread.PitchVarID, thread.LengthVarID, toFull);
+                void Protect(string role, McObjectId variable, double? requested)
                 {
-                    if(variable.IsNull)return;
-                    Keep(variable,requested);
-                    if(requested is double value)
+                    if (variable.IsNull) return;
+                    Keep(variable, requested);
+                    if (requested is double value)
                     {
-                        try { ModelNumericDriverEditor.Validate(thread,variable,value,false); }
-                        catch(DomainException error) when(error.Error.code=="PARAMETER_HAS_EXPRESSION")
+                        try { ModelNumericDriverEditor.Validate(thread, variable, value, false); }
+                        catch (DomainException error) when (error.Error.code == "PARAMETER_HAS_EXPRESSION")
                         {
-                            throw new DomainException("PARAMETER_HAS_EXPRESSION","The thread parameter is formula-driven. Preserve its current value or edit the owning variable through set_model_parameter.",false,
-                                new {role,feature_id=thread.ID.ToString(),variable_id=variable.ToString(),candidate_operation="set_model_parameter"});
+                            throw new DomainException("PARAMETER_HAS_EXPRESSION", "The thread parameter is formula-driven. Preserve its current value or edit the owning variable through set_model_parameter.", false,
+                                new { role, feature_id = thread.ID.ToString(), variable_id = variable.ToString(), candidate_operation = "set_model_parameter" });
                         }
-                        ModelNumericDriverEditor.ValidateChangeScope(thread,variable,value,body!,contents!,views,cancel);
+                        ModelNumericDriverEditor.ValidateChangeScope(thread, variable, value, body!, contents!, views, cancel);
                     }
                 }
-                Protect("thread_pitch",thread.PitchVarID,N(d,"pitch"));
-                if(toFull)IndependentThreadLength(thread);
-                else Protect("thread_length",thread.LengthVarID,B(d,"full_length")?null:N(d,"length"));
+                Protect("thread_pitch", thread.PitchVarID, N(d, "pitch"));
+                if (toFull) IndependentThreadLength(thread);
+                else Protect("thread_length", thread.LengthVarID, B(d, "full_length") ? null : N(d, "length"));
             }
-            else if (edit.Kind=="set_model_hole" && d.TryGetProperty("center",out _))
+            else if (edit.Kind == "set_model_hole" && d.TryGetProperty("center", out _))
             {
-                using var existing=feature.GetObjectOfType<HoleFeature>()!.GetPlacement();
-                Need(existing!=null&&existing.DefType==IppDefinitionType.Fixed,"INVALID_ARGUMENT","A fixed center requires an existing Fixed placement. Read this hole's placement_type before editing.");
+                using var existing = feature.GetObjectOfType<HoleFeature>()!.GetPlacement();
+                Need(existing != null && existing.DefType == IppDefinitionType.Fixed, "INVALID_ARGUMENT", "A fixed center requires an existing Fixed placement. Read this hole's placement_type before editing.");
             }
             else if (edit.Kind == "set_model_hole" && !d.TryGetProperty("center", out _))
             {
@@ -235,7 +235,7 @@ internal static class ModelManufacturingWriter
                     ModelNumericDriverEditor.ValidateChangeScope(owner, driver, driver == holeOffsets.FirstVariable ? holeOffsets.First : holeOffsets.Second, body, contents, views, cancel);
             }
         }
-        return new(body, source, entity.Layer, contents!, views, feature, face, edge1, edge2, plane, sources, Inventory(db, tx), external, retained, datum, profileConsumers.ToArray(), suppression, holeOffsets,threadDrivers);
+        return new(body, source, entity.Layer, contents!, views, feature, face, edge1, edge2, plane, sources, Inventory(db, tx), external, retained, datum, profileConsumers.ToArray(), suppression, holeOffsets, threadDrivers);
     }
     internal static void Preflight(ModifyArguments a, DocumentState s, Transaction t, Action? cancel = null)
     {
@@ -274,7 +274,7 @@ internal static class ModelManufacturingWriter
         if (seat != HoleSeatType.Flat) h.SeatDiameter = N(d, "seat_diameter");
         if (seat == HoleSeatType.Counterbore) h.SeatDepth = N(d, "seat_depth");
         if (seat == HoleSeatType.Countersink) h.SeatAngle = R(d, "seat_angle_degrees");
-        h.FlatBottom = B(d, "flat_bottom"); if (!B(d,"through") && !h.FlatBottom) h.BottomAngle = R(d, "bottom_angle_degrees");
+        h.FlatBottom = B(d, "flat_bottom"); if (!B(d, "through") && !h.FlatBottom) h.BottomAngle = R(d, "bottom_angle_degrees");
     }
     private static HoleSeatType RequestedSeat(JsonElement definition) => S(definition, "seat") switch
     {
@@ -284,17 +284,17 @@ internal static class ModelManufacturingWriter
     };
     static void Thread(ThreadFeature t, JsonElement d, bool add)
     {
-        if(t.IsRight!=B(d,"right_handed"))t.IsRight=B(d,"right_handed");
-        if(t.IsInternal!=B(d,"internal"))t.IsInternal=B(d,"internal");
-        double pitch=N(d,"pitch");
-        if(!add&&!t.PitchVarID.IsNull)ModelNumericDriverEditor.Set(t,t.PitchVarID,pitch,false);
-        else if(add||Math.Abs(t.Pitch-pitch)>1e-8)t.Pitch=pitch;
-        if(t.IsFullLength!=B(d,"full_length"))t.IsFullLength=B(d,"full_length");
-        if(!t.IsFullLength)
+        if (t.IsRight != B(d, "right_handed")) t.IsRight = B(d, "right_handed");
+        if (t.IsInternal != B(d, "internal")) t.IsInternal = B(d, "internal");
+        double pitch = N(d, "pitch");
+        if (!add && !t.PitchVarID.IsNull) ModelNumericDriverEditor.Set(t, t.PitchVarID, pitch, false);
+        else if (add || Math.Abs(t.Pitch - pitch) > 1e-8) t.Pitch = pitch;
+        if (t.IsFullLength != B(d, "full_length")) t.IsFullLength = B(d, "full_length");
+        if (!t.IsFullLength)
         {
-            double length=N(d,"length");
-            if(!add&&!t.LengthVarID.IsNull)ModelNumericDriverEditor.Set(t,t.LengthVarID,length,false);
-            else if(add||Math.Abs(t.Length-length)>1e-8)t.Length=length;
+            double length = N(d, "length");
+            if (!add && !t.LengthVarID.IsNull) ModelNumericDriverEditor.Set(t, t.LengthVarID, length, false);
+            else if (add || Math.Abs(t.Length - length) > 1e-8) t.Length = length;
         }
     }
     static void VerifyValues(McObjectId id, ModelManufacturingEdit edit)
@@ -311,13 +311,13 @@ internal static class ModelManufacturingWriter
             var hole = id.GetObjectOfType<HoleFeature>()!;
             var seat = RequestedSeat(d);
             using var placement = hole.GetPlacement();
-            bool fixedCenter=d.TryGetProperty("center",out var center);
+            bool fixedCenter = d.TryGetProperty("center", out var center);
             ok = hole.SeatType == seat && Near(hole.Diameter, N(d, "diameter")) &&
                 hole.IsFullDepth == B(d, "through") && (hole.IsFullDepth || Near(hole.Depth, N(d, "depth"))) &&
                 hole.FlatBottom == B(d, "flat_bottom") && (hole.IsFullDepth || hole.FlatBottom || Near(hole.BottomAngle, R(d, "bottom_angle_degrees"))) &&
                 placement != null && (fixedCenter ? placement.DefType == IppDefinitionType.Fixed &&
-                    ModelManufacturingHistory.FixedPlacement(placement).Center is double[] actual && center.EnumerateArray().Select((v,i)=>Near(actual[i],v.GetDouble())).All(m=>m) :
-                    placement.DefType==IppDefinitionType.TwoEdges && Near(placement.Param1, N(d, "offset1")) && Near(placement.Param2, N(d, "offset2")) &&
+                    ModelManufacturingHistory.FixedPlacement(placement).Center is double[] actual && center.EnumerateArray().Select((v, i) => Near(actual[i], v.GetDouble())).All(m => m) :
+                    placement.DefType == IppDefinitionType.TwoEdges && Near(placement.Param1, N(d, "offset1")) && Near(placement.Param2, N(d, "offset2")) &&
                     placement.Sector == d.GetProperty("sector").GetInt32());
             if (ok && seat != HoleSeatType.Flat)
                 ok = Near(hole.SeatDiameter, N(d, "seat_diameter")) && (seat == HoleSeatType.Counterbore
@@ -423,15 +423,15 @@ internal static class ModelManufacturingWriter
             using (var verification = state.Document.Database.TransactionManager.StartTransaction())
                 ProjectedHistorySources.Healthy(contents!.ToArray(), ProjectedHistorySources.Read(b.Body, contents.ToArray(), state, verification, job.CheckCancellation));
             VerifyValues(feature, e);
-            if(b.Thread is {} previous)
+            if (b.Thread is { } previous)
             {
-                var thread=feature.GetObjectOfType<ThreadFeature>()!;
-                Need((previous.Pitch.IsNull||thread.PitchVarID==previous.Pitch)&&(previous.Length.IsNull||thread.LengthVarID==previous.Length),
-                    "MODEL_STATE_UNAVAILABLE","The native thread changed the identity of its existing pitch or length driver.");
-                if(previous.ToFullLength)
+                var thread = feature.GetObjectOfType<ThreadFeature>()!;
+                Need((previous.Pitch.IsNull || thread.PitchVarID == previous.Pitch) && (previous.Length.IsNull || thread.LengthVarID == previous.Length),
+                    "MODEL_STATE_UNAVAILABLE", "The native thread changed the identity of its existing pitch or length driver.");
+                if (previous.ToFullLength)
                 {
-                    double value=IndependentThreadLength(thread);
-                    Need(thread.IsFullLength&&Math.Abs(value-thread.Length)<=1e-8,"MODEL_UPDATE_FAILED","The native full-length value and its retained local length driver differ.");
+                    double value = IndependentThreadLength(thread);
+                    Need(thread.IsFullLength && Math.Abs(value - thread.Length) <= 1e-8, "MODEL_UPDATE_FAILED", "The native full-length value and its retained local length driver differ.");
                 }
             }
             if (b.HoleOffsets != null) ModelHoleParameter412.VerifyNumeric(feature.GetObjectOfType<HoleFeature>()!, b.HoleOffsets);

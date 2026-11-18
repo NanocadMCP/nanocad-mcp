@@ -630,7 +630,7 @@ internal static class OutputSchemas
         var children = Array(Object(("ref", Ref("ref")), ("kind", Text()), ("source_index", Integer()), ("tag", Nullable(Text()))));
         children["description"] = "Complete created native children. For define_block, entity/attribute_definition source_index identifies the requested array member. nested_attribute identifies a newly owned attribute of the BlockReference at that entities source_index; tag is its actual tag. inspect_block supplies the actual parent/occurrence path. For set_block_definition_members, added_member/added_nested_attribute source_index identifies add_entities; retired_member/retired_nested_attribute identifies remove_handles, including the actual owned attribute tag. block_reference children are actual retained consumers marked for redraw. Retired IDs are inactive and must not be reused for a later edit. No fixed child-count truncation.";
         structureChange["properties"]!["children"] = children;
-        structureChange["properties"]!["raster_calibration"] = Object(("mm_per_pixel",Number()),("check_error_mm",Nullable(Number())));
+        structureChange["properties"]!["raster_calibration"] = Object(("mm_per_pixel", Number()), ("check_error_mm", Nullable(Number())));
         JsonObject data = operation switch
         {
             "analyze_geometry" => GeometryAnalysis(),

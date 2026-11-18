@@ -23,7 +23,7 @@ public static class ReadPreparationBindings433
             case "inspect_solid_topology": adapter.Topology(data); break;
             case "inspect_sketch_constraints":
             case "inspect_constraints": adapter.Constraints(data, reader); break;
-            // get_document contributes only common read context in the caller.
+                // get_document contributes only common read context in the caller.
         }
         return result;
     }
@@ -52,8 +52,10 @@ public static class ReadPreparationBindings433
         private static bool Present(JsonElement value) => value.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null);
         private static JsonObject Candidate(string pointer, JsonObject target) => new()
         {
-            ["source_pointer"] = pointer, ["target"] = target,
-            ["bindings"] = new JsonArray(), ["current_values"] = new JsonArray()
+            ["source_pointer"] = pointer,
+            ["target"] = target,
+            ["bindings"] = new JsonArray(),
+            ["current_values"] = new JsonArray()
         };
         private void Bind(JsonObject candidate, string field, JsonElement source, string name, string pointer)
         {
@@ -64,7 +66,9 @@ public static class ReadPreparationBindings433
             if (!Field(field) || !Present(value)) return;
             candidate["bindings"]!.AsArray().Add(new JsonObject
             {
-                ["argument"] = prefix + "/" + field, ["value"] = Node(value), ["source_pointer"] = pointer
+                ["argument"] = prefix + "/" + field,
+                ["value"] = Node(value),
+                ["source_pointer"] = pointer
             });
         }
         private static void Current(JsonObject candidate, string name, JsonElement source, string field, string pointer, string? unit = null)
@@ -88,7 +92,9 @@ public static class ReadPreparationBindings433
             BindValue(candidate, "handle", handle, pointer + "/handle");
             if (Field("handles")) candidate["bindings"]!.AsArray().Add(new JsonObject
             {
-                ["argument"] = prefix + "/handles/0", ["value"] = Node(handle), ["source_pointer"] = pointer + "/handle"
+                ["argument"] = prefix + "/handles/0",
+                ["value"] = Node(handle),
+                ["source_pointer"] = pointer + "/handle"
             });
         }
         private static JsonObject Target(JsonElement reference) => new() { ["ref"] = Node(reference), ["scope"] = "observed_target_not_write_preflight" };

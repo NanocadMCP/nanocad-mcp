@@ -245,7 +245,7 @@ public static class StructureWriteValidation
         DrawingViewCreateValidation.ValidateTargetSpace(edits, targetSpace ?? "model");
         SectionViewValidation.ValidateBatch(edits);
         if (edits.OfType<CreateSectionViewEdit>().Any(section => (section.LayoutHandle != null) != (targetSpace == "paper")))
-            throw Invalid("$.target_space","Paper section views require target_space paper and the exact active layout_handle.");
+            throw Invalid("$.target_space", "Paper section views require target_space paper and the exact active layout_handle.");
         SectionCutValidation351.Batch(edits);
         ViewportCreateValidation.ValidateBatch(edits);
         return new(bridge, document, number.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray(), targetSpace);

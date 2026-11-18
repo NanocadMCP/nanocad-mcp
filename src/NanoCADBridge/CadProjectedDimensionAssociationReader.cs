@@ -232,11 +232,17 @@ internal static class CadProjectedDimensionAssociationReader
                             ? (angular ? s : s * drawingScale) : null;
                         if (expected.HasValue && !double.IsFinite(expected.Value)) expected = null;
                         double nominal = dimension.Value, factor = dimension.DimensionScale;
-                        measurement = new { sheet_geometry = sheet, sheet_unit = angular ? "radians" : "drawing_units",
+                        measurement = new
+                        {
+                            sheet_geometry = sheet,
+                            sheet_unit = angular ? "radians" : "drawing_units",
                             physical_length_from_projection = angular ? null : expected,
-                            view_scale_denominator = drawingScale, native_measurement_factor = double.IsFinite(factor) ? (double?)factor : null,
+                            view_scale_denominator = drawingScale,
+                            native_measurement_factor = double.IsFinite(factor) ? (double?)factor : null,
                             native_nominal_length = !angular && double.IsFinite(nominal) && nominal != McDimension.UnknownValue ? (double?)nominal : null,
-                            unavailable_reason = reason, text_mode = DimensionTextContent.DisplayMode(source.DimensionText, source.HasFields) };
+                            unavailable_reason = reason,
+                            text_mode = DimensionTextContent.DisplayMode(source.DimensionText, source.HasFields)
+                        };
                     }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception error) when (error is DomainException or Teigha.Runtime.Exception)

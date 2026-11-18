@@ -10,7 +10,8 @@ internal static class PointCloudSchemas
 
     static JsonObject Object(params (string Name, JsonNode Schema)[] fields) => new()
     {
-        ["type"] = "object", ["additionalProperties"] = false,
+        ["type"] = "object",
+        ["additionalProperties"] = false,
         ["properties"] = new JsonObject(fields.Select(f => KeyValuePair.Create<string, JsonNode?>(f.Name, f.Schema))),
         ["required"] = new JsonArray(fields.Select(f => (JsonNode?)JsonValue.Create(f.Name)).ToArray())
     };
@@ -68,21 +69,31 @@ internal static class PointCloudSchemas
         properties["query_point"]!["description"] = "Statistics only: WCS query point for the nearest actual raw point in the requested subset. A partial scan is not a final nearest-point answer.";
         properties["include_attributes"] = new JsonObject { ["type"] = "boolean", ["default"] = false, ["description"] = "points/section only: request available native point attributes. Unavailable attributes are reported explicitly; default pages contain indices and coordinates only." };
         JsonObject Kind(string kind) => new() { ["type"] = "string", ["const"] = kind };
-        properties["measurement"] = new JsonObject { ["oneOf"] = new JsonArray(
+        properties["measurement"] = new JsonObject
+        {
+            ["oneOf"] = new JsonArray(
             Object(("kind", Kind("point_distance")), ("point_index", Index()), ("second_point_index", Index())),
             Object(("kind", Kind("point_plane_distance")), ("point_index", Index()),
                 ("reference_plane", Object(("origin", Point()), ("normal", Point())))),
-            Object(("kind", Kind("feature_diameter")), ("feature_id", FeatureId()))) };
+            Object(("kind", Kind("feature_diameter")), ("feature_id", FeatureId())))
+        };
         properties["measurement"]!["description"] = "point_distance reads two current native cloud points; point_plane_distance reads one native cloud point and an explicit reference plane with nonzero normal. feature_diameter reads the stored native Cylinder/Sphere radius; it does not fit raw points or establish manufacturing tolerance.";
         root["allOf"] = new JsonArray(
-            new JsonObject { ["if"] = IsMode("measure"), ["then"] = new JsonObject
+            new JsonObject
+            {
+                ["if"] = IsMode("measure"),
+                ["then"] = new JsonObject
                 { ["required"] = new JsonArray("measurement"), ["allOf"] = new JsonArray(Forbidden("section", "region", "page_size", "cursor", "query_point", "include_attributes")) },
-                ["else"] = Forbidden("measurement") },
+                ["else"] = Forbidden("measurement")
+            },
             new JsonObject { ["if"] = IsMode("section"), ["then"] = new JsonObject { ["required"] = new JsonArray("section") } },
             new JsonObject { ["if"] = IsMode("points"), ["then"] = Forbidden("section") },
             new JsonObject { ["if"] = new JsonObject { ["required"] = new JsonArray("query_point") }, ["then"] = IsMode("statistics") },
-            new JsonObject { ["if"] = new JsonObject { ["required"] = new JsonArray("include_attributes") },
-                ["then"] = new JsonObject { ["properties"] = new JsonObject { ["mode"] = new JsonObject { ["enum"] = new JsonArray("points", "section") } } } });
+            new JsonObject
+            {
+                ["if"] = new JsonObject { ["required"] = new JsonArray("include_attributes") },
+                ["then"] = new JsonObject { ["properties"] = new JsonObject { ["mode"] = new JsonObject { ["enum"] = new JsonArray("points", "section") } } }
+            });
         root["description"] = AnalysisDescription;
         return JsonSerializer.SerializeToElement(root);
     }

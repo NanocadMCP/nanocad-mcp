@@ -13,7 +13,9 @@ internal static class ReadPreparationSchema433
         var copy = JsonNode.Parse(original.GetRawText())!.AsObject();
         copy["properties"]!["prepare_for"] = new JsonObject
         {
-            ["type"] = "object", ["additionalProperties"] = false, ["required"] = new JsonArray("operation"),
+            ["type"] = "object",
+            ["additionalProperties"] = false,
+            ["required"] = new JsonArray("operation"),
             ["properties"] = new JsonObject
             {
                 ["operation"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Wire.WriteOperations.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()), ["description"] = "Prepare this write." },
@@ -31,15 +33,23 @@ internal static class ReadPreparationSchema433
 
     internal static JsonObject Output() => new()
     {
-        ["type"] = "object", ["additionalProperties"] = false,
+        ["type"] = "object",
+        ["additionalProperties"] = false,
         ["required"] = new JsonArray("operation", "variant", "status", "detail"),
         ["properties"] = new JsonObject
         {
-            ["operation"] = Text(), ["variant"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
+            ["operation"] = Text(),
+            ["variant"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
             ["status"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("observed", "source_unavailable", "details_omitted") },
-            ["detail"] = Text(), ["details_omitted"] = new JsonObject { ["type"] = "boolean" }, ["source"] = Object(), ["request_bindings"] = Array(Object()),
-            ["candidates"] = Array(Object()), ["candidate_count"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 },
-            ["next_reads"] = Object(), ["input_fields"] = Array(Object()), ["unit_facts"] = Object()
+            ["detail"] = Text(),
+            ["details_omitted"] = new JsonObject { ["type"] = "boolean" },
+            ["source"] = Object(),
+            ["request_bindings"] = Array(Object()),
+            ["candidates"] = Array(Object()),
+            ["candidate_count"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 },
+            ["next_reads"] = Object(),
+            ["input_fields"] = Array(Object()),
+            ["unit_facts"] = Object()
         },
         ["description"] = "Optional stateless observations for one selected operation. Missing preparation means not requested or no remaining transport bytes, never unsupported. Each binding points to the exact returned read or a declared schema constant. Current values are observations, not chosen new values."
     };

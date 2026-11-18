@@ -23,7 +23,7 @@ public sealed class SnapshotPages<T>
             throw new DomainException("QUERY_LIMIT_EXCEEDED", "Snapshot exceeds its actual 8MiB serialized-byte budget; narrow the query.");
         return First(documentId, revision, selectionRevision, filter, items, pageSize, item => item);
     }
-    public SnapshotPage<TResult> First<TResult>(string documentId, string revision, string? selectionRevision, string filter, T[] items, int pageSize, Func<T,TResult> read)
+    public SnapshotPage<TResult> First<TResult>(string documentId, string revision, string? selectionRevision, string filter, T[] items, int pageSize, Func<T, TResult> read)
     {
         Expire();
         while (_snapshots.Count >= 2) Remove(_snapshots.Values.OrderBy(s => s.Expires).First().Id);
@@ -34,7 +34,7 @@ public sealed class SnapshotPages<T>
     }
     public SnapshotPage<T> Next(string cursor, string documentId, string revision, string? selectionRevision, string filter, int pageSize)
         => Next(cursor, documentId, revision, selectionRevision, filter, pageSize, item => item);
-    public SnapshotPage<TResult> Next<TResult>(string cursor, string documentId, string revision, string? selectionRevision, string filter, int pageSize, Func<T,TResult> read)
+    public SnapshotPage<TResult> Next<TResult>(string cursor, string documentId, string revision, string? selectionRevision, string filter, int pageSize, Func<T, TResult> read)
     {
         Expire();
         if (cursor.Length != 104 || !cursor.All(Uri.IsHexDigit)) throw new DomainException("INVALID_CURSOR", "Malformed cursor.");
@@ -51,7 +51,7 @@ public sealed class SnapshotPages<T>
         if (offset < 0 || offset >= snapshot.Items.Length) throw new DomainException("INVALID_CURSOR", "Invalid cursor position.");
         return Slice(snapshot, offset, pageSize, read);
     }
-    private SnapshotPage<TResult> Slice<TResult>(Snapshot snapshot, int offset, int pageSize, Func<T,TResult> read)
+    private SnapshotPage<TResult> Slice<TResult>(Snapshot snapshot, int offset, int pageSize, Func<T, TResult> read)
     {
         var page = new List<TResult>();
         int bytes = 2048;

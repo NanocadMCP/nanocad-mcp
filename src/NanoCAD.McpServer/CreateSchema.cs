@@ -124,12 +124,18 @@ internal static class CreateSchema
                     "No independent defining coordinates, generic _snap inputs, workplane, text override or dimension_style is accepted. Create projected dimensions as their own group. Native preflight verifies the actual primitive, source/owner and placement. No implicit save.";
             if (kind == "projected_angular")
             {
-                projected["properties"]!["line_indices"]=new JsonObject { ["type"]="array", ["minItems"]=2, ["maxItems"]=2, ["uniqueItems"]=true,
-                    ["items"]=new JsonObject { ["type"]="integer", ["minimum"]=0, ["maximum"]=int.MaxValue },
-                    ["description"]="Two distinct current visible projected lines sharing one endpoint in this Paper view; the first line anchors the common vertex." };
-                projected["oneOf"]=new JsonArray(new JsonObject { ["required"]=new JsonArray("arc_index") },new JsonObject { ["required"]=new JsonArray("line_indices") });
-                projected["properties"]!["dimline_point"]!["description"]="Paper XY point strictly inside the intended angular sector.";
-                projected["description"]="Create an associative angular dimension on one ordinary auto-updating Paper view, including 1:1 and scaled views. Supply exactly one selector from the current original-view geometry: arc_index for a finite circular arc, or line_indices for two straight rays with a common endpoint. The second mode binds the two outer ends and the first line's common endpoint. Place dimline_point strictly inside the desired sector. Native verification reads the resident view anchor identities and measured sector for a two-line angle.";
+                projected["properties"]!["line_indices"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["minItems"] = 2,
+                    ["maxItems"] = 2,
+                    ["uniqueItems"] = true,
+                    ["items"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = int.MaxValue },
+                    ["description"] = "Two distinct current visible projected lines sharing one endpoint in this Paper view; the first line anchors the common vertex."
+                };
+                projected["oneOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("arc_index") }, new JsonObject { ["required"] = new JsonArray("line_indices") });
+                projected["properties"]!["dimline_point"]!["description"] = "Paper XY point strictly inside the intended angular sector.";
+                projected["description"] = "Create an associative angular dimension on one ordinary auto-updating Paper view, including 1:1 and scaled views. Supply exactly one selector from the current original-view geometry: arc_index for a finite circular arc, or line_indices for two straight rays with a common endpoint. The second mode binds the two outer ends and the first line's common endpoint. Place dimline_point strictly inside the desired sector. Native verification reads the resident view anchor identities and measured sector for a two-line angle.";
             }
             entities.Add(projected);
         }

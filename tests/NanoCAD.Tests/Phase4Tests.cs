@@ -17,11 +17,11 @@ internal static class Phase4Tests
         double[] matrix = { 0, -3, 0, 109, 2, 0, 0, 46, 0, 0, 1, 0, 0, 0, 0, 1 };
         double[] identity = { 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
         var block = new BlockInfo(Ref("AA"), "Test block", false, false, false, false, false, false, new[] { 2d, 3, 0 }, "Millimeters", null);
-        var stored=new{visible=true,color=new{method="by_layer",aci=(int?)null,rgb=(int[]?)null},linetype="ByLayer",lineweight=new{mode="by_layer",value_hundredth_mm=(int?)null,native_value=-1}};
+        var stored = new { visible = true, color = new { method = "by_layer", aci = (int?)null, rgb = (int[]?)null }, linetype = "ByLayer", lineweight = new { mode = "by_layer", value_hundredth_mm = (int?)null, native_value = -1 } };
         var attribute = new AttributeInfo(Ref("AC"), "TAG", "Value", new[] { 100d, 50, 0 }, 3, 0, false, false, "WCS", identity,
-            new("0","A"),stored,new(Ref("AD"),"Standard",1,0,"TextLeft","TextBase",new double[3]));
+            new("0", "A"), stored, new(Ref("AD"), "Standard", 1, 0, "TextLeft", "TextBase", new double[3]));
         var root = new BlockNode(new[] { "AB" }, new(Ref("AB"), "BlockReference", "test.BlockReference", new("0", "A"), "model", "supported"), identity,
-            null, new(block, new[] { 100d, 50, 0 }, new[] { 0d, 0, 1 }, new[] { 2d, 3, 1 }, Math.PI / 2, matrix, matrix, new[] { attribute }, false, "expanded",stored), null);
+            null, new(block, new[] { 100d, 50, 0 }, new[] { 0d, 0, 1 }, new[] { 2d, 3, 1 }, Math.PI / 2, matrix, matrix, new[] { attribute }, false, "expanded", stored), null);
         return new BlockInspection(Ref("AB"), new[] { root }, true, Array.Empty<string>());
     }
     public static async Task Run(Func<string, Func<Task>, Task> test)
@@ -72,8 +72,13 @@ internal static class Phase4Tests
             int calls = 0; string bridge = Guid.NewGuid().ToString("D");
             using var listener = new BridgeListener(Discovery.Describe(bridge, "structure-test-no-CAD"), (request, _) =>
             { calls++; return Task.FromResult(Result.Ok(request.requestId, new { })); }, new JsonLog("structure-test"));
-            var args = new Dictionary<string, JsonElement> { ["bridge_instance_id"] = Wire.Element(bridge), ["document_id"] = Wire.Element(doc),
-                ["handle"] = Wire.Element("A"), ["save"] = Wire.Element(true) };
+            var args = new Dictionary<string, JsonElement>
+            {
+                ["bridge_instance_id"] = Wire.Element(bridge),
+                ["document_id"] = Wire.Element(doc),
+                ["handle"] = Wire.Element("A"),
+                ["save"] = Wire.Element(true)
+            };
             var result = await new ToolService().CallAsync("inspect_block", args, default);
             Check(result.IsError == true && calls == 0, "unknown structural argument reached native host");
         });

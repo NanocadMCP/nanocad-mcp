@@ -118,10 +118,10 @@ internal sealed class StructureReader
                 if (section is not ("table_styles" or "mleader_styles")) throw mismatch;
                 bool local = !name.Contains('|');
                 bool native = section == "table_styles" ? obj.GetType() == typeof(TableStyle) : obj.GetType() == typeof(MLeaderStyle);
-                if (native && obj is MLeaderStyle leader) return Row(name, CadMLeaderStyleWriter337.ReadProperties(leader,name,db,tr,Check));
+                if (native && obj is MLeaderStyle leader) return Row(name, CadMLeaderStyleWriter337.ReadProperties(leader, name, db, tr, Check));
                 if (native && local && obj is TableStyle table)
                 {
-                    var observed = CadTableStyleWriter337.TryReadProperties(table,db,tr,Check);
+                    var observed = CadTableStyleWriter337.TryReadProperties(table, db, tr, Check);
                     return observed.Value is { } details
                         ? Row(name, new { native_type = obj.GetType().Name, is_local = local, can_reference = true, is_current = id == db.Tablestyle, table_style = details })
                         : Row(name, new { native_type = obj.GetType().Name, is_local = local, can_reference = true, is_current = id == db.Tablestyle, table_style_unavailable_reason = observed.Reason });
@@ -131,17 +131,27 @@ internal sealed class StructureReader
             if (obj is LayerTableRecord layer)
             {
                 using var color = layer.Color;
-                return Row(layer.Name, new { is_off = layer.IsOff, is_frozen = layer.IsFrozen, is_locked = layer.IsLocked,
-                    is_dependent = layer.IsDependent, is_current = id == db.Clayer, is_plottable = layer.IsPlottable,
-                    color = Color(color), linetype = Reference(layer.LinetypeObjectId), lineweight = (int)layer.LineWeight,
-                    transparency = CadAppearanceProperties.ReadTransparency(layer.Transparency), description = CadAppearanceProperties.ReadDescription(layer) });
+                return Row(layer.Name, new
+                {
+                    is_off = layer.IsOff,
+                    is_frozen = layer.IsFrozen,
+                    is_locked = layer.IsLocked,
+                    is_dependent = layer.IsDependent,
+                    is_current = id == db.Clayer,
+                    is_plottable = layer.IsPlottable,
+                    color = Color(color),
+                    linetype = Reference(layer.LinetypeObjectId),
+                    lineweight = (int)layer.LineWeight,
+                    transparency = CadAppearanceProperties.ReadTransparency(layer.Transparency),
+                    description = CadAppearanceProperties.ReadDescription(layer)
+                });
             }
             return obj switch
             {
-                LinetypeTableRecord line => Row(line.Name, LinetypeMetadataReader.Read(line,tr,db,Reference,Check,Check)),
-                TextStyleTableRecord text => Row(text.Name, CurrentStyleProperties(TextStyleMetadataReader.Read(text,Check),id==db.Textstyle)),
-                DimStyleTableRecord dim => Row(dim.Name, CurrentStyleProperties(DimensionStyleMetadataReader.Read(dim,tr,db,Reference,Check,Check),id==db.Dimstyle)),
-                BlockTableRecord block => Row(block.Name, Block(block,state.Id,db,tr,Check)),
+                LinetypeTableRecord line => Row(line.Name, LinetypeMetadataReader.Read(line, tr, db, Reference, Check, Check)),
+                TextStyleTableRecord text => Row(text.Name, CurrentStyleProperties(TextStyleMetadataReader.Read(text, Check), id == db.Textstyle)),
+                DimStyleTableRecord dim => Row(dim.Name, CurrentStyleProperties(DimensionStyleMetadataReader.Read(dim, tr, db, Reference, Check, Check), id == db.Dimstyle)),
+                BlockTableRecord block => Row(block.Name, Block(block, state.Id, db, tr, Check)),
                 _ => throw mismatch
             };
         }
@@ -149,9 +159,9 @@ internal sealed class StructureReader
             return new(section, [ReadRecord(args.StructureRecordHandle)], 1, 1, true, null);
         var key = args.FilterKey("get_structure");
         var page = args.Cursor == null
-            ? _pages.First(state.Id,state.Revision,null,key,Identities().ToArray(),args.PageSize,ReadRecord)
-            : _pages.Next(args.Cursor,state.Id,state.Revision,null,key,args.PageSize,ReadRecord);
-        return new(section,page.items,page.total_count,page.returned_count,page.complete,page.next_cursor);
+            ? _pages.First(state.Id, state.Revision, null, key, Identities().ToArray(), args.PageSize, ReadRecord)
+            : _pages.Next(args.Cursor, state.Id, state.Revision, null, key, args.PageSize, ReadRecord);
+        return new(section, page.items, page.total_count, page.returned_count, page.complete, page.next_cursor);
     }
 
     private static JsonElement CurrentStyleProperties(object properties, bool current)

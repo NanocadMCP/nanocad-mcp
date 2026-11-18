@@ -8,12 +8,12 @@ internal static class SectionViewTests
     { try { Parse(edit); } catch (DomainException) { return; } throw new Exception("Invalid section input accepted."); }
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
-        await test("drawing preparation binds the ordinary section view to the exact requested paper layout",()=>
+        await test("drawing preparation binds the ordinary section view to the exact requested paper layout", () =>
         {
-            var op=Edit();op["layout_handle"]="000A";
-            var request=DrawingViewCreateTests.Input(op);request["target_space"]="paper";
-            var section=(CreateSectionViewEdit)StructureWriteValidation.Parse(Wire.Element(request)).Operations.Single();
-            if(section.LayoutHandle!="A")throw new Exception("Paper layout identity was lost.");
+            var op = Edit(); op["layout_handle"] = "000A";
+            var request = DrawingViewCreateTests.Input(op); request["target_space"] = "paper";
+            var section = (CreateSectionViewEdit)StructureWriteValidation.Parse(Wire.Element(request)).Operations.Single();
+            if (section.LayoutHandle != "A") throw new Exception("Paper layout identity was lost.");
             Reject(op);
             return Task.CompletedTask;
         });

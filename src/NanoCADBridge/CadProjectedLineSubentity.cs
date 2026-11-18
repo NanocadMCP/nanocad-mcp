@@ -47,7 +47,7 @@ internal static class CadProjectedLineSubentity
             {
                 if (subentity is not Line line) return Unavailable("subentity_is_not_a_line");
                 bool Near(Point3d p, Point3d q) => p.DistanceTo(q) <= 1e-7;
-                if (!(Near(a,line.StartPoint) && Near(b,line.EndPoint) || Near(b,line.StartPoint) && Near(a,line.EndPoint)))
+                if (!(Near(a, line.StartPoint) && Near(b, line.EndPoint) || Near(b, line.StartPoint) && Near(a, line.EndPoint)))
                     return Unavailable("native_subentity_endpoints_differ_from_projection");
                 stage = "osnap_point_reference";
                 bool Resolves(ObjectSnapModes mode, Point3d endpoint)
@@ -59,12 +59,18 @@ internal static class CadProjectedLineSubentity
                     reference.NearPointParam = line.GetParameterAtPoint(endpoint);
                     return Near(reference.EvalPoint(), endpoint);
                 }
-                if (!Resolves(ObjectSnapModes.ModeStartpoint,line.StartPoint) || !Resolves(ObjectSnapModes.ModeEnd,line.EndPoint))
+                if (!Resolves(ObjectSnapModes.ModeStartpoint, line.StartPoint) || !Resolves(ObjectSnapModes.ModeEnd, line.EndPoint))
                     return Unavailable("endpoint_reference_does_not_evaluate_on_selected_view");
-                return new { status = "observed", view_handle = view.Handle.ToString(), graphics_marker = marker,
-                    subentity_type = "edge", subentity_index = path.SubentId.IndexPtr.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture),
-                    start_point = new[] { line.StartPoint.X,line.StartPoint.Y,line.StartPoint.Z },
-                    end_point = new[] { line.EndPoint.X,line.EndPoint.Y,line.EndPoint.Z } };
+                return new
+                {
+                    status = "observed",
+                    view_handle = view.Handle.ToString(),
+                    graphics_marker = marker,
+                    subentity_type = "edge",
+                    subentity_index = path.SubentId.IndexPtr.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    start_point = new[] { line.StartPoint.X, line.StartPoint.Y, line.StartPoint.Z },
+                    end_point = new[] { line.EndPoint.X, line.EndPoint.Y, line.EndPoint.Z }
+                };
             }
         }
         catch (Exception ex) when (ex is Teigha.Runtime.Exception or InvalidOperationException or ArgumentException or NotSupportedException or NotImplementedException)

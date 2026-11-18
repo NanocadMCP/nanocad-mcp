@@ -79,24 +79,24 @@ internal static class ProjectedDimensionCreateTests
     {
         await test("projected angular accepts exactly one native selector and preserves its two distinct line identities", () =>
         {
-            var angle=Entity("projected_angular"); angle.Remove("arc_index"); angle["line_indices"]=new JsonArray(1,4);
-            var args=Parse(angle); WriteSpace.Check(args);
-            Need(args.Entities.Single() is ProjectedCornerDimensionSpec { FirstLineIndex:1, SecondLineIndex:4 },"Both native line indices must survive parsing.");
-            Reject(()=>WriteSpace.Check(Parse(angle,"model")),"OUT_OF_SCOPE");
-            Need(args.Fingerprint()!=Parse(Entity("projected_angular")).Fingerprint(),"Arc and two-line geometry cannot have the same intent.");
-            angle["line_indices"]=new JsonArray(4,1);
-            Need(args.Fingerprint()!=Parse(angle).Fingerprint(),"The first selected line supplies the vertex anchor.");
-            angle["arc_index"]=0; Reject(()=>Parse(angle)); angle.Remove("arc_index");
-            foreach(var invalid in new[]{new JsonArray(1,1),new JsonArray(-1,0),new JsonArray(0),new JsonArray(1,2,3),new JsonArray(1,"2")})
-            { angle["line_indices"]=invalid; Reject(()=>Parse(angle)); }
-            var a=new Point2(10,0); var vertex=new Point2(0,0); var b=new Point2(0,20);
-            var minor=ProjectedCornerGeometry.Resolve(a,vertex,vertex,b,new(3,4));
-            var reflex=ProjectedCornerGeometry.Resolve(a,vertex,vertex,b,new(-3,-4));
-            Need(minor.FirstVertex==1 && minor.SecondVertex==0 && !minor.ReverseRays && Math.Abs(minor.Sweep-Math.PI/2)<1e-12 &&
-                reflex.ReverseRays && Math.Abs(reflex.Sweep-3*Math.PI/2)<1e-12,"Native ray order or selected sector was lost.");
-            Reject(()=>ProjectedCornerGeometry.Resolve(a,vertex,vertex,b,new(3,0)),"INVALID_GEOMETRY");
-            Reject(()=>ProjectedCornerGeometry.Resolve(a,vertex,new(0,-5),b,new(3,2)),"INVALID_GEOMETRY");
-            Reject(()=>ProjectedCornerGeometry.Resolve(a,vertex,vertex,new(-10,0),new(3,2)),"INVALID_GEOMETRY");
+            var angle = Entity("projected_angular"); angle.Remove("arc_index"); angle["line_indices"] = new JsonArray(1, 4);
+            var args = Parse(angle); WriteSpace.Check(args);
+            Need(args.Entities.Single() is ProjectedCornerDimensionSpec { FirstLineIndex: 1, SecondLineIndex: 4 }, "Both native line indices must survive parsing.");
+            Reject(() => WriteSpace.Check(Parse(angle, "model")), "OUT_OF_SCOPE");
+            Need(args.Fingerprint() != Parse(Entity("projected_angular")).Fingerprint(), "Arc and two-line geometry cannot have the same intent.");
+            angle["line_indices"] = new JsonArray(4, 1);
+            Need(args.Fingerprint() != Parse(angle).Fingerprint(), "The first selected line supplies the vertex anchor.");
+            angle["arc_index"] = 0; Reject(() => Parse(angle)); angle.Remove("arc_index");
+            foreach (var invalid in new[] { new JsonArray(1, 1), new JsonArray(-1, 0), new JsonArray(0), new JsonArray(1, 2, 3), new JsonArray(1, "2") })
+            { angle["line_indices"] = invalid; Reject(() => Parse(angle)); }
+            var a = new Point2(10, 0); var vertex = new Point2(0, 0); var b = new Point2(0, 20);
+            var minor = ProjectedCornerGeometry.Resolve(a, vertex, vertex, b, new(3, 4));
+            var reflex = ProjectedCornerGeometry.Resolve(a, vertex, vertex, b, new(-3, -4));
+            Need(minor.FirstVertex == 1 && minor.SecondVertex == 0 && !minor.ReverseRays && Math.Abs(minor.Sweep - Math.PI / 2) < 1e-12 &&
+                reflex.ReverseRays && Math.Abs(reflex.Sweep - 3 * Math.PI / 2) < 1e-12, "Native ray order or selected sector was lost.");
+            Reject(() => ProjectedCornerGeometry.Resolve(a, vertex, vertex, b, new(3, 0)), "INVALID_GEOMETRY");
+            Reject(() => ProjectedCornerGeometry.Resolve(a, vertex, new(0, -5), b, new(3, 2)), "INVALID_GEOMETRY");
+            Reject(() => ProjectedCornerGeometry.Resolve(a, vertex, vertex, new(-10, 0), new(3, 2)), "INVALID_GEOMETRY");
             return Task.CompletedTask;
         });
         await test("projected circular dimensions retain actual primitive index and explicit paper placement", () =>
@@ -197,12 +197,12 @@ internal static class ProjectedDimensionCreateTests
                     !fields.EnumerateObject().Any(field => field.Name.EndsWith("_snap", StringComparison.Ordinal)),
                     "Focused projected fields changed or acquired unrelated coordinate bindings.");
                 var required = item.GetProperty("required").EnumerateArray().Select(field => field.GetString()).ToHashSet(StringComparer.Ordinal);
-                if (kind=="projected_angular")
+                if (kind == "projected_angular")
                 {
-                    var alternatives=item.GetProperty("oneOf").EnumerateArray().Select(branch=>branch.GetProperty("required")[0].GetString()).ToHashSet();
-                    Need(alternatives.SetEquals(["arc_index","line_indices"]) && fields.GetProperty("line_indices").GetProperty("uniqueItems").GetBoolean(),"Exactly one native angular source selection is required.");
+                    var alternatives = item.GetProperty("oneOf").EnumerateArray().Select(branch => branch.GetProperty("required")[0].GetString()).ToHashSet();
+                    Need(alternatives.SetEquals(["arc_index", "line_indices"]) && fields.GetProperty("line_indices").GetProperty("uniqueItems").GetBoolean(), "Exactly one native angular source selection is required.");
                 }
-                else Need(required.Remove("arc_index"),"Expected a required native arc selector.");
+                else Need(required.Remove("arc_index"), "Expected a required native arc selector.");
                 Need(required.SetEquals(["type", "kind", "view_handle", "dimline_point"]) &&
                     !item.GetProperty("additionalProperties").GetBoolean(), "Projected item closure or mandatory native references were lost.");
                 string description = item.GetProperty("description").GetString()!;

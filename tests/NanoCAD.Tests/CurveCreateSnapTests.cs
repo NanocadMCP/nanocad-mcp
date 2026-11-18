@@ -15,16 +15,26 @@ internal static class CurveCreateSnapTests
     {
         await test("closed two-arc polyline retains outgoing bulges and resolves source vertices", () =>
         {
-            var spec = Parse(new { type = "Polyline", closed = true, vertices = new object[] {
-                new { point_snap = Center, bulge = 1 }, new { point = new[] { 10, 0 }, bulge = 1 } } });
+            var spec = Parse(new
+            {
+                type = "Polyline",
+                closed = true,
+                vertices = new object[] {
+                new { point_snap = Center, bulge = 1 }, new { point = new[] { 10, 0 }, bulge = 1 } }
+            });
             var result = ((INativeSnappedCreation)spec).Materialize(input => input.Point ?? new Point2(-10, 0));
             Check(result is PolylineSpec { Closed: true, Vertices.Length: 2 } polyline &&
                 polyline.Vertices.All(v => v.Bulge == 1) && polyline.Vertices[0].Point.X == -10,
                 "A valid two-semicircle contour lost its seam or bulges.");
             Reject(() => ((INativeSnappedCreation)spec).Materialize(_ => new Point2(0, 0)));
             foreach (double bulge in new[] { 0d, 1d })
-                Reject(() => Parse(new { type = "Polyline", closed = true, vertices = new[] {
-                    new { point = new[] { -10, 0 }, bulge }, new { point = new[] { 10, 0 }, bulge = -bulge } } }));
+                Reject(() => Parse(new
+                {
+                    type = "Polyline",
+                    closed = true,
+                    vertices = new[] {
+                    new { point = new[] { -10, 0 }, bulge }, new { point = new[] { 10, 0 }, bulge = -bulge } }
+                }));
             return Task.CompletedTask;
         });
         await test("planar curve snaps retain native intent and materialize through the original geometry parser", () =>

@@ -245,10 +245,18 @@ internal static class ModelParameterGraphWriter410
                 {
                     var control = ModelFeatureVariable.Resolve(bound.Body.Body, feature.ID, b.Variables[id], feature.IsAngle, allowPlacement: true, allowFinishing: true, cancel: cancel);
                     double actual = control.Value;
-                    if(control.Role != feature.Role || control.PlacementComponent != feature.PlacementComponent || !ModelParameterSnapshot.Near(actual, expected))
+                    if (control.Role != feature.Role || control.PlacementComponent != feature.PlacementComponent || !ModelParameterSnapshot.Near(actual, expected))
                         throw new DomainException("MODEL_UPDATE_FAILED", "The actual owning control did not retain its planned value/binding.", false,
-                            new { variable_id=id, feature_id=control.ID.ToString(), expected_role=feature.Role,
-                                actual_role=control.Role, expected_value=expected, observed_value=double.IsFinite(actual)?(double?)actual:null, unit=control.Unit });
+                            new
+                            {
+                                variable_id = id,
+                                feature_id = control.ID.ToString(),
+                                expected_role = feature.Role,
+                                actual_role = control.Role,
+                                expected_value = expected,
+                                observed_value = double.IsFinite(actual) ? (double?)actual : null,
+                                unit = control.Unit
+                            });
                 }
             }
             else foreach (string field in new[] { "value", "value_available" }) Need(ModelParameterSnapshot.Equivalent(prior.GetProperty(field), now.GetProperty(field)), "MODEL_STATE_UNAVAILABLE", "An unplanned native variable value changed.");

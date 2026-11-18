@@ -13,25 +13,25 @@ internal static class DrawingViewCreateTests
     {
         await test("drawing preparation supports both orthographic conventions without changing observation directions", () =>
         {
-            var edit=Edit();edit["projection_method"]="first_angle";edit["top_origin"]=new[]{2000d,-80};
-            edit["projected_views"]=new[]{new{direction="right",origin=new[]{1950d,0}}};
-            var first=(CreateDrawingViewsEdit)Parse(edit).Operations.Single();
-            if(first.ProjectedViews.Single().Direction!="right"||first.TopOrigin!.Y!=-80) throw new Exception("First-angle placement changed the view identity.");
-            edit["projection_method"]="third_angle";Reject(Input(edit));
-            edit["top_origin"]=new[]{2000d,80};edit["projected_views"]=new[]{new{direction="right",origin=new[]{2050d,0}}};
-            _=Parse(edit);
+            var edit = Edit(); edit["projection_method"] = "first_angle"; edit["top_origin"] = new[] { 2000d, -80 };
+            edit["projected_views"] = new[] { new { direction = "right", origin = new[] { 1950d, 0 } } };
+            var first = (CreateDrawingViewsEdit)Parse(edit).Operations.Single();
+            if (first.ProjectedViews.Single().Direction != "right" || first.TopOrigin!.Y != -80) throw new Exception("First-angle placement changed the view identity.");
+            edit["projection_method"] = "third_angle"; Reject(Input(edit));
+            edit["top_origin"] = new[] { 2000d, 80 }; edit["projected_views"] = new[] { new { direction = "right", origin = new[] { 2050d, 0 } } };
+            _ = Parse(edit);
             return Task.CompletedTask;
         });
         await test("drawing preparation keeps raster controls and portable reference paths explicit", () =>
         {
-            var pair1=new{pixel=new[]{0,0},drawing=new[]{10,20}};
-            var pair2=new{pixel=new[]{10,0},drawing=new[]{10,40}};
-            var calibration=RasterCalibration.Parse(Wire.Element(new{anchors=new[]{pair1,pair2},check_point=new{pixel=new[]{10,5},drawing=new[]{0,40}},max_check_error_mm=0.1}),"calibration");
-            if(calibration.Map(new(10,5),1)!=new Point2(0,40)||calibration.Map(new(10,5),-1)!=new Point2(20,40)) throw new Exception("Control-frame handedness or scale was lost.");
-            var edit=new Dictionary<string,object>{["operation"]="reload_xref",["reference_kind"]="xref",["handle"]="A",["reference_token"]=new string('A',64),["source_path"]=@"..\parts\base.dwg"};
-            if(((ReferenceLifecycle385)Parse(edit).Operations.Single()).SourcePath!=@"..\parts\base.dwg") throw new Exception("Relative link was resolved against the process directory.");
-            edit["operation"]="detach_xref";Reject(Input(edit));
-            edit["operation"]="reload_xref";edit["source_path"]=@"C:parts\base.dwg";Reject(Input(edit));
+            var pair1 = new { pixel = new[] { 0, 0 }, drawing = new[] { 10, 20 } };
+            var pair2 = new { pixel = new[] { 10, 0 }, drawing = new[] { 10, 40 } };
+            var calibration = RasterCalibration.Parse(Wire.Element(new { anchors = new[] { pair1, pair2 }, check_point = new { pixel = new[] { 10, 5 }, drawing = new[] { 0, 40 } }, max_check_error_mm = 0.1 }), "calibration");
+            if (calibration.Map(new(10, 5), 1) != new Point2(0, 40) || calibration.Map(new(10, 5), -1) != new Point2(20, 40)) throw new Exception("Control-frame handedness or scale was lost.");
+            var edit = new Dictionary<string, object> { ["operation"] = "reload_xref", ["reference_kind"] = "xref", ["handle"] = "A", ["reference_token"] = new string('A', 64), ["source_path"] = @"..\parts\base.dwg" };
+            if (((ReferenceLifecycle385)Parse(edit).Operations.Single()).SourcePath != @"..\parts\base.dwg") throw new Exception("Relative link was resolved against the process directory.");
+            edit["operation"] = "detach_xref"; Reject(Input(edit));
+            edit["operation"] = "reload_xref"; edit["source_path"] = @"C:parts\base.dwg"; Reject(Input(edit));
             return Task.CompletedTask;
         });
         await test("drawing view creation requires explicit placement scale and source", () =>

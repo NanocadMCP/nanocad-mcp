@@ -143,20 +143,21 @@ internal sealed class CadWriter
                 CadEmptyLayoutDeletionWriter.Resolve(structure, layoutDelete, doc.Database, tr, cancel ?? (() => { }));
             else
             {
-                var resolved=CadStructureWriter.Resolve(structure,doc.Database,tr,cancel ?? (() => { }));
-                if (observePlan!=null)
+                var resolved = CadStructureWriter.Resolve(structure, doc.Database, tr, cancel ?? (() => { }));
+                if (observePlan != null)
                 {
                     foreach (var reference in resolved.References.Values)
-                        CadExternalReferences385.CheckReplacementDrawing(reference,cancel ?? (() => { }));
-                    var calibrations=resolved.References.Where(pair=>pair.Value.Calibration!=null).Select(pair=>new
+                        CadExternalReferences385.CheckReplacementDrawing(reference, cancel ?? (() => { }));
+                    var calibrations = resolved.References.Where(pair => pair.Value.Calibration != null).Select(pair => new
                     {
-                        operation_index=pair.Key,handle=pair.Value.Target.Handle.ToString(),
-                        raster_calibration=pair.Value.Calibration!.Result,
-                        origin=new[]{pair.Value.Calibration.Frame.Origin.X,pair.Value.Calibration.Frame.Origin.Y},
-                        x_axis=new[]{pair.Value.Calibration.Frame.Xaxis.X,pair.Value.Calibration.Frame.Xaxis.Y},
-                        y_axis=new[]{pair.Value.Calibration.Frame.Yaxis.X,pair.Value.Calibration.Frame.Yaxis.Y}
+                        operation_index = pair.Key,
+                        handle = pair.Value.Target.Handle.ToString(),
+                        raster_calibration = pair.Value.Calibration!.Result,
+                        origin = new[] { pair.Value.Calibration.Frame.Origin.X, pair.Value.Calibration.Frame.Origin.Y },
+                        x_axis = new[] { pair.Value.Calibration.Frame.Xaxis.X, pair.Value.Calibration.Frame.Xaxis.Y },
+                        y_axis = new[] { pair.Value.Calibration.Frame.Yaxis.X, pair.Value.Calibration.Frame.Yaxis.Y }
                     }).ToArray();
-                    if(calibrations.Length>0) observePlan(new{raster_calibrations=calibrations});
+                    if (calibrations.Length > 0) observePlan(new { raster_calibrations = calibrations });
                 }
             }
         }
@@ -825,8 +826,8 @@ internal sealed class CadWriter
             {
                 verifyAfterCommit?.Invoke();
                 foreach (var verify in createdAssociationChecks) verify();
-                var result = associationReceipt with { warnings = associationReceipt.warnings.Where(w=>w!=verificationPending).ToArray() };
-                job.RecordCommit(result);return result;
+                var result = associationReceipt with { warnings = associationReceipt.warnings.Where(w => w != verificationPending).ToArray() };
+                job.RecordCommit(result); return result;
             });
         if (job.CommittedResult is { } success)
         {

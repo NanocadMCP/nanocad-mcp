@@ -32,12 +32,12 @@ internal static class QuerySummaryTests
             Deny(new { document_id = id, summary_only = "true" }, "summary_only");
             if (Parse(new { document_id = id, summary_only = true, page_size = 1, cursor = "page" }).PageSize != 1)
                 throw new Exception("Summary pagination is unavailable.");
-            var box = Parse(new {document_id = id, bounds = new {min = new[]{0,0,10}, max = new[]{10,10,20}, mode = "within"}}).QueryBounds!;
-            if (new QueryEnvelope(0,0,0,10,10,5).Matches(box) || !new QueryEnvelope(1,1,12,9,9,19).Matches(box))
+            var box = Parse(new { document_id = id, bounds = new { min = new[] { 0, 0, 10 }, max = new[] { 10, 10, 20 }, mode = "within" } }).QueryBounds!;
+            if (new QueryEnvelope(0, 0, 0, 10, 10, 5).Matches(box) || !new QueryEnvelope(1, 1, 12, 9, 9, 19).Matches(box))
                 throw new Exception("Z-separated envelopes were not distinguished.");
             var unavailable = new QuerySummary();
-            unavailable.Add("Line","0",new QueryEnvelope(0,0,double.NaN,1,1,12),box);
-            var partial = Wire.Element(unavailable.Result("model","opaque"));
+            unavailable.Add("Line", "0", new QueryEnvelope(0, 0, double.NaN, 1, 1, 12), box);
+            var partial = Wire.Element(unavailable.Result("model", "opaque"));
             if (partial.GetProperty("complete").GetBoolean() || partial.GetProperty("aggregation_scope").GetString() != "this_page" ||
                 partial.GetProperty("spatial_excluded_unavailable_bounds_count").GetInt32() != 1) throw new Exception("Partial XYZ summary lost its unavailable count.");
             var tool = ToolCatalog.Tools.Single(tool => tool.Name == "nanocad.query_objects");

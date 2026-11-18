@@ -39,14 +39,14 @@ internal static class DrawingViewsReader
     }
 
     private sealed record ProjectionIndex(Dictionary<int, LineEnds?> Markers, Dictionary<LineEnds, int> Occurrences,
-        Dictionary<int,CircularArcShape?> CircularMarkers, List<CircularArcShape> CircularShapes)
+        Dictionary<int, CircularArcShape?> CircularMarkers, List<CircularArcShape> CircularShapes)
     {
         internal bool ContainsUnique(int marker, LineEnds line) =>
             Markers.TryGetValue(marker, out var ends) && ends == line && Occurrences.GetValueOrDefault(line) == 1;
 
         internal bool ContainsUnique(int marker, CircularArcShape arc, Action cancel)
         {
-            if (!CircularMarkers.TryGetValue(marker,out var found) || found == null || !found.Matches(arc)) return false;
+            if (!CircularMarkers.TryGetValue(marker, out var found) || found == null || !found.Matches(arc)) return false;
             int matches = 0;
             // Shapes are sorted once per inventory. Only nearby centers can coincide.
             int low = 0, high = CircularShapes.Count;
@@ -91,7 +91,7 @@ internal static class DrawingViewsReader
             {
                 var arc = CircularArcShape.Read(item);
                 if (arc != null) index.CircularShapes.Add(arc);
-                if (item.GSMarker >= 0 && !index.CircularMarkers.TryAdd(item.GSMarker,arc)) index.CircularMarkers[item.GSMarker] = null;
+                if (item.GSMarker >= 0 && !index.CircularMarkers.TryAdd(item.GSMarker, arc)) index.CircularMarkers[item.GSMarker] = null;
             }
         }
         index.CircularShapes.Sort((left, right) => left.Center.X.CompareTo(right.Center.X));
@@ -107,9 +107,9 @@ internal static class DrawingViewsReader
                 if (!Whole.Markers.TryGetValue(marker, out var ends) || ends is not { } sheet ||
                     !Visible.Markers.TryGetValue(marker, out var other) || other is not { } model ||
                     !Whole.ContainsUnique(marker, sheet) || !Visible.ContainsUnique(marker, model)) return false;
-                bool Near((double X,double Y,double Z) a, (double X,double Y,double Z) b) =>
-                    new Teigha.Geometry.Point3d(a.X,a.Y,a.Z).DistanceTo(new(b.X/PaperDenominator,b.Y/PaperDenominator,b.Z/PaperDenominator)) <= 1e-7;
-                return Near(sheet.Start,model.Start) && Near(sheet.End,model.End);
+                bool Near((double X, double Y, double Z) a, (double X, double Y, double Z) b) =>
+                    new Teigha.Geometry.Point3d(a.X, a.Y, a.Z).DistanceTo(new(b.X / PaperDenominator, b.Y / PaperDenominator, b.Z / PaperDenominator)) <= 1e-7;
+                return Near(sheet.Start, model.Start) && Near(sheet.End, model.End);
             }
             return Whole.CircularMarkers.TryGetValue(marker, out var found) && found is { } arc &&
                 Visible.CircularMarkers.TryGetValue(marker, out var otherArc) && otherArc != null &&
@@ -118,21 +118,30 @@ internal static class DrawingViewsReader
         }
         internal object Evidence(int marker, bool line)
         {
-            static double[] P(Teigha.Geometry.Point3d p) => [p.X,p.Y,p.Z];
+            static double[] P(Teigha.Geometry.Point3d p) => [p.X, p.Y, p.Z];
             object? Locus(ProjectionIndex i)
             {
                 if (line)
                 {
                     if (!i.Markers.TryGetValue(marker, out var ends) || ends == null) return null;
-                    var (a,b) = ends.Value;
-                    return new { start = new[]{a.X,a.Y,a.Z}, end = new[]{b.X,b.Y,b.Z} };
+                    var (a, b) = ends.Value;
+                    return new { start = new[] { a.X, a.Y, a.Z }, end = new[] { b.X, b.Y, b.Z } };
                 }
                 if (!i.CircularMarkers.TryGetValue(marker, out var arc) || arc == null) return null;
-                return new {center=P(arc.Center), radius=arc.Radius, start=P(arc.Start), end=P(arc.End), sweep=arc.Sweep};
+                return new { center = P(arc.Center), radius = arc.Radius, start = P(arc.Start), end = P(arc.End), sweep = arc.Sweep };
             }
-            return new {marker,coordinate_system="view_lcs",whole_view=Locus(Whole),source_visible=Locus(Visible),
-                whole_view_units="sheet_drawing_units", source_visible_units="unscaled_view_units", sheet_scale_denominator=PaperDenominator,
-                whole_marker_count=Whole.Markers.Count,visible_marker_count=Visible.Markers.Count};
+            return new
+            {
+                marker,
+                coordinate_system = "view_lcs",
+                whole_view = Locus(Whole),
+                source_visible = Locus(Visible),
+                whole_view_units = "sheet_drawing_units",
+                source_visible_units = "unscaled_view_units",
+                sheet_scale_denominator = PaperDenominator,
+                whole_marker_count = Whole.Markers.Count,
+                visible_marker_count = Visible.Markers.Count
+            };
         }
     }
 
@@ -149,7 +158,7 @@ internal static class DrawingViewsReader
         {
             var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source, false, true));
             if (visible == null) return null;
-            try { return new(IndexLines(whole, cancel, includeCircular), IndexLines(visible, cancel, includeCircular),denominator); }
+            try { return new(IndexLines(whole, cancel, includeCircular), IndexLines(visible, cancel, includeCircular), denominator); }
             finally
             {
                 foreach (var item in visible.Distinct(ReferenceEqualityComparer.Instance))
@@ -170,7 +179,7 @@ internal static class DrawingViewsReader
         if (local == null || !local.Matches(marker, line, cancel))
             throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE",
                 "The selected native marker is not a unique visible primitive of this source in the view's local coordinates.",
-                false, local?.Evidence(marker,line));
+                false, local?.Evidence(marker, line));
     }
 
     private const string SourceMismatch = "native_marker_source_not_exact_local_solid";
@@ -382,8 +391,8 @@ internal static class DrawingViewsReader
         internal CircularArcShape ToSheet(double denominator)
         {
             if (denominator == 1) return this;
-            Teigha.Geometry.Point3d Scale(Teigha.Geometry.Point3d p) => new(p.X/denominator,p.Y/denominator,p.Z/denominator);
-            return new(Scale(Center),Radius/denominator,Scale(Start),Scale(End),Scale(Midpoint),Sweep,FullCircle);
+            Teigha.Geometry.Point3d Scale(Teigha.Geometry.Point3d p) => new(p.X / denominator, p.Y / denominator, p.Z / denominator);
+            return new(Scale(Center), Radius / denominator, Scale(Start), Scale(End), Scale(Midpoint), Sweep, FullCircle);
         }
         internal bool Matches(CircularArcShape other) => Center.DistanceTo(other.Center) <= 1e-7 &&
             Math.Abs(Radius - other.Radius) <= 1e-7 && FullCircle == other.FullCircle &&
@@ -490,7 +499,7 @@ internal static class DrawingViewsReader
             var members = Members(source);
             if (includeSources && source != null && start < end)
             {
-                bool circles = geometry.Skip(start).Take(end-start).Any(item => item?.GeometryType == G.EntityGeomType.kCircArc);
+                bool circles = geometry.Skip(start).Take(end - start).Any(item => item?.GeometryType == G.EntityGeomType.kCircArc);
                 visible = ReadLocalVisibility(view, source.Id, budget, circles);
                 if (visible != null) allLines = IndexLines(geometry, budget, circles);
             }
@@ -528,7 +537,7 @@ internal static class DrawingViewsReader
                     var row = JsonSerializer.SerializeToNode(entry, Wire.Json)!.AsObject();
                     row["projection_source"] = JsonSerializer.SerializeToNode(observation, Wire.Json);
                     if (pageSize == 1 && visible != null && marker >= 0)
-                        row["projection_visibility"] = JsonSerializer.SerializeToNode(visible.Evidence(marker,lineEnds.HasValue), Wire.Json);
+                        row["projection_visibility"] = JsonSerializer.SerializeToNode(visible.Evidence(marker, lineEnds.HasValue), Wire.Json);
                     if (pageSize == 1 && lineEnds is { } selectedLine && marker >= 0 && source != null)
                         row["dimension_edge_binding"] = JsonSerializer.SerializeToNode(CadProjectedLineSubentity.Observe(state, entity, marker,
                             new(selectedLine.Start.X, selectedLine.Start.Y, selectedLine.Start.Z),
@@ -695,8 +704,14 @@ internal static class DrawingViewsReader
             {
                 var binding = selectedSource == null ? ProjectionSource.Unavailable("requires_healthy_ordinary_projection_of_one_local_solid")
                     : ObserveEdge(selected.View, selectedSource, marker, Members(selectedSource), true);
-                selectedMarker = new { view_handle = args.GeometryViewHandle, marker, scope = "native_marker_source_object_and_edge_key",
-                    visible_uniqueness_evaluated = false, projection_source = binding };
+                selectedMarker = new
+                {
+                    view_handle = args.GeometryViewHandle,
+                    marker,
+                    scope = "native_marker_source_object_and_edge_key",
+                    visible_uniqueness_evaluated = false,
+                    projection_source = binding
+                };
             }
             else selectedGeometry = ReadGeometry(selected.View, selected.Entity, state, instance, state.Id, args.GeometryStartIndex, args.GeometryPageSize,
                 args.IncludeGeometrySources, selectedSource, Budget);
