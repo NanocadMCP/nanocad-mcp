@@ -39,7 +39,9 @@ internal static class ProjectedViewAssociationReadTests
                     related.TryGetProperty("subelement_creator", out _), "The original primitive marker lost its separate topology observation.");
                 Need(control.TryGetProperty("unit", out _) && control.TryGetProperty("variable", out _) &&
                     feature.TryGetProperty("mc_id", out _), "The expanded feature schema lost native ownership or parameter units.");
-                Need(link.GetProperty("source_parts").GetProperty("items").GetProperty("properties").TryGetProperty("body_name", out _) &&
+                var sourcePart = link.GetProperty("source_parts").GetProperty("items").GetProperty("properties");
+                Need(sourcePart.TryGetProperty("body_name", out _) && sourcePart.TryGetProperty("body_name_source", out _) &&
+                    sourcePart.TryGetProperty("native_tree_name", out _) && sourcePart.TryGetProperty("body_name_group", out _) &&
                     marker.GetProperty("projection_source").GetProperty("properties").TryGetProperty("native_subelement_kind", out _) &&
                     design.TryGetProperty("view_source_ref", out _) && design.TryGetProperty("feature_unavailable_reason", out _) &&
                     design.TryGetProperty("measurement_driver_unavailable_reason", out _) &&

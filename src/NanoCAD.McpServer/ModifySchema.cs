@@ -212,8 +212,8 @@ internal static class ModifySchema
         foreach (var operation in ModelManufacturingSchema.Operations()) operations.Add(operation);
         var bodyName = Operation("name_model_body", ("name", new JsonObject { ["type"] = "string", ["minLength"] = 1, ["pattern"] = @"\S" }));
         bodyName["properties"]!["handles"]!["maxItems"] = 1;
-        bodyName["properties"]!["expected_name"] = new JsonObject { ["type"] = "string", ["description"] = "Optional exact current body name, including an empty string for an unnamed root." };
-        bodyName["description"] = "Set the native construction-tree name of one local Model Space solid with an addressable MultiCAD body owner. Use its current drawing handle. Display names may include spaces or Unicode, and different bodies may share a name. A batch may name several distinct body handles. Inspect the retained names in model_body_names.";
+        bodyName["properties"]!["expected_name"] = new JsonObject { ["type"] = "string", ["description"] = "Optional exact effective body name before renaming. Use an empty string for an unnamed solid." };
+        bodyName["description"] = "Name one local Model Space solid by its current body handle. Modeled bodies use the native construction tree. Imported solids can store their name in a native DWG group's Description. Names may repeat and may contain spaces or Unicode. A batch can name distinct bodies. model_body_names reports the retained name and its source.";
         operations.Add(bodyName);
         operations.Add(cloudPlacement);
         operations.Add(DimensionFormatSchema.Edit());

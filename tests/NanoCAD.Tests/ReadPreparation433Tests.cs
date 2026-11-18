@@ -202,6 +202,50 @@ internal static class ReadPreparation433Tests
             Check(Binding(sources, "/operations/0/targets/0/view_token")?["value"]!.GetValue<string>() == Token && Binding(sources, "source_handles") == null, "Source replacement invented a new selection or lost token.");
             return Task.CompletedTask;
         });
+        await test("preparation carries selected native finishing edges and offers full projected circle centers", () =>
+        {
+            const string edge = "{F8FFAFC0-C822-412B-8648-66012E9EDD5B}";
+            const string last = "{7DD83BA6-9074-412D-8180-5A1B0B55AC3E}";
+            var body = Result.Ok("edges", new
+            {
+                source_ref = Ref("53B"),
+                last_item_id = last,
+                edge_token = Token,
+                edges = new[] { new { model_edge_id = edge, curve_type = "CircArc3d", length = 50.27 } }
+            }, Context());
+            foreach (var kind in new[] { "add_model_fillet", "add_model_chamfer" })
+            {
+                var selection = Select("inspect_solid_topology", "modify_entities", kind);
+                var prepared = ReadPreparation433.Build("inspect_solid_topology", selection, body);
+                CheckSources(prepared, body, selection);
+                Check(Binding(prepared, "model_edge_ids/0")?["value"]!.GetValue<string>() == edge &&
+                    Binding(prepared, "edge_token")?["value"]!.GetValue<string>() == Token &&
+                    Binding(prepared, "expected_last_item_id")?["value"]!.GetValue<string>() == last &&
+                    Binding(prepared, "topology_token") == null, "Finishing lost the selected native edge or mixed token namespaces.");
+            }
+            var view = Ref("56D");
+            object Arc(int index, string marker, int x, double angle) => new
+            {
+                index,
+                view_marker = marker,
+                status = "read",
+                geometry = new { kind = "circular_arc", center = new[] { x, 155, 0 }, angle_unit = "radians", start_angle = 0, end_angle = angle }
+            };
+            var views = Result.Ok("views", new
+            {
+                layout_ref = Ref("B0"),
+                space = "paper",
+                items = new[] { new { @ref = view, status = "Ok", auto_update_enabled = true } },
+                selected_geometry = new { view_ref = view, items = new[] { Arc(0, "10", 72, Math.Tau), Arc(1, "5", 122, Math.Tau), Arc(2, "8", 92, Math.PI) } }
+            }, Context());
+            var aligned = Select("get_drawing_views", "create_entities", "projected_aligned");
+            var centers = ReadPreparation433.Build("get_drawing_views", aligned, views);
+            CheckSources(centers, views, aligned);
+            var options = centers["candidates"]!.AsArray().Single()!["circle_center_options"]!.AsArray();
+            Check(options.Count == 2 && options[0]!["marker"]!.GetValue<int>() == 10 && options[1]!["marker"]!.GetValue<int>() == 5 &&
+                Binding(centers, "line_index") == null, "Center preparation used array ordinals or included a partial arc.");
+            return Task.CompletedTask;
+        });
         await test("projected angular preparation retains both measured corners at a three-ray junction", () =>
         {
             var layout = Ref("B0"); var view = Ref("C1");

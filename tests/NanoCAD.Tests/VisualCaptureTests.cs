@@ -7,6 +7,7 @@ internal static class VisualCaptureTests
 {
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await DrawingCaptureSourceTests.Run(test);
         var bridge = Guid.NewGuid().ToString("D"); var document = Guid.NewGuid().ToString("D");
         object Input(int edge = 1600) => new { bridge_instance_id = bridge, document_id = document, expected_revision = "18446744073709551615", max_edge = edge };
         void Deny(Action action, string? code = null) { try { action(); } catch (DomainException e) when (code == null || e.Error.code == code) { return; } throw new Exception("Unsafe visual input accepted"); }

@@ -77,6 +77,27 @@ internal static class ProjectedDimensionCreateTests
 
     internal static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("projected aligned accepts either one line or two distinct circle center markers on Paper", () =>
+        {
+            var value = Entity("projected_aligned");
+            value.Remove("arc_index");
+            value["circle_center_markers"] = new JsonArray(5, 12);
+            var pair = Parse(value);
+            WriteSpace.Check(pair);
+            Need(pair.Entities.Single() is ProjectedCircleCentersSpec { ViewHandle: "A1", FirstMarker: 5, SecondMarker: 12 },
+                "Both native marker identities and the view handle must survive parsing.");
+            Reject(() => WriteSpace.Check(Parse(value, "model")), "OUT_OF_SCOPE");
+            value["line_index"] = 2; Reject(() => Parse(value));
+            value.Remove("circle_center_markers");
+            var line = Parse(value);
+            WriteSpace.Check(line);
+            Need(line.Entities.Single() is ProjectedAlignedDimensionSpec { LineIndex: 2 } && pair.Fingerprint() != line.Fingerprint(),
+                "A line and a pair of circle centers are different native intents.");
+            value.Remove("line_index");
+            foreach (var invalid in new[] { new JsonArray(2, 2), new JsonArray(1, -1), new JsonArray(1), new JsonArray(0, 1, 2), new JsonArray(1, "2") })
+            { value["circle_center_markers"] = invalid; Reject(() => Parse(value)); }
+            return Task.CompletedTask;
+        });
         await test("projected angular accepts exactly one native selector and preserves its two distinct line identities", () =>
         {
             var angle = Entity("projected_angular"); angle.Remove("arc_index"); angle["line_indices"] = new JsonArray(1, 4);

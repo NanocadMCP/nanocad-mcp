@@ -168,7 +168,7 @@ internal static class CadExternalReferences385
         UnderlayDefinition underlay => underlay.SourceFileName,
         _ => throw new DomainException("OUT_OF_SCOPE", "Unexpected native reference definition.")
     };
-    static string? ActiveSource(DBObject definition)
+    internal static string? ActiveSource(DBObject definition)
     {
         try
         {

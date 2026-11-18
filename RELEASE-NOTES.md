@@ -2,6 +2,16 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 458
+
+- Give an imported ACIS solid a label and find it again with MCP or in nanoCAD's Group Manager (`CLASSICGROUP`). The native DWG group has a readable name and keeps your exact label in its Description. Renaming an inspection block, editing its group description and reopening the DWG preserved the final label, both solids' geometry and an unrelated group. Parametric parts use their construction-tree names.
+- Select a specific native edge from a solid topology read for a parametric fillet or chamfer. On a plate with two bosses of the same 16 mm diameter, each finish changed only the selected outer rim. The other boss retained its radius of 8 mm.
+- Attach an aligned drawing dimension to the centers of two visible projected circles. Changing the pitch of two 6 mm diameter holes from 60 to 50 mm updated the same dimension. On a separate 1:2 sheet view, a 30 mm paper distance was displayed as 60 mm.
+- Read the earlier support of a concentric hole after an edge finish. On the tested part, nanoCAD identified the stored source and the present bore separately. The two circular bore boundaries were measured on the current solid.
+- Frame a measured 3.8 by 3.8 mm region around a rim with set_view, then inspect it with capture_view. At a 5.32 mm field height, the active model showed the rounded R1 contour. The saved comparison part showed the straight slope of the 1 by 1 mm chamfer. A saved sheet showed both holes, the pocket, the linked 50 mm spacing and the independent 60 mm dimension together.
+
+On a sheet with protected native dimension containers, current_drawing stops before cloning. Save the DWG and use saved_drawing to see its dimensions. On a floor plan linked by a relative path, both drawing sources showed the raster flipped vertically and reported an orientation warning. Before tracing or measuring a raster, check its original pixels and placement in the drawing.
+
 ## Build 457
 
 - Give individual solids recognizable names in the native model tree. Find the bushing and its matching pin again after reopening the DWG, even when two bodies share a name. Confirm the selected body by its handle and geometry before editing.

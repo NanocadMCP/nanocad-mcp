@@ -26,6 +26,19 @@ internal static class ModelBodyNameTests
 
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("DWG label group keys are recognizable, bounded and collision-safe", () =>
+        {
+            var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "Guide_bushing", "guide_bushing_2" };
+            if (BodyNameGroupKey.Available("Guide bushing", "2F", taken.Contains) != "GUIDE_BUSHING_3" ||
+                BodyNameGroupKey.Available("\u0412\u0442\u0443\u043B\u043A\u0430 / M8", "2F", taken.Contains) != "\u0412\u0422\u0423\u041B\u041A\u0410_M8" ||
+                BodyNameGroupKey.Available("*/?", "2F", taken.Contains) != "BODY_2F")
+                throw new Exception("A drawing-group key lost its readable part label or collided with an existing group.");
+            string longName = new string('A', 40);
+            var key = BodyNameGroupKey.Available(longName, "2F", candidate => candidate == new string('A', 31));
+            if (key.Length != 31 || !key.EndsWith("_2", StringComparison.Ordinal))
+                throw new Exception("A long name did not preserve a unique suffix within the Group dialog limit.");
+            return Task.CompletedTask;
+        });
         await test("model body labels preserve display text and distinguish identity from name", () =>
         {
             const string label = "\u0412\u0442\u0443\u043B\u043A\u0430 \u00D840";

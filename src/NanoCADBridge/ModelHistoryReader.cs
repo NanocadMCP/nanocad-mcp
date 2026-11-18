@@ -258,12 +258,19 @@ internal static class ModelHistoryReader
                 });
                 byteBudget.Add(nodes[^1]);
             }
+            var reference = new EntityRef(instance, state.Id, handle);
+            var physical = (Entity)transaction.GetObject(CadStructureWriter.Find(state.Document.Database, handle), OpenMode.ForRead);
+            var naming = CadModelBodyNames.Inspect(physical, transaction, reference,
+                CadModelBodyNames.ReadTreeName(solid), CadModelBodyNames.IsImported(solid), Budget);
             var body = new
             {
-                @ref = new EntityRef(instance, state.Id, handle),
+                @ref = reference,
                 mc_id = id.ToString(),
                 mc_document_id = document.ID.ToString(),
-                body_name = CadModelBodyNames.ReadTreeName(solid),
+                body_name = naming.Name,
+                body_name_source = naming.Source,
+                native_tree_name = naming.Native,
+                body_name_group = naming.Group,
                 last_item_id = Id(solid.LastPartItemID),
                 complete,
                 nodes,

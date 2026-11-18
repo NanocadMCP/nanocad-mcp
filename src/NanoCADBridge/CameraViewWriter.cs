@@ -156,6 +156,8 @@ internal sealed class CameraViewWriter
                 catch (DomainException e) when (e.Error.code == "FRAME_BOUNDS_UNAVAILABLE")
                 { framingWarning = "FRAMING_BOUNDS_UNAVAILABLE: Preset applied without object framing; inspect the rendered view and reframe after bounds become available."; }
             }
+            if (args.FrameBoundsWcs is { } bounds)
+                desired = desired with { View = CameraObjectFraming.Fit(desired.View, [bounds], args.FramePadding) };
             if (args.DisplayStyle == "shaded_edges") desired = desired with { View = desired.View with { render_mode = nameof(ViewRenderModesEnum.FaceNEdgeFine) }, Mode = ViewRenderModesEnum.FaceNEdgeFine, VisualStyle = Multicad.McObjectId.Null };
             if (args.DisplayStyle == "wireframe_2d") desired = desired with { View = desired.View with { render_mode = nameof(ViewRenderModesEnum.Optimized2d) }, Mode = ViewRenderModesEnum.Optimized2d, VisualStyle = Multicad.McObjectId.Null };
             if (before.Renderer is { } renderer) desired = desired with { Renderer = NativeCameraRenderer370.Plan(renderer, desired.View) };
@@ -193,8 +195,11 @@ internal sealed class CameraViewWriter
             var rendererAfter = rendererReadback?.State;
             if (rendererAfter?.requested_projection_matches == false) warnings.Add("CAMERA_NATIVE_RENDERER_READBACK_DIFFERENCE: The actual native view normalized the requested centre/direction/pixel scale. Actual renderer data is retained; inspect the grouped image before judging framing.");
             string cameraScope = state.Document.Database.TileMode ? "orthographic_model_camera" : "orthographic_paper_camera";
+            if (args.FrameBoundsWcs != null) cameraScope += "_with_wcs_window";
+            else if (args.FrameHandles != null && framingWarning == null) cameraScope += "_with_selected_object_framing";
+            else cameraScope += "_only";
             var result = Result.Ok(job.OriginalRequestId, new CameraChangeResult(args.OperationId, "committed", false, before.View, after, restore,
-                args.FrameHandles == null || framingWarning != null ? cameraScope + "_only" : cameraScope + "_with_selected_object_framing", false, before.Renderer?.State, rendererAfter,
+                cameraScope, false, before.Renderer?.State, rendererAfter,
                 rendererAfter == null ? "editor_view_only; native_renderer_unobserved" : "existing_native_view_camera_applied_and_read; projection_comparison_reported; pixels_not_observed"), Context(state), warnings.ToArray());
             job.RecordCommit(result); return result;
         }

@@ -289,6 +289,7 @@ public static class ReadPreparationBindings433
                     return c;
                 }
                 var rays = new Dictionary<Point2, List<ProjectedRay>>();
+                var centers = new JsonArray();
                 foreach (var (row, rp) in Array(page, "items", pp))
                 {
                     if (Text(row, "status") != "read" || Text(row, "view_marker") == null ||
@@ -309,6 +310,27 @@ public static class ReadPreparationBindings433
                         AddRay(a, b); AddRay(b, a);
                         continue;
                     }
+                    if (!line && variant == "projected_aligned")
+                    {
+                        if (!section && Text(data, "space") == "paper" && Yes(view, "auto_update_enabled") &&
+                            Text(geometry, "kind") == "circular_arc" && Text(geometry, "angle_unit") == "radians" &&
+                            Get(geometry, "start_angle", out var start) && start.ValueKind == JsonValueKind.Number && start.TryGetDouble(out double a) &&
+                            Get(geometry, "end_angle", out var end) && end.ValueKind == JsonValueKind.Number && end.TryGetDouble(out double b) &&
+                            Math.Abs(Math.Abs(b - a) - Math.Tau) <= 1e-8 &&
+                            Get(geometry, "center", out var center) && center.ValueKind == JsonValueKind.Array && center.GetArrayLength() == 3 &&
+                            int.TryParse(Text(row, "view_marker"), System.Globalization.NumberStyles.None,
+                                System.Globalization.CultureInfo.InvariantCulture, out int marker))
+                        {
+                            centers.Add(new JsonObject
+                            {
+                                ["marker"] = marker,
+                                ["source_pointer"] = rp + "/view_marker",
+                                ["center_wcs"] = Node(center),
+                                ["geometry_source_pointer"] = rp + "/geometry"
+                            });
+                        }
+                        continue;
+                    }
                     if (line != (variant == "projected_aligned")) continue;
                     if (!line)
                     {
@@ -325,6 +347,13 @@ public static class ReadPreparationBindings433
                     Current(candidate, "projection_source", row, "projection_source", rp);
                     Current(candidate, "geometry_wcs", row, "geometry", rp);
                     output.Add(candidate);
+                }
+                if (centers.Count > 0)
+                {
+                    var choice = ForGeometry(pp);
+                    choice["circle_center_options"] = centers;
+                    Note(choice, "mapping_note", "Choose two distinct projected centers on the same view for circle_center_markers. Other geometry pages can contain additional centers.", pp);
+                    output.Add(choice);
                 }
                 AddCorners(rays, ForGeometry);
             }
@@ -558,6 +587,23 @@ public static class ReadPreparationBindings433
         internal void Topology(JsonElement data)
         {
             if (operation != "modify_entities" || !Get(data, "source_ref", out var reference) || !Reference(reference)) return;
+            if (Variant("add_model_fillet", "add_model_chamfer") && Text(data, "edge_token") != null &&
+                Text(data, "last_item_id") != null && Field("model_edge_ids"))
+            {
+                foreach (var (edge, pointer) in Array(data, "edges", "/data"))
+                {
+                    if (Text(edge, "model_edge_id") == null) continue;
+                    var selection = Candidate(pointer, Target(reference));
+                    Handle(selection, reference, "/data/source_ref");
+                    Bind(selection, "expected_last_item_id", data, "last_item_id", "/data");
+                    Bind(selection, "edge_token", data, "edge_token", "/data");
+                    Bind(selection, "model_edge_ids/0", edge, "model_edge_id", pointer);
+                    foreach (string field in new[] { "curve_type", "start", "end", "length", "circle" })
+                        Current(selection, field, edge, field, pointer);
+                    output.Add(selection);
+                }
+                return;
+            }
             if (!Field("topology_token")) return;
             var candidate = Candidate("/data", Target(reference));
             Handle(candidate, reference, "/data/source_ref");

@@ -20,7 +20,7 @@ internal static class ProjectedDimensionWriter
         McDocument Owner, Db.ObjectId Space, Db.ObjectId Layer, double ViewScaleDenominator, McGeomParam[] Anchors, bool IsSection);
 
     private static bool IsProjectedDimension(EntitySpec item) =>
-        item is ProjectedAlignedDimensionSpec or ProjectedDiametricDimensionSpec or ProjectedRadialDimensionSpec or
+        item is ProjectedAlignedDimensionSpec or ProjectedCircleCentersSpec or ProjectedDiametricDimensionSpec or ProjectedRadialDimensionSpec or
             ProjectedArcLengthDimensionSpec or ProjectedAngularDimensionSpec or ProjectedCornerDimensionSpec;
 
     internal static bool Handles(CreateArguments args) => args.Entities.Any(IsProjectedDimension);
@@ -67,6 +67,30 @@ internal static class ProjectedDimensionWriter
         return anchors;
     }
 
+    private static McGeomParam CenterAnchor(DrawingViewsReader.ProjectedCenter circle, McDocument owner)
+    {
+        var p = circle.Center;
+        var rim = circle.Rim;
+        double[] coordinates = [p.X, p.Y, p.Z, p.X, p.Y, p.Z];
+        var parameters = new double[2];
+        var data = new long[2];
+        string document = owner.ID.ToString(), view = circle.ViewId.ToString();
+        int direct = NativeModelHistory421.LoadProjectedDiameterAnchors()(document, view, circle.Marker, coordinates, parameters, data);
+        if (direct != 0)
+        {
+            int seeded = NativeModelHistory421.LoadProjectedCircularArcAnchors()(document, view, circle.Marker,
+                [.. coordinates, rim.X, rim.Y, rim.Z], [circle.CenterParameter, circle.CenterParameter], parameters, data);
+            Need(seeded == 0, "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE",
+                $"The SDK did not resolve the center of original circle marker {circle.Marker} (direct 0x{unchecked((uint)direct):X8}, seeded 0x{unchecked((uint)seeded):X8}).");
+        }
+        var anchor = new McGeomParam { ID = circle.ViewId, GSMarker = circle.Marker, Param = parameters[0], Data = data[0] };
+        var evaluated = new G.Point3d();
+        Need(double.IsFinite(parameters[0]) && parameters[0] == parameters[1] && data[0] == data[1] &&
+            anchor.CalculatePoint(ref evaluated) && Same(evaluated, p), "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE",
+            "The original view reference did not reproduce the selected circle center.");
+        return anchor;
+    }
+
     private static Binding[] Resolve(CreateArguments args, DocumentState state, Db.Transaction tx, Action cancel)
     {
         Need(args.Entities.All(IsProjectedDimension),
@@ -83,6 +107,7 @@ internal static class ProjectedDimensionWriter
             cancel();
             var (handle, point) = spec switch
             {
+                ProjectedCircleCentersSpec pair => (pair.ViewHandle, pair.DimLinePoint),
                 ProjectedAlignedDimensionSpec aligned => (aligned.ViewHandle, aligned.DimLinePoint),
                 ProjectedDiametricDimensionSpec diametric => (diametric.ViewHandle, diametric.DimLinePoint),
                 ProjectedRadialDimensionSpec radial => (radial.ViewHandle, radial.DimLinePoint),
@@ -96,8 +121,22 @@ internal static class ProjectedDimensionWriter
             Need(entity != null && entity.OwnerId == space, "OUT_OF_SCOPE", "Select a view in the active target space.");
             var placement = new Point3d(point.X, point.Y, 0);
             Projection projection;
-            McGeomParam[]? cornerAnchors = null;
-            if (spec is ProjectedAlignedDimensionSpec alignedSpec)
+            McGeomParam[]? selectedAnchors = null;
+            if (spec is ProjectedCircleCentersSpec centers)
+            {
+                Need(paper, "OUT_OF_SCOPE", "Projected circle centers require the active Paper sheet.");
+                var first = DrawingViewsReader.ResolveProjectedCenter(entity, state, tx, args.BridgeId, centers.FirstMarker, cancel);
+                var second = DrawingViewsReader.ResolveProjectedCenter(entity, state, tx, args.BridgeId, centers.SecondMarker, cancel);
+                Need(first.ViewId == second.ViewId && first.Marker != second.Marker,
+                    "DRAWING_VIEW_SOURCE_UNAVAILABLE", "Select two different current circle markers on the same native projection.");
+                var direction = second.Center - first.Center;
+                Need(direction.Length > 1e-7 && direction.CrossProduct(placement - first.Center).Length / direction.Length >= .001,
+                    "INVALID_GEOMETRY", "Select separated centers and put the dimension line off their common axis.");
+                _ = NativeModelHistory421.LoadProjectedDimensionAssociation();
+                selectedAnchors = [CenterAnchor(first, owner), CenterAnchor(second, owner)];
+                projection = new(first.ViewId, first.Marker, first.Center, second.Center, Kind: "aligned_centers");
+            }
+            else if (spec is ProjectedAlignedDimensionSpec alignedSpec)
             {
                 var line = DrawingViewsReader.ResolveProjectedLine(entity, state, tx, args.BridgeId, alignedSpec.LineIndex, cancel,
                     allowPlaneSection: paper);
@@ -127,7 +166,7 @@ internal static class ProjectedDimensionWriter
                 // McDimensionData has three point slots. Both native curves
                 // independently evaluated the shared tip. The vertex stays
                 // attached to the first named curve, in either sector.
-                cornerAnchors = corner.ReverseRays ? [bSnap, aSnap, f[corner.FirstVertex]] : [aSnap, bSnap, f[corner.FirstVertex]];
+                selectedAnchors = corner.ReverseRays ? [bSnap, aSnap, f[corner.FirstVertex]] : [aSnap, bSnap, f[corner.FirstVertex]];
                 projection = new(first.ViewId, first.Marker, corner.ReverseRays ? b : a, corner.ReverseRays ? a : b, vertex, "angular", Sweep: corner.Sweep);
             }
             else if (spec is ProjectedDiametricDimensionSpec diametric)
@@ -183,7 +222,7 @@ internal static class ProjectedDimensionWriter
             Need(!layer.IsLocked && !layer.IsOff && !layer.IsFrozen && !layer.IsDependent,
                 "LAYER_UNAVAILABLE", "Use a local visible writable dimension layer.");
             return new Binding(projection, placement, spec.Layer, owner, space, layer.ObjectId, view.DbEntity.DScale,
-                cornerAnchors ?? Anchors(projection, owner), !view.SectionID.IsNull);
+                selectedAnchors ?? Anchors(projection, owner), !view.SectionID.IsNull);
         }).ToArray();
     }
 
@@ -253,7 +292,7 @@ internal static class ProjectedDimensionWriter
                 linear.SetPosition(1, Native(projection.Second)).IsSuccess() &&
                 Same(linear.GetPosition(0), projection.First) && Same(linear.GetPosition(1), projection.Second),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native aligned dimension did not retain the selected endpoints.");
-            if (binding.ViewScaleDenominator != 1) linear.DimensionScale = binding.ViewScaleDenominator;
+            if (binding.ViewScaleDenominator != 1 || projection.Kind == "aligned_centers") linear.DimensionScale = binding.ViewScaleDenominator;
             linear.LinePosition = Native(binding.Placement);
         }
         VerifyPhysicalMeasurement(dimension, binding);
@@ -267,7 +306,7 @@ internal static class ProjectedDimensionWriter
         // drawing denominator: a 1:2 view has DScale=2 and a 10 mm sheet diameter
         // represents 20 mm. Check the native nominal value before the first write
         // and again on the identified resident object after association/update.
-        if (binding.ViewScaleDenominator == 1 || binding.Projection.Kind == "angular") return;
+        if (binding.Projection.Kind == "angular" || binding.ViewScaleDenominator == 1 && binding.Projection.Kind != "aligned_centers") return;
         var projection = binding.Projection;
         var sheetLength = projection.Kind switch
         {
@@ -377,7 +416,7 @@ internal static class ProjectedDimensionWriter
             using var reactors = dimension.GetPersistentReactorIds();
             Need(reactors.Cast<Db.ObjectId>().Any(link => link.IsValid && !link.IsErased && link.Database == database),
                 "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident dimension did not retain local native dependency storage.");
-            if (binding.Anchors.Length == 3)
+            if (binding.Anchors.Length == 3 || projection.Kind == "aligned_centers")
             {
                 var table = (Db.BlockTable)tx.GetObject(database.BlockTableId, Db.OpenMode.ForRead);
                 var summary = EntityAdapter.Summary(dimension, table[Db.BlockTableRecord.ModelSpace], args.BridgeId, args.DocumentId, true);
@@ -389,7 +428,7 @@ internal static class ProjectedDimensionWriter
                     actual.GetProperty("drawing_view_mc_id").GetString() == projection.ViewId.ToString(),
                     "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident dimension did not retain its associative view identity.");
                 var anchors = actual.GetProperty("anchors");
-                Point3d[] expectedPoints = binding.IsSection ? [projection.First, projection.Second] : [projection.First, projection.Second, projection.Center!.Value];
+                Point3d[] expectedPoints = binding.IsSection || projection.Kind == "aligned_centers" ? [projection.First, projection.Second] : [projection.First, projection.Second, projection.Center!.Value];
                 Need(anchors.EnumerateArray().Count(row => !row.GetProperty("is_null").GetBoolean()) == expectedPoints.Length,
                     "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The stored anchor count differs from the selected dimension.");
                 bool Matches(JsonElement row, McGeomParam expected, Point3d point)
@@ -462,7 +501,7 @@ internal static class ProjectedDimensionWriter
                 McObjectManager.UpdateAll();
                 // Observe the newly appended DWG dimension rather than the constructor wrapper.
                 var resident = VerifyResident(changes, binding, database, args, job.CheckCancellation);
-                if (binding.ViewScaleDenominator != 1 && binding.Projection.Kind != "angular")
+                if (binding.Projection.Kind == "aligned_centers" || binding.ViewScaleDenominator != 1 && binding.Projection.Kind != "angular")
                 {
                     var observed = dimension.ID.GetObject() as McDimension;
                     Need(observed != null && observed.ID == dimension.ID && observed.ID.Handle == resident.Handle.Value &&

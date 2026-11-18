@@ -8,6 +8,9 @@ public sealed record DimensionSpec(string Kind, Point2 First, Point2 Second, Poi
 public sealed record ProjectedAlignedDimensionSpec(string ViewHandle, int LineIndex, Point2 DimLinePoint, string LayerName)
     : EntitySpec("Dimension", LayerName)
 { public string Kind => "projected_aligned"; }
+public sealed record ProjectedCircleCentersSpec(string ViewHandle, int FirstMarker, int SecondMarker, Point2 DimLinePoint, string LayerName)
+    : EntitySpec("Dimension", LayerName)
+{ public string Kind => "projected_aligned"; }
 public sealed record ProjectedDiametricDimensionSpec(string ViewHandle, int ArcIndex, Point2 DimLinePoint, string LayerName)
     : EntitySpec("Dimension", LayerName)
 { public string Kind => "projected_diametric"; }
@@ -58,6 +61,16 @@ public static partial class CreateValidation
         string kind = Text(item, "kind", path, 24);
         if (kind is "projected_aligned" or "projected_diametric" or "projected_radial" or "projected_arc_length" or "projected_angular")
         {
+            if (kind == "projected_aligned" && item.TryGetProperty("circle_center_markers", out var circles))
+            {
+                Shape(item, path, "type", "kind", "layer", "view_handle", "circle_center_markers", "dimline_point");
+                if (circles.ValueKind != JsonValueKind.Array || circles.GetArrayLength() != 2 ||
+                    circles[0].ValueKind != JsonValueKind.Number || !circles[0].TryGetInt32(out var firstMarker) || firstMarker < 0 ||
+                    circles[1].ValueKind != JsonValueKind.Number || !circles[1].TryGetInt32(out var secondMarker) || secondMarker < 0 || firstMarker == secondMarker)
+                    throw Invalid(path + ".circle_center_markers", "Select two distinct current full-circle GS markers on this view.");
+                return new ProjectedCircleCentersSpec(Validation.NormalizeHandle(Text(item, "view_handle", path, 16)),
+                    firstMarker, secondMarker, Point(item, "dimline_point", path), layer);
+            }
             if (kind == "projected_angular" && item.TryGetProperty("line_indices", out var pair))
             {
                 Shape(item, path, "type", "kind", "layer", "view_handle", "line_indices", "dimline_point");

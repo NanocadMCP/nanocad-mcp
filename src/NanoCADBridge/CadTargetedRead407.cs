@@ -108,7 +108,7 @@ internal static class CadTargetedRead407
         },
         body_name = args.BodyName == null ? null : new
         {
-            scope = "top_level_model_solid_native_tree_name",
+            scope = "top_level_model_solid_effective_name",
             match = "ordinal_ignore_case_equals",
             page_solids_excluded_unavailable_name = unavailableBodyNames
         },
@@ -130,6 +130,9 @@ internal static class CadTargetedRead407
                 Validation.NormalizeHandle(entity.OwnerId.Handle.ToString()))
         };
         if (summary.body_name != null) result.Add("body_name", summary.body_name);
+        if (summary.body_name_source != null) result.Add("body_name_source", summary.body_name_source);
+        if (summary.native_tree_name != null) result.Add("native_tree_name", summary.native_tree_name);
+        if (summary.body_name_group != null) result.Add("body_name_group", summary.body_name_group);
         bool editing = sections.Contains("editing", StringComparer.Ordinal);
         bool geometry = editing || sections.Contains("geometry", StringComparer.Ordinal);
         bool appearance = sections.Contains("appearance", StringComparer.Ordinal);

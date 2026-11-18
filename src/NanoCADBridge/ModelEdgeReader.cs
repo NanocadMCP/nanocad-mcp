@@ -35,6 +35,28 @@ internal static class ModelEdgeReader
     internal static Snapshot Capture(ObjectId representation, DocumentState state, string instance, CancellationToken cancel, Action? checkCancel = null)
         => Scan(representation, state, instance, cancel, checkCancel, null);
 
+    internal static McObjectId[] ResolveFeatureEdges(ObjectId representation, McObjectId body, DocumentState state,
+        string instance, string expectedLast, string token, string[] ids, Action? check)
+    {
+        var wanted = ids.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var current = Scan(representation, state, instance, CancellationToken.None, check, null, wanted);
+        Need(current.body_mc_id == body.ToString() && current.last_item_id.Equals(expectedLast, StringComparison.OrdinalIgnoreCase)
+            && current.edge_token.Equals(token, StringComparison.OrdinalIgnoreCase), "STALE_TOPOLOGY", "Read the current edge token and history anchor on this body.");
+        var byId = current.edges.ToDictionary(row => row.model_edge_id, StringComparer.OrdinalIgnoreCase);
+        var result = new McObjectId[ids.Length];
+        for (int i = 0; i < ids.Length; i++)
+        {
+            check?.Invoke();
+            if (!byId.TryGetValue(ids[i], out var edge))
+                throw new DomainException("SUBENTITY_NOT_FOUND", "The selected native model edge does not belong to this body.");
+            var actual = McObjectId.FromGsMarker(body, long.Parse(edge.marker, CultureInfo.InvariantCulture));
+            Need(!actual.IsNull && actual.IsEdge && !actual.IsInexactFEV && actual.ParentId == body && actual.ToString().Equals(ids[i], StringComparison.OrdinalIgnoreCase),
+                "SUBENTITY_IDENTITY_UNAVAILABLE", "The selected edge changed before feature creation.");
+            result[i] = actual;
+        }
+        return result;
+    }
+
     internal static object BoundaryPage(ObjectId representation, DocumentState state, string instance, CancellationToken cancel, ModelEdgeQuery query)
     {
         var page = new Page(query);
@@ -61,7 +83,7 @@ internal static class ModelEdgeReader
         };
     }
 
-    private static Snapshot Scan(ObjectId representation, DocumentState state, string instance, CancellationToken cancel, Action? checkCancel, Page? page)
+    private static Snapshot Scan(ObjectId representation, DocumentState state, string instance, CancellationToken cancel, Action? checkCancel, Page? page, HashSet<string>? wanted = null)
     {
         void Budget() { checkCancel?.Invoke(); cancel.ThrowIfCancellationRequested(); }
         Budget(); var inventoryBudget = new ModelInventoryBudget(Budget);
@@ -126,8 +148,11 @@ internal static class ModelEdgeReader
             JsonSerializer.Serialize(json, observed, Wire.Json);
             if (page == null)
             {
-                inventoryBudget.Add(observed);
-                edges.Add(observed);
+                if (wanted == null || wanted.Contains(observed.model_edge_id))
+                {
+                    if (wanted == null) inventoryBudget.Add(observed);
+                    edges.Add(observed);
+                }
             }
             else if (boundary!.Remove(edgeId))
             {
@@ -152,7 +177,7 @@ internal static class ModelEdgeReader
         }
         if (boundary?.Count > 0) throw new DomainException("SUBENTITY_IDENTITY_UNAVAILABLE", "A linked boundary edge was absent from the current native edge inventory.");
         json.WriteEndArray(); json.WriteEndObject(); json.Flush(); stream.FlushFinalBlock();
-        if (page == null && json.BytesCommitted > 8L * 1024 * 1024) throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Native model edge snapshot exceeds the actual8MiB serialized byte budget.");
+        if (page == null && wanted == null && json.BytesCommitted > 8L * 1024 * 1024) throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Native model edge snapshot exceeds the actual8MiB serialized byte budget.");
         var token = Convert.ToHexString(hash.Hash!); Budget();
         return new(source, bodyId.ToString(), last, token, edges.ToArray());
     }

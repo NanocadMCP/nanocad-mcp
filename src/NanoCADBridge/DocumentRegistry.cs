@@ -86,7 +86,12 @@ internal sealed class DocumentRegistry : IDisposable
     }
     private void SystemVariableChanged(object? sender, HostMgd.ApplicationServices.SystemVariableChangedEventArgs args)
     {
-        if (args.Changed) { PointCloudReadScope402.ContextChanged("SystemVariableChanged", args.Name); _context.Advance(); }
+        if (args.Changed && !ForeignHeaderPairs.AttributeForeign(args.Name, InvalidateHeader)) InvalidateHeader(args.Name);
+    }
+    private void InvalidateHeader(string name)
+    {
+        PointCloudReadScope402.ContextChanged("SystemVariableChanged", name);
+        _context.Advance();
     }
     private void Closing(object? sender, DocumentCollectionEventArgs args)
     {

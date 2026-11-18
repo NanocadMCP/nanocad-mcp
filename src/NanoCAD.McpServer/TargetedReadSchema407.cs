@@ -39,7 +39,7 @@ internal static class TargetedReadSchema407
         text["description"] = "Literal ordinary note content or explicit dimension override; decoded plain MTEXT/MLeader when available. No Field evaluation, Table-cell scan or nested block-attribute traversal. match defaults contains, case_sensitive defaults false.";
         var summary = Flag();
         summary["description"] = "Count filtered objects by type and layer and combine WCS XYZ bounds. For a paged summary, follow next_cursor with the same filters, sum page counts by type/layer and take the union of page bounds. aggregation_scope distinguishes entire_query from this_page.";
-        var bodyName = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["description"] = "Exact native tree name of a top-level Model Space solid, matched case-insensitively. Names may repeat. Use the returned handles to inspect the candidates before editing. A page reports solids excluded because no native name was available." };
+        var bodyName = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["description"] = "Exact effective name of a top-level Model Space solid, matched case-insensitively. Includes native tree names and supported DWG group descriptions for imported solids. Names may repeat. Inspect the matching body handles before editing." };
         return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block, ["body_name"] = bodyName, ["summary_only"] = summary };
     }
     internal static JsonObject InspectProperties() => new()
@@ -107,7 +107,19 @@ internal static class TargetedReadSchema407
         {
             ["type"] = "object",
             ["additionalProperties"] = true,
-            ["properties"] = new JsonObject { ["spatial"] = new JsonObject { ["anyOf"] = new JsonArray(spatial, new JsonObject { ["type"] = "null" }) } },
+            ["properties"] = new JsonObject
+            {
+                ["spatial"] = new JsonObject { ["anyOf"] = new JsonArray(spatial, new JsonObject { ["type"] = "null" }) },
+                ["body_name"] = new JsonObject
+                {
+                    ["anyOf"] = new JsonArray(Object(new JsonObject
+                    {
+                        ["scope"] = Enum("top_level_model_solid_effective_name"),
+                        ["match"] = Enum("ordinal_ignore_case_equals"),
+                        ["page_solids_excluded_unavailable_name"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 }
+                    }, "scope", "match", "page_solids_excluded_unavailable_name"), new JsonObject { ["type"] = "null" })
+                }
+            },
             ["description"] = "Actual combined-filter scope and per-page unavailable count; literal text/definition scope. Omitted when no additional filters were requested. bounds_kind identifies native versus conservative array envelope semantics."
         };
     }

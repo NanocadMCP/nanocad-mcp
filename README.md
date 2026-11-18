@@ -10,7 +10,7 @@ You describe the result, dimensions and constraints. The assistant reads the dra
 
 - Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks; adjust supported properties of existing dynamic blocks.
 - Reuse eligible local DWG content as static blocks, and update shared definitions while retaining insertion placement and attribute values.
-- Name individual solids in the native model tree and find them again by name, geometry and current drawing handle.
+- Name parametric solids in the model tree and label imported ACIS solids with native DWG groups. Find each part again by name and current drawing handle.
 - Build solids with extrusion, revolution, sweep, loft, Boolean operations and finishing tools.
 - Use supported native sketches, constraints, parameters and dependent features to build editable individual parts.
 - Prepare editable DWG documentation with dimensions linked to supported drawing views, and work with local drawing and raster references.
@@ -29,16 +29,16 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 457](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/457).
+Get the installer or ready-to-run ZIP from [release 458](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/458).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-457.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-457.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-458.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-458.zip` | Manual setup, or installation from an extracted folder |
 
-Use the matching `SHA256SUMS-457.txt` and source/documentation archives from the same release. See [what changes in 457](RELEASE-NOTES.md#build-457).
+Use the matching `SHA256SUMS-458.txt` and source/documentation archives from the same release. See [what changes in 458](RELEASE-NOTES.md#build-458).
 
-Name individual parts in the native model tree, find their driving features, check internal material and verify how a design change affects sheet dimensions and view placement.
+Find imported parts by a label stored in the DWG. Choose a solid edge for an editable fillet or chamfer and frame it to inspect its profile. Attach a dimension to two projected hole centers and read the updated spacing on the saved drawing.
 
 ## Get started
 

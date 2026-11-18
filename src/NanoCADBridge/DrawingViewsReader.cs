@@ -455,6 +455,41 @@ internal static class DrawingViewsReader
         return found;
     }
 
+    internal sealed record ProjectedCenter(McObjectId ViewId, int Marker, Teigha.Geometry.Point3d Center,
+        Teigha.Geometry.Point3d Rim, double CenterParameter);
+
+    internal static ProjectedCenter ResolveProjectedCenter(Entity entity, DocumentState state, Transaction tx,
+        string instance, int marker, Action cancel)
+    {
+        var (view, viewId, source) = ResolveProjectedSource(entity, state, tx, instance, cancel);
+        if (!view.EnableAutoUpdate || !view.SectionID.IsNull)
+            throw new DomainException("OUT_OF_SCOPE", "Select an ordinary auto-updating Paper view.");
+        var geometry = view.GetViewGeometry(true, 0);
+        if (geometry == null) throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The view has no current projected geometry.");
+        try
+        {
+            var selected = geometry.Where(item => { cancel(); return item != null && item.GSMarker == marker; }).ToArray();
+            if (selected.Length != 1 || CircleShape.Read(selected[0]) is not { } circle ||
+                !ContainsCircle(geometry, marker, circle, true, cancel))
+                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "Select one unique visible full circle for each marker.");
+            RequireLocalVisibility(view, source.Id, marker, false, cancel);
+            var binding = ReadProjectionSource(view, source, marker);
+            if (binding.Reason == SourceMismatch)
+                throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The stored projection source conflicts with the local part.");
+            var center = new G.Point3d(circle.Center.X, circle.Center.Y, circle.Center.Z);
+            double parameter = double.NaN;
+            if (selected[0].GetParamAtPoint(center, out var observed) && double.IsFinite(observed) &&
+                selected[0].GetPointAtParam(observed, out var point) && (point - center).Length <= 1e-7) parameter = observed;
+            return new(viewId, marker, circle.Center, new(circle.Center.X + circle.Radius, circle.Center.Y, circle.Center.Z),
+                parameter);
+        }
+        finally
+        {
+            foreach (var item in geometry.Distinct(ReferenceEqualityComparer.Instance))
+                if (item is IDisposable owned) owned.Dispose();
+        }
+    }
+
     internal static ProjectedCircle ResolveProjectedCircle(Entity entity, DocumentState state, Transaction tx,
         string instance, int index, Action cancel)
     {

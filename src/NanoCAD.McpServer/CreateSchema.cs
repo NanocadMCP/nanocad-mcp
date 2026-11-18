@@ -122,7 +122,7 @@ internal static class CreateSchema
                     ["minimum"] = 0,
                     ["maximum"] = int.MaxValue,
                     ["description"] = $"Current visible {geometry} index from get_drawing_views."
-                }, kind != "projected_angular"),
+                }, kind is not ("projected_angular" or "projected_aligned")),
                 ("dimline_point", placement, true));
             if (kind is "projected_radial" or "projected_arc_length" or "projected_angular")
                 projected["description"] = "Create an associative native DWG dimension from the actual visible circular primitive in an ordinary auto-updating Paper view of one local body, including 1:1 and scaled Paper views (native DScale is the denominator). " +
@@ -131,6 +131,21 @@ internal static class CreateSchema
                         "Measure the angle subtended by the selected finite non-full circular arc. ") +
                     "Use arc_index from the current get_drawing_views geometry page and place dimline_point in sheet XY. Native original-view parameters retain the association; this does not invent a 3D source-edge key. " +
                     "No independent defining coordinates, generic _snap inputs, workplane, text override or dimension_style is accepted. Create projected dimensions as their own group. Native preflight verifies the actual primitive, source/owner and placement. No implicit save.";
+            if (kind == "projected_aligned")
+            {
+                projected["properties"]!["circle_center_markers"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["minItems"] = 2,
+                    ["maxItems"] = 2,
+                    ["uniqueItems"] = true,
+                    ["items"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = int.MaxValue },
+                    ["description"] = "Two visible full-circle GS markers on this ordinary Paper view. Each must retain its own native center reference."
+                };
+                projected["oneOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("line_index") },
+                    new JsonObject { ["required"] = new JsonArray("circle_center_markers") });
+                projected["description"] = "Dimension one visible straight line using line_index, or the distance between two distinct projected hole centers with circle_center_markers in an ordinary Paper view. Supply an off-axis dimline_point. Circle centers require verified native center snaps on both actual markers.";
+            }
             if (kind == "projected_angular")
             {
                 projected["properties"]!["line_indices"] = new JsonObject

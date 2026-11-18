@@ -165,6 +165,7 @@ internal static class ModelManufacturingSchema
                         required.RemoveAt(required.Count - 1);
                         properties["edge_token"] = Token();
                         properties["concentric_edge_id"] = Id();
+                        properties["concentric_edge_id"]!["description"] = "After a fillet or chamfer consumes this rim, inspect_model_history can report its stored reference keys separately from the measured current bore center and current_bore_face_id. Check reference_geometry_scope and any unavailable reason.";
                         definition2["oneOf"] = JsonNode.Parse("""[{"required":["center"],"not":{"anyOf":[{"required":["edge_token"]},{"required":["concentric_edge_id"]}]}},{"required":["edge_token","concentric_edge_id"],"not":{"required":["center"]}}]""");
                         fixedSchema["description"] = "Add one native HoleFeature on a current planar face. Supply a fixed WCS center or select a full circular boundary of that same face with edge_token and concentric_edge_id. Concentric placement requires a verified native reference and placement frame. Read current face and edge identities with inspect_solid_topology. Use the returned body_ref after regeneration.";
                     }

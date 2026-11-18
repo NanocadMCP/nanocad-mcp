@@ -228,6 +228,8 @@ Saving an active drawing uses its native owning-document lifecycle when MultiCAD
 
 # set_view
 
+For a local feature, use frame_bounds_wcs with two ordered WCS corners in the active space's drawing units. Use the selected feature's measured position and extent to frame a close-up. Use frame_handles for entire objects. Both accept optional per-side frame_padding. In a millimetre model get_document(include_view=true) can also return the active renderer camera. Its pixel_size_mm multiplied by the viewport height in pixels gives the displayed field height. The drawing image identifies the camera it used.
+
 Frame relevant content for a design decision or result review. Use top with display_style=wireframe_2d for Model schedules and callouts, or shaded_edges for 3D inspection; preserve retains the current native display style. This changes display, not part geometry. A useful existing view does not need resetting. Native camera readback and successful refresh do not prove that an image shows the requested contents: inspect the returned group image.
 
 # capture_view

@@ -6,22 +6,33 @@ namespace NanoCAD.Contracts;
 // document/revision/camera before and after the host-side desktop capture.
 public sealed record VisualCaptureBridgeArguments(string BridgeId, string CaptureId, int MaxEdge, bool InlineImage = false)
 {
+    public const string SavedDrawing = "saved_drawing";
+    public const string CurrentDrawing = "current_drawing";
+    public string SelectedSource { get; init; } = WindowSource;
+    public const string WindowSource = "windows_graphics_capture";
+    public bool NativeGraphics { get; init; }
     public bool ViewportOnly { get; init; }
     public CaptureWorldBounds? Bounds { get; init; }
     public string? CameraToken { get; init; }
-    public bool RequiresViewport => ViewportOnly || Bounds != null;
+    public bool RequiresViewport => NativeGraphics || ViewportOnly || Bounds != null;
 
     public static VisualCaptureBridgeArguments Parse(JsonElement input)
     {
         if (input.ValueKind != JsonValueKind.Object) throw new DomainException("INVALID_ARGUMENT", "Capture request must be an object.");
         string? bridge = null, capture = null, cameraToken = null; int edge = 0; bool inline = false, viewportOnly = false;
         CaptureWorldBounds? bounds = null;
+        bool native = false; string selected = WindowSource;
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in input.EnumerateObject())
         {
             if (!names.Add(property.Name)) throw new DomainException("INVALID_ARGUMENT", "Duplicate capture argument.");
             switch (property.Name)
             {
+                case "source":
+                    if (property.Value.ValueKind != JsonValueKind.String || property.Value.GetString() is not (SavedDrawing or CurrentDrawing or WindowSource))
+                        throw new DomainException("INVALID_ARGUMENT", "Unknown capture source.");
+                    selected = property.Value.GetString()!; native = selected != WindowSource;
+                    break;
                 case "bridge_instance_id":
                     if (property.Value.ValueKind != JsonValueKind.String || !Guid.TryParseExact(property.Value.GetString(), "D", out var id) || id == Guid.Empty)
                         throw new DomainException("INVALID_ARGUMENT", "Capture requires an exact bridge instance ID.");
@@ -55,8 +66,10 @@ public sealed record VisualCaptureBridgeArguments(string BridgeId, string Captur
             }
         }
         if (bridge == null || capture == null || edge == 0) throw new DomainException("INVALID_ARGUMENT", "Capture bridge, token and max_edge are required.");
-        if ((bounds == null) != (cameraToken == null))
+        if (native && (!inline || bounds != null || cameraToken == null))
+            throw new DomainException("INVALID_ARGUMENT", "Native graphics capture requires a current camera and an inline whole-view result.");
+        if (!native && (bounds == null) != (cameraToken == null))
             throw new DomainException("INVALID_ARGUMENT", "A region capture must include bounds and its observed camera token.");
-        return new(bridge, capture, edge, inline) { ViewportOnly = viewportOnly, Bounds = bounds, CameraToken = cameraToken };
+        return new(bridge, capture, edge, inline) { ViewportOnly = viewportOnly, Bounds = bounds, CameraToken = cameraToken, NativeGraphics = native, SelectedSource = selected };
     }
 }

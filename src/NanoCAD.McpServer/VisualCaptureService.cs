@@ -16,8 +16,23 @@ public static class VisualCaptureService
     private static readonly SemaphoreSlim Gate = new(1, 1);
     // Only a hint about observation quality. Identical pixels after a camera
     // change cannot prove that the CAD view has rendered the new state.
-    private sealed record CaptureFingerprint(string Bridge, string Document, string Camera, string Sha256, bool ViewportOnly, CaptureWorldBounds? Bounds);
+    private sealed record CaptureFingerprint(string Bridge, string Document, string Camera, string Sha256, bool ViewportOnly, CaptureWorldBounds? Bounds, string Source);
     private static CaptureFingerprint? _lastCapture;
+    internal static string? IncompleteReferenceWarning(JsonElement observation)
+    {
+        if (!observation.TryGetProperty("referenced_definitions", out var refs) || refs.ValueKind != JsonValueKind.Object ||
+            !refs.TryGetProperty("frame_completeness", out var status) || status.ValueKind != JsonValueKind.String ||
+            status.GetString() != "incomplete_external_references") return null;
+        return "CAPTURE_EXTERNAL_REFERENCES_INCOMPLETE: A placed external drawing, raster image or underlay could not be verified. " +
+            "Its outline or an empty area may appear in this frame. Inspect offscreen_observation.referenced_definitions for affected insertions.";
+    }
+    internal static string? RasterOrientationWarning(JsonElement observation)
+    {
+        if (!observation.TryGetProperty("referenced_definitions", out var refs) || refs.ValueKind != JsonValueKind.Object ||
+            !refs.TryGetProperty("raster_orientation_warning", out var warning) || warning.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(warning.GetString())) return null;
+        return "CAPTURE_RASTER_ORIENTATION_UNVERIFIED: " + warning.GetString();
+    }
     public static void RequireContext(VisualCaptureArguments args, JsonElement data)
     {
         if (data.GetProperty("document_id").GetString() != args.DocumentId) throw new DomainException("DOCUMENT_NOT_ACTIVE", "The requested document is not active; capture was refused.");
@@ -31,8 +46,39 @@ public static class VisualCaptureService
         if (!JsonElement.DeepEquals(before, after)) throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The document context changed during capture; the image was discarded.", true);
     }
 
-    public static void RequireCaptureArea(VisualCaptureArguments args, JsonElement result)
+    public static JsonElement? ReadDrawingObservation(VisualCaptureArguments args, JsonElement remote, JsonElement beforeData)
     {
+        if (!args.NativeGraphics) return null;
+        static string? Text(JsonElement data, string key) =>
+            data.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        if (!remote.TryGetProperty("offscreen_observation", out var observed) || observed.ValueKind != JsonValueKind.Object ||
+            Text(observed, "source_kind") != args.SelectedSource || Text(observed, "renderer") != "native_layout_bitmap" || Text(observed, "document_id") != args.DocumentId ||
+            Text(observed, "drawing_path") != Text(beforeData, "path") ||
+            !observed.TryGetProperty("camera", out var receiptCamera) || receiptCamera.ValueKind != JsonValueKind.Object ||
+            Text(receiptCamera, "camera_token") != Text(beforeData.GetProperty("view"), "camera_token") ||
+            beforeData.TryGetProperty("render_camera", out var renderCamera) &&
+                (!observed.TryGetProperty("render_camera", out var renderedCamera) || !JsonElement.DeepEquals(renderCamera, renderedCamera) ||
+                 Text(observed, "camera_source") != (renderCamera.ValueKind == JsonValueKind.Null ? "editor_view" : "native_model_view")) ||
+            Text(observed, "revision") != args.Revision ||
+            !observed.TryGetProperty("rendered_bytes_sha256", out var rendered) ||
+            !observed.TryGetProperty("rendered_bytes_length", out var length) ||
+            (args.SelectedSource == VisualCaptureBridgeArguments.SavedDrawing
+             ? rendered.ValueKind != JsonValueKind.String || rendered.GetString() is not { Length: 64 } dwgDigest ||
+               !dwgDigest.All(Uri.IsHexDigit) || length.ValueKind != JsonValueKind.Number || !length.TryGetInt64(out var size) || size <= 0
+             : rendered.ValueKind != JsonValueKind.Null || length.ValueKind != JsonValueKind.Null))
+            throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The bridge's offscreen source, drawing, camera or saved digest differs.", true);
+        return observed.Clone();
+    }
+
+    public static void RequireCaptureArea(VisualCaptureArguments args, JsonElement result, string? nativeCameraToken = null)
+    {
+        if (args.NativeGraphics)
+        {
+            if (!result.TryGetProperty("source", out var source) || source.ValueKind != JsonValueKind.String || source.GetString() != args.SelectedSource)
+                throw new DomainException("NATIVE_GRAPHICS_UNAVAILABLE", "The bridge did not confirm the offscreen render of the drawing.");
+            if (nativeCameraToken == null || !result.TryGetProperty("capture_camera_token", out var token) || token.ValueKind != JsonValueKind.String || token.GetString() != nativeCameraToken)
+                throw new DomainException("CAPTURE_CONTEXT_CHANGED", "The native bitmap did not confirm the observed camera.", true);
+        }
         bool viewportOnly = result.TryGetProperty("viewport_only", out var viewport) && viewport.ValueKind == JsonValueKind.True;
         if (viewportOnly != args.RequiresViewport)
             throw new DomainException(args.Bounds == null ? "CAPTURE_VIEWPORT_UNAVAILABLE" : "CAPTURE_BOUNDS_UNAVAILABLE",
@@ -53,6 +99,18 @@ public static class VisualCaptureService
         if (reported != args.Bounds || !result.TryGetProperty("crop_pixels", out var pixels) || CapturePixelRect.Read(pixels) is not { } crop ||
             !crop.Fits(Pixels("viewport_width"), Pixels("viewport_height")) ||
             crop.right - crop.left != Pixels("source_width") || crop.bottom - crop.top != Pixels("source_height")) throw Invalid();
+    }
+    public static (string Frame, string Start) CaptureTiming(JsonElement frame)
+    {
+        bool Ticks(string name, out long ticks)
+        {
+            ticks = -1;
+            return frame.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String &&
+                long.TryParse(value.GetString(), NumberStyles.None, CultureInfo.InvariantCulture, out ticks) && ticks >= 0;
+        }
+        if (!Ticks("frame_system_relative_ticks", out var captured) || !Ticks("capture_started_system_relative_ticks", out var start) || captured < start)
+            throw new DomainException("CAPTURE_STALE_FRAME", "The frame timestamp is unavailable or predates this capture session.");
+        return (captured.ToString(CultureInfo.InvariantCulture), start.ToString(CultureInfo.InvariantCulture));
     }
     public static void RequirePng(byte[] png, int width, int height, int maxEdge)
     {
@@ -125,6 +183,14 @@ public static class VisualCaptureService
                 ["inline_image"] = true
             };
             if (args.ViewportOnly) workerInput["viewport_only"] = true;
+            if (args.NativeGraphics)
+            {
+                if (!beforeData.TryGetProperty("view", out var activeView) || activeView.ValueKind != JsonValueKind.Object ||
+                    !activeView.TryGetProperty("camera_token", out var snapshotToken) || snapshotToken.ValueKind != JsonValueKind.String)
+                    throw new DomainException("NATIVE_GRAPHICS_UNAVAILABLE", "The active viewport camera could not be verified.");
+                workerInput["source"] = args.SelectedSource;
+                workerInput["expected_camera_token"] = snapshotToken.GetString();
+            }
             if (args.Bounds is { } bounds)
             {
                 if (!beforeData.TryGetProperty("view", out var beforeCamera) || beforeCamera.ValueKind != JsonValueKind.Object ||
@@ -136,14 +202,16 @@ public static class VisualCaptureService
             var response = await client.CallAsync(descriptor, new Request(Wire.Version, Guid.NewGuid().ToString("D"), "capture_window", 9000,
                 Wire.Element(workerInput)), deadline.Token);
             if (args.RequiresViewport && response.error is { code: "INVALID_ARGUMENT", message: "Unknown capture argument." })
-                throw args.Bounds != null
+                throw args.NativeGraphics ? new DomainException("NATIVE_GRAPHICS_UNAVAILABLE", "The loaded bridge does not support native graphics capture.") : args.Bounds != null
                     ? new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "The loaded bridge does not support WCS bounds capture.")
                     : new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The loaded bridge does not support viewport-only capture.");
             if (!response.success) throw new DomainException(response.error!.code, response.error.message, response.error.retryable, response.error.details);
             var remote = Wire.Element(response.data!);
             if (remote.GetProperty("capture_id").GetString() != captureId || remote.GetProperty("process_id").GetInt32() != descriptor.process_id)
                 throw new DomainException("CAPTURE_FAILED", "Bridge capture token or process identity differs.");
-            RequireCaptureArea(args, remote);
+            RequireCaptureArea(args, remote, args.NativeGraphics ? beforeData.GetProperty("view").GetProperty("camera_token").GetString() : null);
+            var offscreenObservation = ReadDrawingObservation(args, remote, beforeData);
+            var (timestamp, captureStart) = CaptureTiming(remote);
             frame = Wire.Element(new
             {
                 captured = true,
@@ -151,14 +219,10 @@ public static class VisualCaptureService
                 width = remote.GetProperty("width").GetInt32(),
                 height = remote.GetProperty("height").GetInt32(),
                 source_width = remote.GetProperty("source_width").GetInt32(),
-                source_height = remote.GetProperty("source_height").GetInt32(),
-                frame_system_relative_ticks = remote.GetProperty("frame_system_relative_ticks").GetString(),
-                capture_started_system_relative_ticks = remote.GetProperty("capture_started_system_relative_ticks").GetString()
+                source_height = remote.GetProperty("source_height").GetInt32()
             });
             if (!frame.GetProperty("captured").GetBoolean() || frame.GetProperty("pid").GetInt32() != descriptor.process_id) throw new DomainException("CAPTURE_FAILED", "Visual worker identity or result differs.");
             int width = frame.GetProperty("width").GetInt32(), height = frame.GetProperty("height").GetInt32();
-            string timestamp = frame.GetProperty("frame_system_relative_ticks").GetString()!, captureStart = frame.GetProperty("capture_started_system_relative_ticks").GetString()!;
-            if (!long.TryParse(timestamp, out long frameTicks) || !long.TryParse(captureStart, out long startedTicks) || frameTicks < startedTicks) throw new DomainException("CAPTURE_STALE_FRAME", "Frame predates this capture session.");
             byte[] png = DecodeImage(remote, width, height, args.MaxEdge);
             if (window != IntPtr.Zero) Target(descriptor, window);
             var after = await Context(); var afterData = Wire.Element(after.data!); RequireUnchanged(beforeData, afterData);
@@ -169,14 +233,14 @@ public static class VisualCaptureService
                 ? token.GetString() ?? "" : "";
             var previous = _lastCapture;
             bool identicalAfterCameraChange = previous != null && previous.Bridge == args.BridgeId && previous.Document == args.DocumentId &&
-                previous.ViewportOnly == args.RequiresViewport && previous.Bounds == args.Bounds && previous.Camera.Length > 0 && cameraToken.Length > 0 && previous.Camera != cameraToken && previous.Sha256 == digest;
-            _lastCapture = new(args.BridgeId, args.DocumentId, cameraToken, digest, args.RequiresViewport, args.Bounds);
-            string scope = args.Bounds != null ? "native_viewport_wcs_bounds_observation" :
+                previous.Source == args.SelectedSource && previous.ViewportOnly == args.RequiresViewport && previous.Bounds == args.Bounds && previous.Camera.Length > 0 && cameraToken.Length > 0 && previous.Camera != cameraToken && previous.Sha256 == digest;
+            _lastCapture = new(args.BridgeId, args.DocumentId, cameraToken, digest, args.RequiresViewport, args.Bounds, args.SelectedSource);
+            string scope = args.NativeGraphics ? args.SelectedSource + "_render_with_current_camera" : args.Bounds != null ? "native_viewport_wcs_bounds_observation" :
                 args.ViewportOnly ? "native_viewport_observation" : "main_window_observation";
             var data = new
             {
                 frame_id = id,
-                source = "windows_graphics_capture",
+                source = args.NativeGraphics ? args.SelectedSource : VisualCaptureBridgeArguments.WindowSource,
                 mime_type = "image/png",
                 width,
                 height,
@@ -199,6 +263,16 @@ public static class VisualCaptureService
                     "CAPTURE_IDENTICAL_AFTER_CAMERA_CHANGE: Pixels match the previous frame despite a different camera token. Inspect the actual image; rendering may not have updated. This does not imply a CAD write failure."}
                 : new[] { "Visual observation only: verify dimensions and write outcomes with exact APIs; separate dialogs/menus may be absent." };
             object resultData = data;
+            if (offscreenObservation is { } observation)
+            {
+                if (IncompleteReferenceWarning(observation) is { } referenceWarning)
+                    warnings = warnings.Append(referenceWarning).ToArray();
+                if (RasterOrientationWarning(observation) is { } orientationWarning)
+                    warnings = warnings.Append(orientationWarning).ToArray();
+                var drawing = JsonSerializer.SerializeToNode(data, Wire.Json)!.AsObject();
+                drawing["offscreen_observation"] = JsonNode.Parse(observation.GetRawText());
+                resultData = drawing;
+            }
             if (args.Bounds != null)
             {
                 var regionData = JsonSerializer.SerializeToNode(data, Wire.Json)!.AsObject();

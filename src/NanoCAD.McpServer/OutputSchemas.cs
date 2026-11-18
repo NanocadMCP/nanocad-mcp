@@ -24,6 +24,15 @@ internal static class OutputSchemas
     private static JsonObject Ref(string name) => new() { ["$ref"] = "#/$defs/" + name };
     private static JsonObject Nullable(JsonObject schema) => new() { ["anyOf"] = new JsonArray(schema, new JsonObject { ["type"] = "null" }) };
     private static JsonObject Array(JsonObject schema) => new() { ["type"] = "array", ["items"] = schema };
+    private static void AddBodyNameProvenance(JsonNode properties, bool committed = false)
+    {
+        var sources = new JsonArray("native_tree", "dwg_group_description");
+        if (!committed) sources.Add("ambiguous_dwg_group");
+        var source = new JsonObject { ["type"] = "string", ["enum"] = sources };
+        properties["body_name_source"] = committed ? source : Nullable(source);
+        properties["native_tree_name"] = Nullable(Text());
+        properties["body_name_group"] = Nullable(Ref("body_name_group"));
+    }
     private static JsonObject Point(int dimensions = 3) => new() { ["type"] = "array", ["minItems"] = dimensions, ["maxItems"] = dimensions, ["items"] = Number() };
     private static JsonObject Object(params (string Name, JsonObject Schema)[] fields)
     {
@@ -45,6 +54,7 @@ internal static class OutputSchemas
             ("units", Object(("name", Text()), ("value", Integer()))), ("active_space", Text()), ("revision", Text()), ("fingerprint_guid", Text()));
         data["properties"]!["view"] = Nullable(CameraViewData());
         data["properties"]!["view_unavailable_reason"] = Nullable(Text());
+        data["properties"]!["render_camera"] = Nullable(CameraRendererData370());
         return data;
     }
     private static JsonObject StructureData(JsonObject change)
@@ -206,6 +216,7 @@ internal static class OutputSchemas
             ("body_ref", Nullable(Ref("ref"))), ("sketch_id", Nullable(Text())), ("projection_ids", Array(Text())), ("feature_id", Nullable(Text())), ("rebuilt_bodies", Array(Ref("ref")))));
         data["properties"]!["model_parameter_names"] = Array(Object(("body_ref", Ref("ref")), ("variable_id", Text()), ("previous_name", Text()), ("name", Text()), ("rewritten_expression_ids", Array(Text()))));
         data["properties"]!["model_body_names"] = Array(Object(("body_ref", Ref("ref")), ("previous_name", Text()), ("name", Text())));
+        AddBodyNameProvenance(data["properties"]!["model_body_names"]!["items"]!["properties"]!, committed: true);
         var relation431 = data["properties"]!["drawing_profile_changes"]!["items"]!["properties"]!["constraints"]!["items"]!["properties"]!.AsObject();
         relation431["third_handle"] = Nullable(Text());
         foreach (var field in new[] { "first_segment_index", "second_segment_index", "third_segment_index" }) relation431[field] = Nullable(Integer());
@@ -387,6 +398,7 @@ internal static class OutputSchemas
         var body = Object(("ref", Ref("ref")), ("mc_id", Text()), ("mc_document_id", Text()),
             ("last_item_id", Nullable(Text())), ("complete", Bool()), ("nodes", Array(node)));
         body["properties"]!["body_name"] = Nullable(Text());
+        AddBodyNameProvenance(body["properties"]!);
         body["properties"]!["edit_routes"] = AnyObject();
         body["properties"]!["dependency_trace"] = AnyObject();
         body["properties"]!["reference_planes"] = Array(Object(("name", Text()), ("plane_id", Text()), ("scope", Text())));
@@ -535,6 +547,7 @@ internal static class OutputSchemas
         var link = association["properties"]!["links"]!["items"]!["properties"]!;
         link["source_parts"] = Array(Object(("ref", Ref("ref")), ("mc_id", Text()),
             ("body_name", Nullable(Text())), ("dwg_material_handle", Nullable(Text()))));
+        AddBodyNameProvenance(link["source_parts"]!["items"]!["properties"]!);
         link["marker_sources"] = Array(Object(("marker", Integer()), ("projection_source", ProjectionSource()),
             ("design_source", Ref("projected_design_source"))));
         return association;
@@ -563,6 +576,7 @@ internal static class OutputSchemas
             ["error"] = Object(("code", Text()), ("message", Text()), ("retryable", Bool()), ("details", Nullable(AnyObject()))),
             ["context"] = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("revision", Text()), ("captured_at_utc", Text())),
             ["ref"] = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("handle", Text())),
+            ["body_name_group"] = Object(("name", Text()), ("ref", Ref("ref"))),
             ["projected_design_source"] = ProjectedDesignSource(),
             ["projected_feature"] = ProjectedFeature(),
             ["original_marker_topology"] = Object(("original_marker", Text()), ("native_subelement_id", Text()),
@@ -677,7 +691,13 @@ internal static class OutputSchemas
             ("properties", Ref("properties")), ("warnings", Array(Text())));
         definitions["summary"]!["properties"]!["body_name"] = Text();
         definitions["entity"]!["properties"]!["body_name"] = Text();
-        if (operation == "inspect_objects") definitions["compact_entity"] = TargetedReadSchema407.CompactEntityOutput(Ref("ref"));
+        AddBodyNameProvenance(definitions["summary"]!["properties"]!);
+        AddBodyNameProvenance(definitions["entity"]!["properties"]!);
+        if (operation == "inspect_objects")
+        {
+            definitions["compact_entity"] = TargetedReadSchema407.CompactEntityOutput(Ref("ref"));
+            AddBodyNameProvenance(definitions["compact_entity"]!["properties"]!);
+        }
         definitions["item"] = Object(("handle", Text()), ("success", Bool()),
             ("entity", Nullable(operation == "inspect_objects" ? new JsonObject { ["anyOf"] = new JsonArray(Ref("entity"), Ref("compact_entity")) } : Ref("entity"))), ("error", Nullable(Ref("error"))));
         definitions["document_info"] = Object(("document_id", Text()), ("name", Text()), ("path", Nullable(Text())),

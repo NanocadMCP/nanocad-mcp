@@ -1,11 +1,39 @@
 using System.Text.Json;
+using System.Text;
 
 namespace NanoCAD.Contracts;
 
 public sealed record ModelBodyNameEdit(string[] Targets, string Name, string? ExpectedName)
     : EditSpec("name_model_body", Targets);
 
-public sealed record ModelBodyNameChange(EntityRef body_ref, string previous_name, string name);
+public sealed record ModelBodyNameGroup(string name, EntityRef @ref);
+public sealed record ModelBodyNameChange(EntityRef body_ref, string previous_name, string name,
+    string body_name_source, string? native_tree_name, ModelBodyNameGroup? body_name_group);
+
+public static class BodyNameGroupKey
+{
+    // The Object Grouping dialog accepts 31 characters, without spaces.
+    public static string Available(string description, string handle, Func<string, bool> occupied)
+    {
+        var text = new StringBuilder();
+        foreach (var c in description)
+        {
+            if (text.Length == 31) break;
+            if (char.IsLetterOrDigit(c) || c is '$' or '-' or '_')
+                text.Append(char.ToUpperInvariant(c));
+            else if (text.Length > 0 && text[^1] != '_') text.Append('_');
+        }
+        string stem = text.ToString().Trim('_');
+        if (stem.Length == 0) stem = "BODY_" + handle;
+        string key = stem;
+        for (long index = 2; occupied(key); index++)
+        {
+            string suffix = "_" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            key = stem[..Math.Min(stem.Length, 31 - suffix.Length)] + suffix;
+        }
+        return key;
+    }
+}
 
 public static partial class ModifyValidation
 {

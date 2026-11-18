@@ -110,6 +110,8 @@ internal static class DesktopCaptureBridge
     {
         var args = VisualCaptureBridgeArguments.Parse(request.arguments);
         if (args.BridgeId != descriptor.bridge_instance_id) throw new DomainException("BRIDGE_UNAVAILABLE", "Capture targets another bridge lifetime.");
+        if (args.NativeGraphics)
+            return await queue.SubmitAsync(request with { operation = OffscreenDrawingCapture.Operation }, cancellation);
         var window = MainWindow();
         var viewport = args.RequiresViewport ? await GetViewportTarget(queue, request.arguments, cancellation) : null;
         var crop = viewport?.Region?.Crop;

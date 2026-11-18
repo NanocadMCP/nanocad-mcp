@@ -18,11 +18,11 @@ internal static class ModelManufacturingHistory
         return center.All(double.IsFinite) && axis.All(double.IsFinite) && axis.Any(v => v != 0)
             ? new(center, axis, null) : new(null, null, "nonfinite_or_degenerate_placement");
     }
-    static object? Placement(IppDefinition? p, McObjectId body)
+    static object? Placement(IppDefinition? p, HoleFeature hole, Action? cancel)
     {
         if (p == null) return null;
         string placement_type = p.DefType.ToString(), support_face_id = p.TargetPlaneId.ToString();
-        if (p.DefType == IppDefinitionType.Concentric) return ModelConcentricHole.Read(p, body);
+        if (p.DefType == IppDefinitionType.Concentric) return ModelConcentricHole.Read(p, hole.HostSolidID, hole, cancel);
         if (p.DefType == IppDefinitionType.Fixed)
         {
             var actual = FixedPlacement(p);
@@ -93,7 +93,7 @@ internal static class ModelManufacturingHistory
             };
         }
         var h = id.GetObjectOfType<HoleFeature>();
-        if (h != null) { using var p = h.GetPlacement(); bool angleActive = !h.IsFullDepth && !h.FlatBottom; return new { kind = "hole", diameter = h.Diameter, through = h.IsFullDepth, depth = h.Depth, seat = h.SeatType.ToString(), seat_diameter = h.SeatDiameter, seat_depth = h.SeatDepth, seat_angle_degrees = h.SeatAngle * 180 / Math.PI, flat_bottom = h.FlatBottom, bottom_angle_applicable = angleActive, bottom_angle_degrees = angleActive ? (double?)(h.BottomAngle * 180 / Math.PI) : null, face_id = h.FaceId.ToString(), terminal_face_id = h.TerminalFaceId.ToString(), placement = Placement(p, h.HostSolidID), thread_id = h.GetThread()?.ID.ToString() }; }
+        if (h != null) { using var p = h.GetPlacement(); bool angleActive = !h.IsFullDepth && !h.FlatBottom; return new { kind = "hole", diameter = h.Diameter, through = h.IsFullDepth, depth = h.Depth, seat = h.SeatType.ToString(), seat_diameter = h.SeatDiameter, seat_depth = h.SeatDepth, seat_angle_degrees = h.SeatAngle * 180 / Math.PI, flat_bottom = h.FlatBottom, bottom_angle_applicable = angleActive, bottom_angle_degrees = angleActive ? (double?)(h.BottomAngle * 180 / Math.PI) : null, face_id = h.FaceId.ToString(), terminal_face_id = h.TerminalFaceId.ToString(), placement = Placement(p, h, cancel), thread_id = h.GetThread()?.ID.ToString() }; }
         var t = id.GetObjectOfType<ThreadFeature>();
         if (t != null) return new { kind = "thread", pitch = t.Pitch, right_handed = t.IsRight, @internal = t.IsInternal, full_length = t.IsFullLength, length_applicable = !t.IsFullLength, length = t.Length, minimum_diameter = t.MinDiameter, maximum_diameter = t.MaxDiameter, designation = t.Designation, face_id = t.ThreadFaceId.ToString(), front_edge_id = t.FrontEdgeId.ToString(), pitch_variable_id = t.PitchVarID.ToString(), length_variable_id = t.LengthVarID.ToString(), representation = "native_thread_feature_helical_brep_unverified" };
         var c = id.GetObjectOfType<CircularPatternFeature>();

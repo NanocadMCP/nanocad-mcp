@@ -6,6 +6,25 @@ internal static class QuerySummaryTests
 {
     internal static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("body name query and inspection publish the native name source and group identity", () =>
+        {
+            var summary = AuditServerContractSupport.Output("query_objects").GetProperty("$defs").GetProperty("summary");
+            var inspected = AuditServerContractSupport.Output("inspect_objects").GetProperty("$defs");
+            foreach (var item in new[] { summary, inspected.GetProperty("entity"), inspected.GetProperty("compact_entity") })
+            {
+                var fields = item.GetProperty("properties");
+                var sources = fields.GetProperty("body_name_source").GetProperty("anyOf").EnumerateArray().Single(s => s.TryGetProperty("enum", out _));
+                foreach (var value in new[] { "native_tree", "dwg_group_description", "ambiguous_dwg_group" })
+                    if (!sources.GetProperty("enum").EnumerateArray().Any(source => source.GetString() == value))
+                        throw new Exception("Missing body name source: " + value);
+                var group = fields.GetProperty("body_name_group").GetProperty("anyOf").EnumerateArray()
+                    .Single(option => option.TryGetProperty("properties", out _)).GetProperty("properties");
+                if (!fields.TryGetProperty("native_tree_name", out _) || !group.TryGetProperty("name", out _) ||
+                    !group.GetProperty("ref").GetProperty("properties").TryGetProperty("handle", out _))
+                    throw new Exception("Missing tree label or named group reference.");
+            }
+            return Task.CompletedTask;
+        });
         await test("native face query filters supporting geometry and preserves distinct axis and plane distances", () =>
         {
             var cylinder = ModelFaceQuery.Parse(Wire.Element(new

@@ -34,6 +34,8 @@ internal sealed class CadReader
             if (Environment.CurrentManagedThreadId != _uiThread)
                 throw new DomainException("UI_THREAD_MISMATCH", "Native reads must execute on the bridge initialization thread.");
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.operation == OffscreenDrawingCapture.Operation)
+                return OffscreenDrawingCapture.Read(request, _instance, _documents, cancellationToken);
             if (request.operation == DesktopCaptureBridge.ViewportTargetRead)
                 return DesktopCaptureBridge.ReadViewportTarget(request, _documents);
             var args = Validation.Parse(request.operation, request.arguments);
@@ -207,6 +209,7 @@ internal sealed class CadReader
         {
             var observation = CameraViewReader.Read(_instance, state);
             data["view"] = observation.view; data["view_unavailable_reason"] = observation.view_unavailable_reason;
+            data["render_camera"] = observation.render_camera;
         }
         return data;
     }
@@ -235,7 +238,7 @@ internal sealed class CadReader
             if (args.Layers != null && !args.Layers.Contains(summary.layer!.name, StringComparer.OrdinalIgnoreCase)) return null;
             if (!CadTargetedRead407.MatchBlock(entity, args.QueryBlock, transaction, cancellationToken.ThrowIfCancellationRequested)) return null;
             if (!CadTargetedRead407.MatchText(entity, args.QueryText, cancellationToken.ThrowIfCancellationRequested)) return null;
-            if (!args.SummaryOnly || args.BodyName != null) summary = bodyNames.Observe(entity, summary);
+            if (!args.SummaryOnly || args.BodyName != null) summary = bodyNames.Observe(entity, summary, transaction, cancellationToken.ThrowIfCancellationRequested);
             if (args.BodyName != null && entity is Solid3d && entity.OwnerId == modelId && summary.body_name == null) unavailableBodyNames++;
             if (args.BodyName != null && !string.Equals(summary.body_name, args.BodyName, StringComparison.OrdinalIgnoreCase)) return null;
             return (entity, summary);
@@ -319,7 +322,7 @@ internal sealed class CadReader
                     throw new DomainException("OUT_OF_SCOPE", "The handle does not identify an entity.");
                 bool paper = entity.OwnerId != modelId && transaction.GetObject(entity.OwnerId, OpenMode.ForRead) is BlockTableRecord owner && owner.IsLayout;
                 var summary = EntityAdapter.Summary(entity, modelId, _instance, state.Id, paper);
-                summary = bodyNames.Observe(entity, summary);
+                summary = bodyNames.Observe(entity, summary, transaction, cancellationToken.ThrowIfCancellationRequested);
                 if (entity.OwnerId != modelId && !paper) throw new DomainException("OUT_OF_SCOPE", "Only top-level Model or paper-layout entities can be inspected; nested block content uses inspect_block.", false, new { summary });
                 bool needsGeometry = args.DetailSections == null || args.DetailSections.Contains("geometry", StringComparer.Ordinal) || args.DetailSections.Contains("editing", StringComparer.Ordinal);
                 if (summary.type == "Unknown" && needsGeometry) throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Geometry for this type is not supported; sections:[] can still read its identity and owner.", false, new { summary });

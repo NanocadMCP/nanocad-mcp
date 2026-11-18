@@ -429,6 +429,7 @@ NanoCAD_ReadOwnedAlienDataAssociation(const wchar_t* drawingWorkId,
     catch (...) { return E_UNEXPECTED; }
 }
 
+
 // The installed managed GetLocalCutData copies m_idDV into both ID fields.
 // Read the complete public SDK structure instead. The physical handle resolves
 // the current sketch; all supplied WorkID strings are cross-checks only.

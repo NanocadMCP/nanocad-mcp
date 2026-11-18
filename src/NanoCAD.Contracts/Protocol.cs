@@ -57,12 +57,24 @@ public sealed record EntitySummary(EntityRef @ref, string type, string runtime_t
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? body_name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? body_name_source { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? native_tree_name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelBodyNameGroup? body_name_group { get; init; }
 }
 public sealed record EntityDetail(EntityRef @ref, string type, string runtime_type, LayerDto? layer, string space,
     string detail_support, string coordinate_system, object geometry, object properties, string[] warnings)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? body_name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? body_name_source { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? native_tree_name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ModelBodyNameGroup? body_name_group { get; init; }
 }
 public sealed record ItemResult(string handle, bool success, EntityDetail? entity, DomainError? error);
 public sealed record Page(EntitySummary[] items, int? total_count, int returned_count, bool complete, string? next_cursor, string? selection_revision);
