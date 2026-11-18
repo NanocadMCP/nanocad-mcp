@@ -10,7 +10,7 @@ You describe the result, dimensions and constraints. The assistant reads the dra
 
 - Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks; adjust supported properties of existing dynamic blocks.
 - Reuse eligible local DWG content as static blocks, and update shared definitions while retaining insertion placement and attribute values.
-- Name parametric solids in the model tree and label imported ACIS solids with native DWG groups. Find each part again by name and current drawing handle.
+- Name 3D parts and find them again in the drawing, including imported ACIS solids.
 - Build solids with extrusion, revolution, sweep, loft, Boolean operations and finishing tools.
 - Use supported native sketches, constraints, parameters and dependent features to build editable individual parts.
 - Prepare editable DWG documentation with dimensions linked to supported drawing views, and work with local drawing and raster references.
@@ -27,6 +27,10 @@ Each operation has its own requirements. Read [capabilities and limits](docs/en/
 
 The release includes the MCP server runtime. You do not need Python, a compiler or the nanoCAD SDK to use the packaged application. The integration runs locally; your AI client may send drawing information and images to its provider. Read [data and privacy](docs/en/privacy.md).
 
+## What's new in 459
+
+Fixed a bug that prevented moving or editing an imported solid after it was named. [Release notes](RELEASE-NOTES.md#build-459)
+
 ## Download
 
 Get the installer or ready-to-run ZIP from [release 459](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/459).
@@ -36,9 +40,7 @@ Get the installer or ready-to-run ZIP from [release 459](https://github.com/Nano
 | `NanoCAD-MCP-Setup-459.exe` | Guided installation and assistant configuration |
 | `nanocad-mcp-local-459.zip` | Manual setup, or installation from an extracted folder |
 
-Use the matching `SHA256SUMS-459.txt` and source/documentation archives from the same release. See [what changes in 459](RELEASE-NOTES.md#build-459).
-
-Find an imported part by its DWG label, move it or drill a blind hole, then find the same part again by name. Choose a solid edge for an editable fillet or chamfer and frame it to inspect its profile. Attach a dimension to two projected hole centers and read the updated spacing on the saved drawing.
+Checksums are listed in `SHA256SUMS-459.txt` on the release page.
 
 ## Get started
 

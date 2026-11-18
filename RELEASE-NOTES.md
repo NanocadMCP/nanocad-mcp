@@ -4,69 +4,37 @@
 
 ## Build 459
 
-Find an imported part by its DWG label, move it or drill a blind hole, then find the same part again by name.
-
-A labeled 10 × 20 × 30 mm block moved 3 mm along X, from 100–110 mm to 103–113 mm. On another copy, a 2 mm diameter blind hole cut 3 mm into the top face and left 27 mm of material under its floor. Both edits kept the original solid, group and label. The neighboring solid stayed in place.
-
-On a separate copy, an R1 edge fillet produced a cylindrical face. Rotating, scaling, moving and recoloring the finished block preserved its label. Subtracting a cylinder from another copy kept the cutting tool available for reuse. Pulling one side face of that block outward by 1 mm added 600 mm³ while retaining its name and group.
-
-Native group membership is checked during in-place edits. Direct translation of a parametric guide bushing was refused before changing the sketch, extrusion or hole that drives it.
+Fixed a regression in 458 that prevented move and edit operations on imported 3D solids with DWG group labels.
 
 ## Build 458
 
-- Give an imported ACIS solid a label and find it again with MCP or in nanoCAD's Group Manager (`CLASSICGROUP`). The native DWG group has a readable name and keeps your exact label in its Description. Renaming an inspection block, editing its group description and reopening the DWG preserved the final label, both solids' geometry and an unrelated group. Parametric parts use their construction-tree names.
-- Select a specific native edge from a solid topology read for a parametric fillet or chamfer. On a plate with two bosses of the same 16 mm diameter, each finish changed only the selected outer rim. The other boss retained its radius of 8 mm.
-- Attach an aligned drawing dimension to the centers of two visible projected circles. Changing the pitch of two 6 mm diameter holes from 60 to 50 mm updated the same dimension. On a separate 1:2 sheet view, a 30 mm paper distance was displayed as 60 mm.
-- Read the earlier support of a concentric hole after an edge finish. On the tested part, nanoCAD identified the stored source and the present bore separately. The two circular bore boundaries were measured on the current solid.
-- Frame a measured 3.8 by 3.8 mm region around a rim with set_view, then inspect it with capture_view. At a 5.32 mm field height, the active model showed the rounded R1 contour. The saved comparison part showed the straight slope of the 1 by 1 mm chamfer. A saved sheet showed both holes, the pocket, the linked 50 mm spacing and the independent 60 mm dimension together.
-
-On a sheet with protected native dimension containers, current_drawing stops before cloning. Save the DWG and use saved_drawing to see its dimensions. On a floor plan linked by a relative path, both drawing sources showed the raster flipped vertically and reported an orientation warning. Before tracing or measuring a raster, check its original pixels and placement in the drawing.
+- Added persistent labels for imported ACIS solids. Labels are stored in DWG groups and are editable in Group Manager.
+- Added individual edge selection for parametric fillets and chamfers.
+- Added associative center-to-center dimensions for projected holes, including scaled views.
+- Added capture of the current drawing or the last saved DWG, with framing by drawing coordinates. Fixed loading of relative raster references in current-drawing captures.
 
 ## Build 457
 
-- Give individual solids recognizable names in the native model tree. Find the bushing and its matching pin again after reopening the DWG, even when two bodies share a name. Confirm the selected body by its handle and geometry before editing.
-- A two-sheet DWG retained the native names “Guide bushing” and “Locating pin” on reopening. The pin's sheet shows its 12 mm diameter in the end view and its 20 mm length in the side view.
-- Follow a cylindrical or planar face to the feature that created it when nanoCAD identifies the source. Inspect its driving variables, upstream features and downstream consumers. A focused history read can identify a failed sketch support and the features that depend on it.
-- Ask for the edges of a particular model face. The end of a guide bushing returned its two concentric rings at radii 12.5 and 20 mm, with distinct native edge IDs for feature selection.
-- Check the physical material inside a part using a planar section and a line segment. On a counterbored through-hole this distinguishes the open passage, annular shoulder and outer wall.
-- Check proposed paper-space view positions against measured view and annotation extents. A stepped bushing's axial section retained the shoulder and overall-length dimension anchors when the shoulder changed from 8 to 10 mm.
-- Find the dimensions attached to a selected element of a specific view. The bushing end view returned both diameters anchored to its chosen circle and distinguished an identical circle in another view.
-- A pocket-depth change from 3 to 5 mm updated the section dimension and left a measured 5 mm wall in a 10 mm plate. Changing the hole spacing from 50 to 60 mm updated the projected edge-to-edge distance from 44 to 54 mm. The independent center-spacing annotation needed an explicit edit.
-- A single change to the guide bushing's length from 40 to 44 mm kept the Ø24 passage open end to end. The existing section on the same sheet measured 44 mm overall and 10 mm at the shoulder. An existing Simple Fixed through hole with only 4 mm of open bore could also be repaired in place.
-- Place a native concentric blind hole on the chosen cylindrical boss. A Ø6 hole, 5 mm deep, stayed on the second of two Ø16 bosses after reopening and after their spacing increased from 34 to 46 mm. The first boss remained solid.
-- Enlarging the opening in an associative hatch from Ø8 to Ø12 updated the inner boundary and its retained diameter dimension. With effective DIMTMOVE=2, moving the label by 7 mm preserved the Ø12 measurement, both chord points and the native link to the circle. The eight line and arc segments of the hatch's outer boundary stayed in place.
-- Inspect measured gaps and joins in a selection of drawing curves. Compare points in a loaded scan with a solid section and see which portions of its boundary have measurements. Empty portions carry no deviation value.
-- Read the drawing coordinates of a raster's pixel origin and the two steps corresponding to one pixel in each direction. Use them to locate a detail in the drawing or check the saved image clip.
+- Solids in the model tree can now be named and searched by name.
+- Added planar solid sections, material thickness measurements along a line, and point-cloud comparison against a solid section.
+- Face inspection now identifies the feature that created a face and exposes its parameters and dependencies when available.
+- Added concentric hole placement on cylindrical bosses and corrected through-hole depth after part length changes.
+- Sheet layout tools now check for overlap with views and annotations. New layouts can copy a title block with its attributes.
+- Added dimension lookup by projected geometry and support for repositioning associative diameter labels with `DIMTMOVE=2`.
+- Added gap detection for selected curves and pixel-to-drawing coordinates for raster attachments.
 
 ## Build 456
 
-- Place first-angle or third-angle projected views, select child view alignment and inspect section ownership on the chosen sheet. Projected dimensions account for view scale. A diameter on a 1:2 view followed a model edit from 20 to 24 mm. An angular dimension can use two converging visible line segments.
-- Inspect table cell types, units, formula expressions and evaluated values after inserting or deleting rows. Restore measured dimension text after a long literal override, and snap to the selected vertex of an eligible polyline.
-- Check the material removed by a small bore and the ownership of chamfer edges. Inspect native Loft section sources and the available sketch and feature controls. Thread edits report the retained pitch and length drivers where applicable.
-- Find objects by a 3D world-coordinate region, inspect one structure entry by handle and follow a nested block path with its accumulated transform. Repoint an eligible external drawing reference and check raster calibration against an independent third point.
-
-A view dimension can retain a valid attachment even when nanoCAD cannot identify the original solid edge. The result reports the available native references. Table totals were checked with numeric, unitless results and source lengths in millimetres.
-
-The connection reports server 0.283.0 and bridge 0.241.0. Download the installer, runtime, source, documentation and matching checksums from [release 456](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/456).
+- Added first-angle and third-angle projection, child view alignment, and angular dimensions between two projected segments. Corrected diameter dimensions on scaled views.
+- Added inspection of table cell formulas, units and calculated values. Row insertion now preserves references in supported formulas.
+- Fixed false rejections of small drill cuts on large solids.
+- Fixed a dimension text bug that prevented restoring the measured value after a long text override.
+- Added inspection of loft profiles and thread pitch and length parameters.
+- Added 3D bounds filtering for object searches, nested block transforms, editing of external DWG reference paths, and a third control point for checking raster calibration.
 
 ## Build 455
 
-- Addresses the confirmed native tab accessibility crash observed when Codex
-  Computer Use queried an empty nanoCAD tab control. The assessed repair covers
-  both an existing control and a newly created one, while normal tab queries
-  continue to use the native provider.
-
-- Works alongside Codex Computer Use without disabling its helper or changing
-  its app permissions. Existing drawing and modeling capabilities and the
-  nanoCAD version checks introduced in 454 are retained.
-
-The reported failure was assessed on nanoCAD 26.0.7476.4950. Protection begins
-when the bridge loads; this does not establish a fix for unrelated crashes.
-The connection reports server 0.282.0 and bridge 0.240.0.
-
-Use the matching installer, runtime ZIP, source/documentation archives and
-`SHA256SUMS-455.txt` from
-[release 455](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/455).
+Fixed a nanoCAD crash when Codex Computer Use queried an empty tab control.
 
 ## Build 454
 
