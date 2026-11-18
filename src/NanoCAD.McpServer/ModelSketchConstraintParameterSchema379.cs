@@ -25,6 +25,12 @@ internal static class ModelSketchConstraintParameterSchema379
     {var value=Ids();value["minItems"]=1;value["description"]="Optional exact existing internal dimensional relation IDs. Requires one handles part and one sketch_ids sketch. Returns current eligibility, parameter_token, actual owning variable/member IDs and declared millimeter/radian control units for set_sketch_constraint_parameter. An unavailable binding gives its reason and no usable token; it is not an empty or solved network. This read does not solve, enter edit mode, create a relation or change geometry.";return value;}
     public static JsonObject ReadOutput()=>Object(new(){["constraint_id"]=Id(),["eligible"]=Bool(),["parameter_token"]=Nullable(Token()),["unavailable_reason"]=Nullable(Text()),["variable_id"]=Nullable(Id()),["member_id"]=Nullable(Id()),["kind"]=Nullable(Text()),["control_value"]=Nullable(Number()),
         ["control_value_unit"]=Text(),["variable_expression"]=Nullable(Text()),["variable_host_id"]=Nullable(Id()),["circle_geometry"]=Nullable(new JsonObject{["type"]="object"}),["profile_ids"]=Ids(),["consumer_feature_ids"]=Ids(),["effect_scope"]=Text(),["binding_scope"]=Nullable(new JsonObject{["type"]="object"})});
-    public static JsonObject ChangeOutput(JsonObject entityRef)=>Object(new(){["operation_index"]=new JsonObject{["type"]="integer",["minimum"]=0},["source"]=entityRef.DeepClone(),["body_ref"]=entityRef.DeepClone(),["body_mc_id"]=Id(),["sketch_id"]=Id(),["constraint_id"]=Id(),["variable_id"]=Id(),["member_id"]=Id(),["kind"]=Text(),
+    public static JsonObject ChangeOutput(JsonObject entityRef)
+    {
+        var result=Object(new(){["operation_index"]=new JsonObject{["type"]="integer",["minimum"]=0},["source"]=entityRef.DeepClone(),["body_ref"]=entityRef.DeepClone(),["body_mc_id"]=Id(),["sketch_id"]=Id(),["constraint_id"]=Id(),["variable_id"]=Id(),["member_id"]=Id(),["kind"]=Text(),
         ["previous_value"]=Number(),["value"]=Number(),["value_unit"]=Text(),["previous_expression"]=Text(),["expression_numeric_value"]=Number(),["previous_radius"]=Nullable(Number()),["radius"]=Nullable(Number()),["profile_ids"]=Ids(),["consumer_feature_ids"]=Ids(),["source_representation_replaced"]=Bool(),["storage_preservation"]=Text(),["storage_diagnostics"]=Nullable(new JsonObject{["type"]="object"})});
+        result["properties"]!["control_observation"]=Nullable(new JsonObject{["type"]="object"});
+        result["properties"]!["control_availability"]=Nullable(new JsonObject{["type"]="object"});
+        return result;
+    }
 }

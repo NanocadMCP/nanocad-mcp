@@ -16,8 +16,8 @@ internal static class ReadPreparationSchema433
             ["type"] = "object", ["additionalProperties"] = false, ["required"] = new JsonArray("operation"),
             ["properties"] = new JsonObject
             {
-                ["operation"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Wire.WriteOperations.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()), ["description"] = "Existing write tool without nanocad. prefix. Preparation is a read, never submission of that write." },
-                ["variant"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 128, ["description"] = "Exact existing create/modify/structure variant, required for those three batched tools. Other tools omit variant. Obtain names from focused schema help." }
+                ["operation"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray(Wire.WriteOperations.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()), ["description"] = "Prepare this write." },
+                ["variant"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 128, ["description"] = "Batched item kind/type/operation." }
             },
             ["allOf"] = new JsonArray(new JsonObject
             {
@@ -38,7 +38,8 @@ internal static class ReadPreparationSchema433
             ["operation"] = Text(), ["variant"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
             ["status"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("observed", "source_unavailable", "details_omitted") },
             ["detail"] = Text(), ["details_omitted"] = new JsonObject { ["type"] = "boolean" }, ["source"] = Object(), ["request_bindings"] = Array(Object()),
-            ["candidates"] = Array(Object()), ["input_fields"] = Array(Object()), ["unit_facts"] = Object()
+            ["candidates"] = Array(Object()), ["candidate_count"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 },
+            ["next_reads"] = Object(), ["input_fields"] = Array(Object()), ["unit_facts"] = Object()
         },
         ["description"] = "Optional stateless observations for one selected operation. Missing preparation means not requested or no remaining transport bytes, never unsupported. Each binding points to the exact returned read or a declared schema constant. Current values are observations, not chosen new values."
     };

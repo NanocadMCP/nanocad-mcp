@@ -52,7 +52,11 @@ public static class NativeTableFormulaMetadata358
     }
     static void ExistingField(JsonElement before,JsonElement after,Action cancel)
     {
-        if(!Exact(before.GetProperty("common"),after.GetProperty("common")))throw Bad("Native formula editing changed an existing Field identity, owner, XData, extension or unrelated reactor.");
+        var priorCommon=before.GetProperty("common");var currentCommon=after.GetProperty("common");
+        if(!Exact(priorCommon,currentCommon))
+            throw new DomainException("NATIVE_TABLE_MISMATCH","Native formula editing changed an existing Field identity, owner, XData, extension or unrelated reactor.",false,
+                new{field_handle=Id(before),differing_common_properties=priorCommon.EnumerateObject().Where(property=>
+                    !currentCommon.TryGetProperty(property.Name,out var actual)||!Exact(property.Value,actual)).Select(property=>property.Name).ToArray()});
         var old=before.GetProperty("table_formula_field");var current=after.GetProperty("table_formula_field");
         foreach(var property in old.EnumerateObject())
         {

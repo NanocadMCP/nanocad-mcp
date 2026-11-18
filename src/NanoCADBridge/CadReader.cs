@@ -17,6 +17,8 @@ internal sealed class CadReader
     private readonly DocumentRegistry _documents;
     private readonly JsonLog _log;
     private readonly HandlePages<EntitySummary> _snapshots = new();
+    private sealed record SummaryItem(string Type, string Layer, QueryEnvelope? Bounds);
+    private readonly HandlePages<SummaryItem> _summaryPages = new();
     private readonly StructureReader _structure;
     private readonly int _uiThread = Environment.CurrentManagedThreadId;
     public CadReader(string instance, DocumentRegistry documents, JsonLog log) { _instance = instance; _documents = documents; _log = log; _structure = new(instance); }
@@ -253,7 +255,6 @@ internal sealed class CadReader
         // Yield a continuation, including an empty filtered page, rather than reject
         // a drawing for exceeding a scan count/time. No entity DTOs are read ahead.
         bool Yield() => watch.ElapsedMilliseconds >= 200;
-        if (args.Cursor != null) return Convert(_snapshots.Next(args.Cursor, state.Id, state.Revision, selectionRevision, args.FilterKey(operation), args.PageSize, Read, Yield));
         IEnumerable<ulong> Identities()
         {
             IEnumerable<ObjectId> ids;
@@ -275,13 +276,18 @@ internal sealed class CadReader
         }
         if (args.SummaryOnly)
         {
+            SummaryItem? ReadSummary(ulong handle) => ReadMatch(handle) is { } match
+                ? new(match.summary.type, match.summary.layer!.name, CadTargetedRead407.ReadBounds(match.entity, cancellationToken.ThrowIfCancellationRequested))
+                : null;
+            var key = args.FilterKey(operation);
+            var page = args.Cursor == null
+                ? _summaryPages.First(state.Id, state.Revision, null, key, Identities(), args.PageSize, ReadSummary, Yield)
+                : _summaryPages.Next(args.Cursor, state.Id, state.Revision, null, key, args.PageSize, ReadSummary, Yield);
             var summary = new QuerySummary();
-            foreach (var handle in Identities())
-                if (ReadMatch(handle) is { } match)
-                    summary.Add(match.summary.type, match.summary.layer!.name,
-                        CadTargetedRead407.ReadBounds(match.entity, cancellationToken.ThrowIfCancellationRequested), args.QueryBounds);
-            return summary.Result(args.ReadSpace);
+            foreach (var item in page.items) summary.Add(item.Type, item.Layer, item.Bounds, args.QueryBounds);
+            return summary.Result(args.ReadSpace, page.next_cursor, args.Cursor != null);
         }
+        if (args.Cursor != null) return Convert(_snapshots.Next(args.Cursor, state.Id, state.Revision, selectionRevision, args.FilterKey(operation), args.PageSize, Read, Yield));
         return Convert(_snapshots.First(state.Id, state.Revision, selectionRevision, args.FilterKey(operation), Identities(), args.PageSize, Read, Yield));
     }
     private object Inspect(Arguments args, DocumentState state, Transaction transaction, ObjectId modelId, CancellationToken cancellationToken)

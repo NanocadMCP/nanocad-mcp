@@ -34,7 +34,7 @@ public static class StructureValidation
     {
         if (input.ValueKind != JsonValueKind.Object) throw new DomainException("INVALID_ARGUMENT", "Expected object.");
         var allowed = new HashSet<string>(new[] { "bridge_instance_id", "document_id", "expected_revision" }, StringComparer.Ordinal);
-        allowed.UnionWith(operation == "get_structure" ? new[] { "section", "page_size", "cursor" } : new[] { "handle", "max_depth", "max_nodes" });
+        allowed.UnionWith(operation == "get_structure" ? new[] { "section", "page_size", "cursor", "record_handle" } : new[] { "handle", "max_depth", "max_nodes", "occurrence_path" });
         var seen = new HashSet<string>(); var common = new Dictionary<string, JsonElement>();
         foreach (var property in input.EnumerateObject())
         {
@@ -59,8 +59,21 @@ public static class StructureValidation
         {
             string section = Text("section", 32);
             if (!Sections.Contains(section)) throw new DomainException("INVALID_ARGUMENT", "Unknown structure section.");
-            return args with { Section = section };
+            string? target = input.TryGetProperty("record_handle", out _) ? Validation.NormalizeHandle(Text("record_handle", 16)) : null;
+            if (target != null && (args.Cursor != null || input.TryGetProperty("page_size", out _)))
+                throw new DomainException("INVALID_ARGUMENT", "record_handle selects one record and cannot be combined with pagination.");
+            return args with { Section = section, StructureRecordHandle = target };
         }
-        return args with { BlockHandle = Validation.NormalizeHandle(Text("handle", 16)), MaxDepth = Integer("max_depth", 4, 0, int.MaxValue), MaxNodes = Integer("max_nodes", int.MaxValue, 1, int.MaxValue) };
+        string root = Validation.NormalizeHandle(Text("handle", 16));
+        string[]? path = null;
+        if (input.TryGetProperty("occurrence_path", out var sequence))
+        {
+            if (sequence.ValueKind != JsonValueKind.Array || sequence.GetArrayLength() == 0)
+                throw new DomainException("INVALID_ARGUMENT", "occurrence_path must be a nonempty array of handles starting at handle.");
+            path = sequence.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String
+                ? Validation.NormalizeHandle(item.GetString()!) : throw new DomainException("INVALID_ARGUMENT", "Expected a handle in occurrence_path.")).ToArray();
+            if (path[0] != root) throw new DomainException("INVALID_ARGUMENT", "occurrence_path must start at the requested handle.");
+        }
+        return args with { BlockHandle = root, OccurrencePath = path, MaxDepth = Integer("max_depth", path == null ? 4 : 0, 0, int.MaxValue), MaxNodes = Integer("max_nodes", int.MaxValue, 1, int.MaxValue) };
     }
 }

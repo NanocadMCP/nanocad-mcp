@@ -30,6 +30,15 @@ public static class DrawingViewsValidation
                 throw new DomainException("INVALID_ARGUMENT", name + " requires a selected geometry_view_handle and an integer in its published page range.");
             return number;
         }
+        int? marker = null;
+        if (values.Remove("geometry_source_marker", out var markerValue))
+        {
+            if (geometryViewHandle == null || markerValue.ValueKind != JsonValueKind.Number ||
+                !markerValue.TryGetInt32(out int value) || value < 0 || values.ContainsKey("geometry_start_index") ||
+                values.ContainsKey("geometry_page_size") || values.ContainsKey("include_geometry_sources"))
+                throw new DomainException("INVALID_ARGUMENT", "geometry_source_marker requires one view and a nonnegative marker, without geometry pagination or include_geometry_sources.");
+            marker = value;
+        }
         int start = PageValue("geometry_start_index", 0, 0, int.MaxValue), size = PageValue("geometry_page_size", 100, 1, int.MaxValue);
         bool geometrySources = false;
         if (values.Remove("include_geometry_sources", out var sourceOption))
@@ -41,6 +50,6 @@ public static class DrawingViewsValidation
         if (!values.Remove("layout_handle", out var layout) || values.ContainsKey("handle"))
             throw new DomainException("INVALID_ARGUMENT", "Explicit layout_handle from get_structure layouts is required.");
         values.Add("handle", layout);
-        return ModelVariablesValidation.Parse(Wire.Element(values)) with { GeometryViewHandle = geometryViewHandle, GeometryStartIndex = start, GeometryPageSize = size, DrawingViewSourceIdentityHandle = sourceIdentityHandle, IncludeGeometrySources = geometrySources };
+        return ModelVariablesValidation.Parse(Wire.Element(values)) with { GeometryViewHandle = geometryViewHandle, GeometryStartIndex = start, GeometryPageSize = size, DrawingViewSourceIdentityHandle = sourceIdentityHandle, IncludeGeometrySources = geometrySources, GeometrySourceMarker = marker };
     }
 }

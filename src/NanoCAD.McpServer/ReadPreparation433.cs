@@ -86,6 +86,9 @@ public static class ReadPreparation433
                 .Select(field => (JsonNode?)new JsonObject { ["argument"] = field["argument"]!.DeepClone(), ["alternative"] = field["alternative"]?.DeepClone() }).ToArray());
         }
         output["candidates"] = candidates;
+        output["candidate_count"] = candidates.Count;
+        if (candidates.Count == 0)
+            output["detail"] = "Request context is available. This read supplied no target candidates for the selected operation. Use the focused schema and the relevant object or driver observation.";
         output["input_fields"] = fields;
         if (reader == "get_document" && selection is { Operation: "modify_entities", Variant: "add_model_hole" })
         {

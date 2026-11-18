@@ -5,7 +5,7 @@ namespace NanoCAD.McpServer;
 
 internal static class TargetedReadSchema407
 {
-    internal const string QueryDescription = " Optional bounds filters finite WCS XY candidate envelopes, never exact geometric intersections. Ordinary entities use reported native extents. MInsert uses a conservative spacing envelope because its native getter can cover only the seed: absolute row/column travel expanded for plausible owner/definition scale and arbitrary grid orientation. This may overselect; within requires the entire conservative envelope inside the query and may exclude other geometrically contained arrays. No grid cells are enumerated or exploded. Unavailable extents and infinite Ray/Xline entities are excluded explicitly in match_semantics. Optional text searches literal TEXT, decoded plain MTEXT/MLeader and explicit dimension overrides, without evaluating Fields or searching Table cells/nested block attributes. Optional block_definition filters canonical named dynamic definitions or direct ordinary definitions. Predicates combine with AND; carry identical filters and space on every cursor page. Empty filtered pages with next_cursor are valid; continue until complete.";
+    internal const string QueryDescription = " Optional bounds filters finite WCS XY or XYZ candidate envelopes, never exact geometric intersections. Ordinary entities use reported native extents. MInsert uses a conservative spacing envelope because its native getter can cover only the seed: absolute row/column travel expanded for plausible owner/definition scale and arbitrary grid orientation. This may overselect; within requires the entire conservative envelope inside the query and may exclude other geometrically contained arrays. No grid cells are enumerated or exploded. Unavailable extents and infinite Ray/Xline entities are excluded explicitly in match_semantics. Optional text searches literal TEXT, decoded plain MTEXT/MLeader and explicit dimension overrides, without evaluating Fields or searching Table cells/nested block attributes. Optional block_definition filters canonical named dynamic definitions or direct ordinary definitions. Predicates combine with AND; carry identical filters and space on every cursor page. Empty filtered pages with next_cursor are valid; continue until complete.";
     internal const string InspectDescription = " Optional sections selects compact detail: [] returns identity/type/layer/space and owner only; appearance returns stored display properties without geometry; geometry returns the native stored shape; editing also requests available native edit tokens and complete editor observations in geometry. The default omits sections and retains full detail. Select only information needed for the requested task. Polyline2d reports actual stored vertex kinds/WCS positions without converting a fitted contour; Point/Ray/Xline are readable existing entities. Native fitted/periodic Spline observation does not certify every editing or analysis route.";
     private static JsonObject Text() => new() { ["type"] = "string" };
     private static JsonObject Flag() => new() { ["type"] = "boolean", ["default"] = false };
@@ -17,7 +17,7 @@ internal static class TargetedReadSchema407
         ["properties"] = properties,
         ["required"] = new JsonArray(required.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray())
     };
-    private static JsonObject Point2() => new() { ["type"] = "array", ["minItems"] = 2, ["maxItems"] = 2, ["items"] = new JsonObject { ["type"] = "number" } };
+    private static JsonObject BoundsPoint(int dimension) => new() { ["type"] = "array", ["minItems"] = dimension, ["maxItems"] = dimension, ["items"] = new JsonObject { ["type"] = "number" } };
     internal static JsonObject QueryProperties()
     {
         var block = Object(new JsonObject
@@ -28,8 +28,8 @@ internal static class TargetedReadSchema407
         });
         block["anyOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("handle") }, new JsonObject { ["required"] = new JsonArray("name") });
         block["description"] = "Exact definition handle and/or name; both supplied predicates must match. Named canonical definition for dynamic insertions, direct definition for ordinary insertions/MInsert arrays. Name comparison defaults case-insensitive.";
-        var bounds = Object(new JsonObject { ["min"] = Point2(), ["max"] = Point2(), ["mode"] = Enum("intersects", "within") }, "min", "max");
-        bounds["description"] = "Finite WCS XY [x,y] rectangle in drawing units, min<=max. mode defaults intersects. Ordinary objects use reported native extents; MInsert uses an explicitly conservative whole-grid spacing envelope because native extents may cover only its seed. May overselect, never exact geometric intersection. within is sufficient containment of that envelope, not exhaustive geometric containment. Infinite/unavailable extents are excluded and counted on each page; no array-cell enumeration.";
+        JsonObject Bounds(int dimension) => Object(new JsonObject { ["min"] = BoundsPoint(dimension), ["max"] = BoundsPoint(dimension), ["mode"] = Enum("intersects", "within") }, "min", "max");
+        var bounds = new JsonObject { ["oneOf"] = new JsonArray(Bounds(2), Bounds(3)), ["description"] = "WCS rectangle [x,y] or spatial box [x,y,z] in drawing units. Both corners use the same dimension. Candidate extents use native bounds or a conservative whole-grid envelope for MInsert. Unavailable extents are counted separately." };
         var text = Object(new JsonObject
         {
             ["value"] = new JsonObject { ["type"] = "string", ["minLength"] = 1 },
@@ -38,7 +38,7 @@ internal static class TargetedReadSchema407
         }, "value");
         text["description"] = "Literal ordinary note content or explicit dimension override; decoded plain MTEXT/MLeader when available. No Field evaluation, Table-cell scan or nested block-attribute traversal. match defaults contains, case_sensitive defaults false.";
         var summary = Flag();
-        summary["description"] = "Count filtered objects by type and layer and combine available WCS XYZ bounds. Omit page_size and cursor.";
+        summary["description"] = "Count filtered objects by type and layer and combine WCS XYZ bounds. For a paged summary, follow next_cursor with the same filters, sum page counts by type/layer and take the union of page bounds. aggregation_scope distinguishes entire_query from this_page.";
         return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block, ["summary_only"] = summary };
     }
     internal static JsonObject InspectProperties() => new()
@@ -63,8 +63,6 @@ internal static class TargetedReadSchema407
         {
             if (properties["types"]?["items"]?["enum"] is JsonArray types)
                 foreach (var type in new[] { "Polyline2d", "Polyline3d", "Point", "Ray", "Xline" }) if (!types.Any(value => value?.GetValue<string>() == type)) types.Add(type);
-            if (node["allOf"] == null) node["allOf"] = new JsonArray();
-            node["allOf"]!.AsArray().Add(JsonNode.Parse("""{"if":{"required":["summary_only"],"properties":{"summary_only":{"const":true}}},"then":{"not":{"anyOf":[{"required":["page_size"]},{"required":["cursor"]}]}}}"""));
         }
         return JsonSerializer.SerializeToElement(node);
     }
@@ -91,7 +89,7 @@ internal static class TargetedReadSchema407
     {
         var spatial = Object(new JsonObject
         {
-            ["coordinate_system"] = new JsonObject { ["type"] = "string", ["const"] = "WCS_XY" },
+            ["coordinate_system"] = Enum("WCS_XY", "WCS_XYZ"),
             ["predicate"] = Text(),
             ["exact_geometry_intersection"] = new JsonObject { ["type"] = "boolean", ["const"] = false },
             ["unavailable_bounds_policy"] = new JsonObject { ["type"] = "string", ["const"] = "excluded" },
@@ -130,7 +128,9 @@ internal static class TargetedReadSchema407
         return Object(new JsonObject
         {
             ["summary_only"] = new JsonObject { ["const"] = true },
-            ["complete"] = new JsonObject { ["const"] = true },
+            ["complete"] = new JsonObject { ["type"] = "boolean" },
+            ["next_cursor"] = new JsonObject { ["type"] = new JsonArray("string", "null") },
+            ["aggregation_scope"] = Enum("entire_query", "this_page"),
             ["total_count"] = Count(),
             ["by_type"] = Groups("type"),
             ["by_layer"] = Groups("layer"),

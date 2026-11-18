@@ -64,7 +64,8 @@ internal static class ModelManufacturingSchema
                     d["diameter"] = Number(.001); d["through"] = Flag(); d["depth"] = Number();
                     d["seat"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("none", "counterbore", "countersink") };
                     d["seat_diameter"] = Number(); d["seat_depth"] = Number(); d["seat_angle_degrees"] = Number(.001, 179.999);
-                    d["flat_bottom"] = Flag(); d["bottom_angle_degrees"] = Number(.001, 179.999);
+                    d["flat_bottom"] = Flag(); d["bottom_angle_degrees"] = new JsonObject { ["anyOf"] = new JsonArray(Number(.001,180), new JsonObject { ["type"]="null" }),
+                        ["description"]="Only a blind conical hole uses the bottom angle. Inactive readback may be null or a legacy numeric angle." };
                     d["offset1"] = Number(-1e6); d["offset2"] = Number(-1e6); d["sector"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 3 };
                     if (add) { d["face_token"] = Token(); d["face_id"] = Id(); d["edge_token"] = Token(); d["first_edge_id"] = Id(); d["second_edge_id"] = Id(); }
                 }
@@ -92,11 +93,24 @@ internal static class ModelManufacturingSchema
                 var definition = Object(d);
                 if (kind == "hole")
                 {
-                    definition["required"] = new JsonArray(d.Where(pair => !pair.Key.StartsWith("seat_", StringComparison.Ordinal))
+                    definition["required"] = new JsonArray(d.Where(pair => !pair.Key.StartsWith("seat_", StringComparison.Ordinal) && pair.Key != "bottom_angle_degrees")
                         .Select(pair => (JsonNode?)JsonValue.Create(pair.Key)).ToArray());
                     definition["allOf"] = new JsonArray(
                         RequireHoleSeatFields("counterbore", "seat_diameter", "seat_depth"),
-                        RequireHoleSeatFields("countersink", "seat_diameter", "seat_angle_degrees"));
+                        RequireHoleSeatFields("countersink", "seat_diameter", "seat_angle_degrees"),
+                        new JsonObject {
+                            ["if"] = new JsonObject { ["properties"] = new JsonObject { ["flat_bottom"] = new JsonObject { ["const"] = false }, ["through"] = new JsonObject { ["const"] = false } } },
+                            ["then"] = new JsonObject { ["required"] = new JsonArray("bottom_angle_degrees"),
+                                ["properties"] = new JsonObject { ["bottom_angle_degrees"] = Number(.001, 179.999) } }
+                        });
+                }
+                if (kind == "thread")
+                {
+                    definition["required"] = new JsonArray(d.Where(pair => pair.Key != "length").Select(pair => (JsonNode?)JsonValue.Create(pair.Key)).ToArray());
+                    definition["allOf"] = new JsonArray(new JsonObject {
+                        ["if"] = new JsonObject { ["properties"] = new JsonObject { ["full_length"] = new JsonObject { ["const"] = false } } },
+                        ["then"] = new JsonObject { ["required"] = new JsonArray("length"), ["properties"] = new JsonObject { ["length"] = Number(.001) } }
+                    });
                 }
                 if (kind == "circular_pattern")
                 {

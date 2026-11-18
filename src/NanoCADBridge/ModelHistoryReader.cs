@@ -88,6 +88,7 @@ internal static class ModelHistoryReader
             Budget();
             if (contents == null) throw new DomainException("HISTORY_UNAVAILABLE", "MultiCAD did not return the part contents; no empty-history claim is made.");
             var nodes = new List<object>();
+            var visibilitySketches=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool complete = true;
             var nativeSources=NativePathSources.Inspect(contents,Budget);
             ProjectedHistorySources.Source[] projected=[];
@@ -114,6 +115,12 @@ internal static class ModelHistoryReader
                     continue;
                 }
                 if(includeProfileEditing)ReadNotices(node,handle,id,nodeId);
+                if(nodeId.GetObjectOfType<Multicad.Mc3D.PlanarSketch>() is {} visibilitySketch &&
+                    visibilitySketch.DbEntity.Document?.ID==solid.DbEntity.Document?.ID)
+                {
+                    try { DrawingViewSketchWriteScope282.RequireSupported(visibilitySketch); visibilitySketches.Add(nodeId.ToString()); }
+                    catch(DomainException error) when(error.Error.code=="UNSUPPORTED_DRAWING_VIEW_CUT_WRITE") { }
+                }
                 var dependencies = node.GetDependsOn(false, false);
                 if (dependencies == null) throw new DomainException("HISTORY_UNAVAILABLE", "MultiCAD did not return dependencies for a history item.");
                 object? parameters = null;
@@ -181,7 +188,7 @@ internal static class ModelHistoryReader
                 byteBudget.Add(nodes[^1]);
             }
             items.Add(new { @ref = new EntityRef(instance, state.Id, handle), mc_id = id.ToString(), mc_document_id = document.ID.ToString(),
-                last_item_id = Id(solid.LastPartItemID), complete, nodes,edit_routes=ModelEditRoutes.Describe(nodes) });
+                last_item_id = Id(solid.LastPartItemID), complete, nodes,edit_routes=ModelEditRoutes.Describe(nodes,id.ToString(),complete,visibilitySketches) });
         }
         Budget();
         if (!requestedSketches.SetEquals(foundSketches))

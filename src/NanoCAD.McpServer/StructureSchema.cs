@@ -41,15 +41,21 @@ internal static class StructureSchema
             properties["page_size"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = int.MaxValue, ["default"] = 100 };
             properties["cursor"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 2048, ["description"] = "Opaque snapshot cursor; same document/section, expires in 60 seconds. Follow until complete." };
             required.Add("section");
+            properties["record_handle"] = new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$", ["description"] = "Read one record owned by the selected section. Omit page_size and cursor." };
         }
         else
         {
             properties["handle"] = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 16, ["pattern"] = "^[0-9A-Fa-f]{1,16}$", ["description"] = "Exact native block definition from get_structure blocks, or top-level native BlockReference in Model/ordinary Paper from query_objects. Definition inspection reports parent_definition coordinates and direct member IDs without fabricating an insertion; occurrence inspection retains its actual owner. MText and independent Hatch loops/patterns remain in their parent definition frame; ordinary nested references expose the actual stored transform and attributes. definition_editing supplies the current token and supported direct-member geometry edit scope; definition_text_editing supplies literal shared Text/MText content readiness, exact stored contents and its own current token. nested_attribute_editing supplies actual direct nested variable attribute handles/contents, eligibility, the complete shared definition token and all actual consumers for set_attribute_text. No layout activation." };
-            properties["max_depth"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0, ["default"] = 4 };
+            properties["max_depth"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0,
+                ["description"] = "Additional nesting levels. Defaults to four for the root and zero for a selected occurrence." };
             properties["max_nodes"] = new JsonObject { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = int.MaxValue, ["default"] = int.MaxValue };
             required.Add("handle");
+            properties["occurrence_path"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["items"] = new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" },
+                ["description"] = "Exact occurrence_path from a block node, beginning at handle. Read the selected node in its native accumulated frame. max_depth counts additional levels below it and defaults to 0 for this selection." };
         }
-        return JsonSerializer.SerializeToElement(new JsonObject { ["type"] = "object", ["additionalProperties"] = false, ["properties"] = properties, ["required"] = required });
+        var schema = new JsonObject { ["type"] = "object", ["additionalProperties"] = false, ["properties"] = properties, ["required"] = required };
+        if (operation == "get_structure") schema["allOf"] = JsonNode.Parse("""[{"if":{"required":["record_handle"]},"then":{"not":{"anyOf":[{"required":["cursor"]},{"required":["page_size"]}]}}}]""");
+        return JsonSerializer.SerializeToElement(schema);
     }
     public static JsonObject Output(string operation, JsonObject definitions)
     {

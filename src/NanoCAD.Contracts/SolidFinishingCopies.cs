@@ -3,7 +3,15 @@ using System.Text.Json;
 
 namespace NanoCAD.Contracts;
 
-public sealed record SolidFinishingCopySpec(string Kind,string SourceHandle,string TopologyToken,string[] Subentities,string? BaseFace,double Size,double OtherSize,string LayerName,string ShellSide="inward"):EntitySpec("Solid3d",LayerName);
+public sealed record SolidFinishingCopySpec(string Kind,string SourceHandle,string TopologyToken,string[] Subentities,string? BaseFace,double Size,double OtherSize,string LayerName,string ShellSide="inward"):EntitySpec("Solid3d",LayerName)
+{
+    public void RequireBoundaryEdges(ISet<string> boundary)
+    {
+        var missing=Subentities.Where(edge=>!boundary.Contains(edge)).ToArray();
+        if(missing.Length>0)throw new DomainException("EDGE_NOT_ON_BASE_FACE","Selected chamfer edges must belong to the boundary of the selected base face.",false,
+            new{base_face=BaseFace,nonincident_edges=missing,boundary_edges=boundary.OrderBy(edge=>edge,StringComparer.Ordinal).ToArray()});
+    }
+}
 public sealed record SolidFinishingEditSpec(string Kind,string[] Targets,string TopologyToken,string[] Subentities,string? BaseFace,double Size,double OtherSize,string ShellSide="inward"):EditSpec(Kind,Targets)
 {
     public SolidFinishingCopySpec AsCopySpec(string layer) => new(Kind switch

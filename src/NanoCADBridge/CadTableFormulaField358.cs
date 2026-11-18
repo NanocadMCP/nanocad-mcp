@@ -43,10 +43,10 @@ internal static class CadTableFormulaField358
                 field.IsTextField,field.HasFields,false,"actual_native_cell_formula_binding_and_readable_field_definition; private_child_state_unobserved");
             budget.Add(observed);fields.Add(id,observed);return observed;
         }
-        internal CadTableFieldCache365.Sample Cache(ObjectId id)
+        internal CadTableFieldCache365.Sample Cache(ObjectId id,string formula)
         {
             Need(transaction!=null&&fields.ContainsKey(id),"Observe the actual formula Field binding/definition before its existing cache.","OBJECT_READ_FAILED");
-            return CadTableFieldCache365.Read(table,id,transaction!,cancel);
+            return CadTableFieldCache365.Read(table,id,transaction!,cancel,formula);
         }
         internal void ValidateRoot()
         {
@@ -78,12 +78,28 @@ internal static class CadTableFormulaField358
         =>CadTableFormulaOwnership360.Capture(table,tr,cancel,fields);
     internal static string[] Selected(CadTableEditingReader.Snapshot snapshot,IEnumerable<(int Row,int Column)> cells)
         =>cells.Select(cell=>snapshot.Values[checked(cell.Row*snapshot.Columns+cell.Column)]?.native_formula_field?.handle).OfType<string>().Distinct(StringComparer.Ordinal).ToArray();
-    internal static void Verify(JsonElement before,JsonElement after,CadTableEditingReader.Snapshot old,CadTableEditingReader.Snapshot current,
-        IEnumerable<(int Row,int Column)> selectedBefore,IEnumerable<(int Row,int Column)> selectedAfter,Action cancel)
+    internal static CadTableEditingReader.Snapshot Verify(JsonElement before,JsonElement after,CadTableEditingReader.Snapshot old,CadTableEditingReader.Snapshot current,
+        IEnumerable<(int Row,int Column)> selectedBefore,IEnumerable<(int Row,int Column)> selectedAfter,Action cancel,List<string>? retainedCarrierWarnings=null,
+        IReadOnlyList<CadTableFormulaStructuralBindings.Slot>? fieldPlan=null,Func<string,object>? readReactor=null)
     {
         var oldFields=Selected(old,selectedBefore);var newFields=Selected(current,selectedAfter);
-        CadTableFormulaMTextMetadata362.Verify(before,after,old,current,oldFields,newFields,cancel);
-        NativeTableFormulaMetadata358.Verify(CadTableFormulaMTextMetadata362.WithoutCarriers(CadTableFormulaMetadata360.Comparable(before,old,cancel)),
-            CadTableFormulaMTextMetadata362.WithoutCarriers(CadTableFormulaMetadata360.Comparable(after,current,cancel)),oldFields,newFields,cancel);
+        var prior=CadTableFormulaMetadata360.Comparable(before,old,cancel);
+        var actual=CadTableFormulaMetadata360.Comparable(after,current,cancel);
+        var priorCells=old;
+        try
+        {
+            if(retainedCarrierWarnings!=null)(actual,priorCells)=CadTableRetainedFieldStorage.Compare(prior,actual,old,retainedCarrierWarnings,cancel,fieldPlan);
+            // Topology uses the real pre/post coordinates and carrier roles.
+            bool normalizedCarriers=retainedCarrierWarnings!=null&&fieldPlan==null;
+            CadTableFormulaMTextMetadata362.Verify(normalizedCarriers?prior:before,normalizedCarriers?actual:after,old,current,oldFields,newFields,cancel);
+            NativeTableFormulaMetadata358.Verify(CadTableFormulaMTextMetadata362.WithoutCarriers(prior),
+                CadTableFormulaMTextMetadata362.WithoutCarriers(actual),oldFields,newFields,cancel);
+        }
+        catch(DomainException error)when(fieldPlan!=null&&error.Error.code=="NATIVE_TABLE_MISMATCH")
+        {
+            throw new DomainException(error.Error.code,error.Error.message,false,
+                CadTableFormulaStructuralBindings.Diagnostics(before,after,fieldPlan,error,cancel,readReactor));
+        }
+        return priorCells;
     }
 }

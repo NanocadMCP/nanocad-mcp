@@ -58,6 +58,27 @@ internal static class DimensionMeasurementReader
 
     // A caller which has already checked the exact resident projection anchors
     // can measure a detached clone without applying the ordinary source adapter.
+    internal static (double? Value, string? Unavailable) MeasureProjectedSheet(Dimension source, Action check)
+    {
+        check();
+        // MultiCAD projected dimensions can retain their physical nominal in the
+        // DWG measurement cache even on a clone with DIMLFAC reset to one.
+        // The stored chord and extension points are in the owning sheet's units.
+        double? sheetLength = source switch
+        {
+            DiametricDimension d => d.ChordPoint.DistanceTo(d.FarChordPoint),
+            RadialDimension d => d.Center.DistanceTo(d.ChordPoint),
+            AlignedDimension d => d.XLine1Point.DistanceTo(d.XLine2Point),
+            RotatedDimension d when d.Normal == Vector3d.ZAxis => Math.Abs(
+                (d.XLine2Point.X - d.XLine1Point.X) * Math.Cos(d.Rotation) +
+                (d.XLine2Point.Y - d.XLine1Point.Y) * Math.Sin(d.Rotation)),
+            _ => null
+        };
+        if (sheetLength is { } length)
+            return double.IsFinite(length) ? (length, null) : (null, "nonfinite_sheet_geometry");
+        return MeasureDetached(source, Wire.Element(DimensionGeometryReader.Definition(source)), check);
+    }
+
     internal static (double? Value, string? Unavailable) MeasureDetached(Dimension source, JsonElement definition, Action check)
     {
         check();

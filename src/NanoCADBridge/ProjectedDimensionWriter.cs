@@ -4,6 +4,7 @@ using Multicad.Dimensions;
 using Multicad.Mc3D;
 using NanoCAD.Contracts;
 using NanoCAD.Ipc;
+using System.Text.Json;
 using Db = Teigha.DatabaseServices;
 using G = Multicad.Geometry;
 using Point3d = Teigha.Geometry.Point3d;
@@ -16,11 +17,11 @@ internal static class ProjectedDimensionWriter
         Point3d? Center = null, string Kind = "aligned", Point3d? Interior = null, double Sweep = 0,
         double[]? ObservedParameters = null);
     private sealed record Binding(Projection Projection, Point3d Placement, string LayerName,
-        McDocument Owner, Db.ObjectId Space, Db.ObjectId Layer, McGeomParam[] Anchors);
+        McDocument Owner, Db.ObjectId Space, Db.ObjectId Layer, double ViewScaleDenominator, McGeomParam[] Anchors);
 
     private static bool IsProjectedDimension(EntitySpec item) =>
         item is ProjectedAlignedDimensionSpec or ProjectedDiametricDimensionSpec or ProjectedRadialDimensionSpec or
-            ProjectedArcLengthDimensionSpec or ProjectedAngularDimensionSpec;
+            ProjectedArcLengthDimensionSpec or ProjectedAngularDimensionSpec or ProjectedCornerDimensionSpec;
 
     internal static bool Handles(CreateArguments args) => args.Entities.Any(IsProjectedDimension);
 
@@ -87,6 +88,7 @@ internal static class ProjectedDimensionWriter
                 ProjectedRadialDimensionSpec radial => (radial.ViewHandle, radial.DimLinePoint),
                 ProjectedArcLengthDimensionSpec arcLength => (arcLength.ViewHandle, arcLength.DimLinePoint),
                 ProjectedAngularDimensionSpec angular => (angular.ViewHandle, angular.DimLinePoint),
+                ProjectedCornerDimensionSpec corner => (corner.ViewHandle, corner.DimLinePoint),
                 _ => throw new DomainException("OUT_OF_SCOPE", "Expected a projected dimension.")
             };
             var selected = CadStructureWriter.Find(database, handle);
@@ -94,6 +96,7 @@ internal static class ProjectedDimensionWriter
             Need(entity != null && entity.OwnerId == space, "OUT_OF_SCOPE", "Select a view in the active target space.");
             var placement = new Point3d(point.X, point.Y, 0);
             Projection projection;
+            McGeomParam[]? cornerAnchors = null;
             if (spec is ProjectedAlignedDimensionSpec alignedSpec)
             {
                 var line = DrawingViewsReader.ResolveProjectedLine(entity, state, tx, args.BridgeId, alignedSpec.LineIndex, cancel);
@@ -102,6 +105,29 @@ internal static class ProjectedDimensionWriter
                     direction.CrossProduct(placement - line.Start).Length / direction.Length >= .001,
                     "INVALID_GEOMETRY", "Select a nonzero XY view line and put the dimension line off its endpoints.");
                 projection = new(line.ViewId, line.Marker, line.Start, line.End);
+            }
+            else if (spec is ProjectedCornerDimensionSpec cornerSpec)
+            {
+                Need(paper, "OUT_OF_SCOPE", "Projected angular dimensions require an active Paper sheet.");
+                var first = DrawingViewsReader.ResolveProjectedLine(entity,state,tx,args.BridgeId,cornerSpec.FirstLineIndex,cancel);
+                var second = DrawingViewsReader.ResolveProjectedLine(entity,state,tx,args.BridgeId,cornerSpec.SecondLineIndex,cancel);
+                Need(first.ViewId == second.ViewId && first.Marker != second.Marker &&
+                    first.Start.Z == 0 && first.End.Z == 0 && second.Start.Z == 0 && second.End.Z == 0,
+                    "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "Select two distinct visible straight primitives on the same XY projection.");
+                Point2 XY(Point3d p) => new(p.X,p.Y);
+                var corner=ProjectedCornerGeometry.Resolve(XY(first.Start),XY(first.End),XY(second.Start),XY(second.End),point);
+                var f=Anchors(new(first.ViewId,first.Marker,first.Start,first.End),owner);
+                var s=Anchors(new(second.ViewId,second.Marker,second.Start,second.End),owner);
+                _=NativeModelHistory421.LoadProjectedDimensionAssociation();
+                var a=corner.FirstVertex==0 ? first.End : first.Start;
+                var b=corner.SecondVertex==0 ? second.End : second.Start;
+                var vertex=corner.FirstVertex==0 ? first.Start : first.End;
+                var aSnap=f[1-corner.FirstVertex]; var bSnap=s[1-corner.SecondVertex];
+                // McDimensionData has three point slots. Both native curves
+                // independently evaluated the shared tip. The vertex stays
+                // attached to the first named curve, in either sector.
+                cornerAnchors=corner.ReverseRays ? [bSnap,aSnap,f[corner.FirstVertex]] : [aSnap,bSnap,f[corner.FirstVertex]];
+                projection=new(first.ViewId,first.Marker,corner.ReverseRays ? b : a,corner.ReverseRays ? a : b,vertex,"angular",Sweep:corner.Sweep);
             }
             else if (spec is ProjectedDiametricDimensionSpec diametric)
             {
@@ -148,13 +174,14 @@ internal static class ProjectedDimensionWriter
             }
             var view = projection.ViewId.GetObjectOfType<DrawingView>();
             Need(view != null && view.DbEntity.DocumentID == owner.ID && view.DbEntity.Document?.ID == owner.ID &&
-                view.DbEntity.DScale == 1 && view.DbEntity.Scale == 1,
-                "OUT_OF_SCOPE", "Select an ordinary unit-scale view owned by the active Model space or paper sheet.");
+                view.EnableAutoUpdate && view.DbEntity.Scale == 1 && double.IsFinite(view.DbEntity.DScale) && view.DbEntity.DScale > 0 &&
+                (paper || view.DbEntity.DScale == 1),
+                "OUT_OF_SCOPE", "Use a local Paper drawing view with a positive drawing-scale denominator and design scale 1, or a unit-scale Model view.");
             Need(layers.Has(spec.Layer), "LAYER_UNAVAILABLE", "The requested dimension layer is unavailable.");
             var layer = (Db.LayerTableRecord)tx.GetObject(layers[spec.Layer], Db.OpenMode.ForRead);
             Need(!layer.IsLocked && !layer.IsOff && !layer.IsFrozen && !layer.IsDependent,
                 "LAYER_UNAVAILABLE", "Use a local visible writable dimension layer.");
-            return new Binding(projection, placement, spec.Layer, owner, space, layer.ObjectId, Anchors(projection, owner));
+            return new Binding(projection, placement, spec.Layer, owner, space, layer.ObjectId, view.DbEntity.DScale, cornerAnchors ?? Anchors(projection, owner));
         }).ToArray();
     }
 
@@ -181,20 +208,20 @@ internal static class ProjectedDimensionWriter
                 diameter.SetPosition(1, Native(projection.Second)).IsSuccess(),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native diameter did not accept both chord positions.");
             diameter.Symbol = McDimensionSymbol.Diameter;
-            diameter.DimensionScale = 1;
+            diameter.DimensionScale = binding.ViewScaleDenominator;
             // IMcDimension::setTextPos is the explicit position of the text;
             // setLinePos has different placement semantics for this subtype.
             diameter.TextPosition = Native(binding.Placement);
-            Need(diameter.Symbol == McDimensionSymbol.Diameter && diameter.DimensionScale == 1 && Same(diameter.Center, center) &&
+            Need(diameter.Symbol == McDimensionSymbol.Diameter && diameter.DimensionScale == binding.ViewScaleDenominator && Same(diameter.Center, center) &&
                 Same(diameter.GetPosition(0), projection.First) && Same(diameter.GetPosition(1), projection.Second),
-                "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native diameter did not retain its two chord points and unit scale.");
+                "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native diameter did not retain its two chord points and native measurement scale.");
             Need(!diameter.IsTextPositionDefault && Same(diameter.TextPosition, binding.Placement),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native diameter did not retain the requested text position.");
         }
         else if (dimension is McRadialDimension radial && projection.Center is { } radialCenter)
         {
             radial.Center = Native(radialCenter); radial.Position = Native(projection.First);
-            radial.DimensionScale = 1; radial.TextPosition = Native(binding.Placement);
+            radial.DimensionScale = binding.ViewScaleDenominator; radial.TextPosition = Native(binding.Placement);
             Need(Same(radial.Center, radialCenter) && Same(radial.Position, projection.First),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native radius did not retain its center and chord point.");
         }
@@ -203,7 +230,7 @@ internal static class ProjectedDimensionWriter
             arc.Center = Native(arcCenter);
             Need(arc.SetPosition(0, Native(projection.First)).IsSuccess() && arc.SetPosition(1, Native(projection.Second)).IsSuccess(),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native arc length did not accept its endpoints.");
-            arc.DimensionScale = 1; arc.LinePosition = Native(binding.Placement); arc.TextPosition = Native(binding.Placement);
+            arc.DimensionScale = binding.ViewScaleDenominator; arc.LinePosition = Native(binding.Placement); arc.TextPosition = Native(binding.Placement);
         }
         else if (dimension is McAngularDimension angular && projection.Center is { } angularCenter)
         {
@@ -211,6 +238,10 @@ internal static class ProjectedDimensionWriter
             Need(angular.SetPosition(0, Native(projection.First)).IsSuccess() && angular.SetPosition(1, Native(projection.Second)).IsSuccess(),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native angle did not accept its arc endpoint rays.");
             angular.DimensionScale = 1; angular.LinePosition = Native(binding.Placement); angular.TextPosition = Native(binding.Placement);
+            if (binding.Anchors.Length==3)
+                Need(Same(angular.Center,angularCenter) && Same(angular.GetPosition(0),projection.First) &&
+                    Same(angular.GetPosition(1),projection.Second) && Same(angular.LinePosition,binding.Placement),
+                    "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached angular dimension did not retain the two projected rays, vertex and selected sector.");
         }
         else
         {
@@ -220,13 +251,37 @@ internal static class ProjectedDimensionWriter
                 linear.SetPosition(1, Native(projection.Second)).IsSuccess() &&
                 Same(linear.GetPosition(0), projection.First) && Same(linear.GetPosition(1), projection.Second),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native aligned dimension did not retain the selected endpoints.");
+            if (binding.ViewScaleDenominator != 1) linear.DimensionScale = binding.ViewScaleDenominator;
             linear.LinePosition = Native(binding.Placement);
         }
+        VerifyPhysicalMeasurement(dimension, binding);
         dimension.DbEntity.Layer = binding.LayerName;
         return dimension;
     }
 
-    private static Db.ObjectId VerifyResident(NativeOperationChanges changes, Binding binding, Db.Database database, Action cancel)
+    private static void VerifyPhysicalMeasurement(McDimension dimension, Binding binding)
+    {
+        // IMcDimension::getDimScale is the measurement scale. DScale is the
+        // drawing denominator: a 1:2 view has DScale=2 and a 10 mm sheet diameter
+        // represents 20 mm. Check the native nominal value before the first write
+        // and again on the identified resident object after association/update.
+        if (binding.ViewScaleDenominator == 1 || binding.Projection.Kind == "angular") return;
+        var projection = binding.Projection;
+        var sheetLength = projection.Kind switch
+        {
+            "radial" => projection.First.DistanceTo(projection.Center!.Value),
+            "arc_length" => projection.First.DistanceTo(projection.Center!.Value) * projection.Sweep,
+            _ => projection.First.DistanceTo(projection.Second)
+        };
+        double expected = sheetLength * binding.ViewScaleDenominator;
+        double nominal = dimension.Value;
+        Need(double.IsFinite(expected) && expected > 0 && double.IsFinite(nominal) &&
+            dimension.DimensionScale == binding.ViewScaleDenominator &&
+            Math.Abs(nominal - expected) <= Math.Max(1e-7, Math.Abs(expected) * 1e-9),
+            "NATIVE_DIMENSION_SCALE_MISMATCH", $"The native dimension's nominal measurement {nominal} does not match the physical length {expected} at sheet scale 1:{binding.ViewScaleDenominator}.");
+    }
+
+    private static Db.ObjectId VerifyResident(NativeOperationChanges changes, Binding binding, Db.Database database, CreateArguments args, Action cancel)
     {
         using var tx = database.TransactionManager.StartTransaction();
         Db.ObjectId result = Db.ObjectId.Null;
@@ -252,8 +307,7 @@ internal static class ProjectedDimensionWriter
                     "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident diameter did not retain the two opposite points of the projected circle.");
                 Need(!diameter.UsingDefaultTextPosition && SamePoint(diameter.TextPosition, binding.Placement),
                     "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident diameter did not retain the requested text position.");
-                var definition = Wire.Element(DimensionGeometryReader.Definition(diameter));
-                var (measurement, reason) = DimensionMeasurementReader.MeasureDetached(diameter, definition, cancel);
+                var (measurement, reason) = DimensionMeasurementReader.MeasureProjectedSheet(diameter, cancel);
                 Need(measurement.HasValue && Math.Abs(measurement.Value - projection.First.DistanceTo(projection.Second)) <= 1e-7,
                     "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", $"The resident diameter did not measure twice the projected circle radius ({reason ?? "value mismatch"}).");
             }
@@ -297,8 +351,7 @@ internal static class ProjectedDimensionWriter
                         "The resident angle did not retain the projected arc center and endpoint rays.");
                     expected = projection.Sweep;
                 }
-                var definition = Wire.Element(DimensionGeometryReader.Definition(dimension));
-                var (measurement, reason) = DimensionMeasurementReader.MeasureDetached(dimension, definition, cancel);
+                var (measurement, reason) = DimensionMeasurementReader.MeasureProjectedSheet(dimension, cancel);
                 Need(measurement.HasValue && Math.Abs(measurement.Value - expected) <= 1e-7,
                     "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", $"The resident {projection.Kind} did not retain the selected measurement ({reason ?? "value mismatch"}).");
                 Need(!dimension.UsingDefaultTextPosition && SamePoint(dimension.TextPosition, binding.Placement),
@@ -322,6 +375,43 @@ internal static class ProjectedDimensionWriter
             using var reactors = dimension.GetPersistentReactorIds();
             Need(reactors.Cast<Db.ObjectId>().Any(link => link.IsValid && !link.IsErased && link.Database == database),
                 "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident dimension did not retain local native dependency storage.");
+            if (binding.Anchors.Length==3)
+            {
+                var table=(Db.BlockTable)tx.GetObject(database.BlockTableId,Db.OpenMode.ForRead);
+                var summary=EntityAdapter.Summary(dimension,table[Db.BlockTableRecord.ModelSpace],args.BridgeId,args.DocumentId,true);
+                var observed=CadProjectedDimensionAssociationReader.ReadLoaded(dimension,summary,cancel);
+                Need(observed!=null,"NATIVE_DIMENSION_ASSOCIATION_MISMATCH","The stored native angular dimension anchor inventory is unavailable.");
+                var actual=Wire.Element(observed);
+                Need(actual.GetProperty("native_associative").ValueKind==System.Text.Json.JsonValueKind.True &&
+                    actual.GetProperty("links_complete").GetBoolean() && actual.GetProperty("links").GetArrayLength()==1 &&
+                    actual.GetProperty("drawing_view_mc_id").GetString()==projection.ViewId.ToString(),
+                    "NATIVE_DIMENSION_ASSOCIATION_MISMATCH","The resident angular dimension did not retain its associative view identity.");
+                var anchors=actual.GetProperty("anchors");
+                var expectedPoints=new[]{projection.First,projection.Second,projection.Center!.Value};
+                Need(anchors.GetArrayLength()==3,"NATIVE_DIMENSION_ASSOCIATION_MISMATCH","Expected three stored angular anchors.");
+                bool Matches(JsonElement row, McGeomParam expected, Point3d point)
+                {
+                    var wcs=row.GetProperty("evaluated_point_wcs");
+                    return !row.GetProperty("is_null").GetBoolean() &&
+                        row.GetProperty("source_mc_id").GetString()==expected.ID.ToString() && row.GetProperty("gs_marker").GetInt32()==expected.GSMarker &&
+                        row.GetProperty("parameter").ValueKind==JsonValueKind.Number &&
+                        row.GetProperty("parameter").GetDouble()==expected.Param &&
+                        row.GetProperty("data").GetString()==expected.Data.ToString(System.Globalization.CultureInfo.InvariantCulture) &&
+                        wcs.ValueKind==JsonValueKind.Array && wcs.GetArrayLength()==3 &&
+                        SamePoint(new(wcs[0].GetDouble(),wcs[1].GetDouble(),wcs[2].GetDouble()),point);
+                }
+                // nanoCAD can reorder the two ray anchors to normalize its DWG
+                // angular sector. Each of the three actual parameter identities
+                // must still match exactly one distinct resident storage slot.
+                var usedSlots=new HashSet<int>();
+                for (int role=0;role<expectedPoints.Length;role++)
+                {
+                    var matching=anchors.EnumerateArray().Where(row=>Matches(row,binding.Anchors[role],expectedPoints[role]))
+                        .Select(row=>row.GetProperty("slot").GetInt32()).ToArray();
+                    Need(matching.Length==1 && matching[0] is >=0 and <3 && usedSlots.Add(matching[0]),
+                        "NATIVE_DIMENSION_ASSOCIATION_MISMATCH",$"Angular anchor role {role} has no unique resident slot retaining its original view marker, point and parameter.");
+                }
+            }
             result = id;
         }
         Need(!result.IsNull, "OBJECT_IDENTITY_MISMATCH", "The native creation did not append a resident dimension.");
@@ -368,7 +458,15 @@ internal static class ProjectedDimensionWriter
                 dimension.DbEntity.Update();
                 McObjectManager.UpdateAll();
                 // Observe the newly appended DWG dimension rather than the constructor wrapper.
-                var resident = VerifyResident(changes, binding, database, job.CheckCancellation);
+                var resident = VerifyResident(changes, binding, database, args, job.CheckCancellation);
+                if (binding.ViewScaleDenominator != 1 && binding.Projection.Kind != "angular")
+                {
+                    var observed = dimension.ID.GetObject() as McDimension;
+                    Need(observed != null && observed.ID == dimension.ID && observed.ID.Handle == resident.Handle.Value &&
+                        observed.DbEntity.DocumentID == binding.Owner.ID, "OBJECT_IDENTITY_MISMATCH",
+                        "The scaled resident dimension must resolve to its actual owner and DWG handle.");
+                    VerifyPhysicalMeasurement(observed, binding);
+                }
                 refs.Add(new(args.BridgeId, args.DocumentId, Validation.NormalizeHandle(resident.Handle.ToString())));
             }
             job.BeginCommit();

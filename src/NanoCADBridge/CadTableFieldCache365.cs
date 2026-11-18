@@ -9,8 +9,8 @@ namespace NanoCADBridge;
 internal static class CadTableFieldCache365
 {
     internal const string Source="actual_native_Field_existing_cache; no_Table_value_or_text_expression_getter; no_evaluation_requested";
-    internal sealed record Sample(object? Value,string Text,string? ValueReason,string? TextReason);
-    internal static Sample Read(Table table,ObjectId fieldId,Transaction transaction,Action cancel)
+    internal sealed record Sample(object? Value,string Text,string? ValueReason,string? TextReason,string ValueSource);
+    internal static Sample Read(Table table,ObjectId fieldId,Transaction transaction,Action cancel,string? formula=null)
     {
         cancel();var item=transaction.GetObject(fieldId,OpenMode.ForRead);
         if(item.GetType()!=typeof(Field)||item.Database?.UnmanagedObject!=table.Database?.UnmanagedObject||item.OwnerId.IsNull)
@@ -34,6 +34,26 @@ internal static class CadTableFieldCache365
             catch(OperationCanceledException){throw;}
             catch(Exception error){textReason="Existing native Field formatted-text cache unavailable: "+error.GetType().Name+"; no Table display getter was used.";}
         }
-        return new(value,text,valueReason,textReason);
+        string source=Source;
+        if(formula!=null&&field.IsTextField)
+        {
+            try
+            {
+                CadTableFormulaEvaluation.WithExpression(field,formula,child=>
+                {
+                    var childState=child.State;
+                    if((childState&(FieldState.HasCache|FieldState.Evaluated|FieldState.Modified))!=(FieldState.HasCache|FieldState.Evaluated)||
+                        child.EvaluationStatus.Status!=FieldEvaluationStatus.Success)return;
+                    object raw=child.Value;
+                    if(raw is not int&&!(raw is double number&&double.IsFinite(number)))return;
+                    value=raw;valueReason=null;source="native_numeric_cache_of_direct_AcExpr_child_of_bound_text_Field";
+                },cancel);
+            }
+            catch(Teigha.Runtime.Exception error)
+            {
+                if(valueReason!=null)valueReason+=" Native expression child cache observation: "+error.ErrorStatus+".";
+            }
+        }
+        return new(value,text,valueReason,textReason,source);
     }
 }

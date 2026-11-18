@@ -26,6 +26,7 @@ internal static class DrawingViewCreateSchema
                 ["layout_handle"]=new JsonObject{["type"]="string",["pattern"]="^[0-9A-Fa-f]{1,16}$",["description"]="Optional explicit active ordinary Paper layout from get_structure. Requires root target_space paper and CVPORT1. Omit for the existing Model creation route. Fresh native sheet objects only; no retained layout transfer."},
                 ["name_prefix"]=new JsonObject{["type"]="string",["minLength"]=1,["maxLength"]=64},
                 ["front_origin"]=Point(),["top_origin"]=Point(),
+                ["projection_method"]=new JsonObject{["type"]="string",["enum"]=new JsonArray("first_angle","third_angle"),["default"]="third_angle",["description"]="Orthographic placement convention. In first_angle, Top is below Front and a right-side view is to its left. In third_angle, Top is above Front and a right-side view is to its right. Explicit isometric placements keep their named quadrants."},
                 ["projection_plane"]=new JsonObject{["type"]="object",["additionalProperties"]=false,
                     ["required"]=new JsonArray("origin","x_axis","y_axis"),
                     ["properties"]=new JsonObject{["origin"]=Triple(),["x_axis"]=Triple(),["y_axis"]=Triple()},

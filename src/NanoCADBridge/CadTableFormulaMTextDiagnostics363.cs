@@ -49,7 +49,7 @@ internal static class CadTableFormulaMTextDiagnostics363
         return properties;
     }
     internal static JsonElement Carrier(JsonElement record,IReadOnlyDictionary<string,JsonElement> records,HashSet<string> fields,HashSet<string> containers,
-        bool lost,bool xdataAbsent,bool reactorsEmpty,bool extensionAllowed,bool fieldAllowed,CadTableEditingReader.Snapshot before,CadTableEditingReader.Snapshot after,Action cancel)
+        string change,bool xdataAbsent,bool reactorsEmpty,bool extensionAllowed,bool fieldAllowed,CadTableEditingReader.Snapshot before,CadTableEditingReader.Snapshot after,Action cancel)
     {
         cancel();var common=record.GetProperty("common");var role=record.GetProperty("table_cell_mtext_owner");
         string carrier=common.GetProperty("handle").GetString()!;var extension=common.GetProperty("extension_handle");
@@ -82,7 +82,7 @@ internal static class CadTableFormulaMTextDiagnostics363
         JsonElement Build(bool compact)=>Wire.Element(new{
             table_handle=role.GetProperty("table_handle"),carrier_handle=carrier,carrier_owner_handle=common.GetProperty("owner_handle"),
             carrier_runtime_type=Small(common.GetProperty("runtime_type"),384,"large_carrier_runtime_type_omitted"),
-            layout_block_handle=role.GetProperty("block_handle"),carrier_change=lost?"lost":"introduced",default_field_handle=role.GetProperty("field_handle"),
+            layout_block_handle=role.GetProperty("block_handle"),carrier_change=change,default_field_handle=role.GetProperty("field_handle"),
             guards=new{xdata_absent=xdataAbsent,reactors_empty=reactorsEmpty,extension_null_or_selected_field_only=extensionAllowed,default_field_absent_or_selected=fieldAllowed},
             carrier_xdata_kind=common.GetProperty("xdata").ValueKind.ToString(),carrier_reactor_count=common.GetProperty("reactors").GetArrayLength(),
             cell_binding_count=role.GetProperty("cell_bindings").GetArrayLength(),

@@ -12,12 +12,14 @@ internal static class SolidFinisher
     private static void Need(bool condition,string code,string message){if(!condition)throw new DomainException(code,message);}
     internal static void Validate(SolidFinishingCopySpec spec,Solid3d source,EntityRef reference,Action? cancel=null)
     {
-        var snapshot=Snapshot(source,reference,cancel);
+        var boundary=spec.BaseFace==null?null:new HashSet<string>(StringComparer.Ordinal);
+        var snapshot=Wire.Element(SolidTopologyReader.Capture(source,reference,CancellationToken.None,cancel,selectedFace:spec.BaseFace,selectedBoundaryEdges:boundary));
         Need(snapshot.GetProperty("snapshot_token").GetString()==spec.TopologyToken,"STALE_TOPOLOGY","Reacquire the source topology; snapshot differs.");
         string collection=spec.Kind=="shell_copy"?"faces":"edges";
         var ids=snapshot.GetProperty(collection).EnumerateArray().Select(x=>x.GetProperty("native_id").GetString()).ToHashSet(StringComparer.Ordinal);
         Need(spec.Subentities.All(ids.Contains),"SUBENTITY_NOT_FOUND","Selected subentity does not belong to this source snapshot.");
         if(spec.BaseFace!=null)Need(snapshot.GetProperty("faces").EnumerateArray().Any(x=>x.GetProperty("native_id").GetString()==spec.BaseFace),"SUBENTITY_NOT_FOUND","Chamfer base face does not belong to the source.");
+        if(boundary!=null)spec.RequireBoundaryEdges(boundary);
     }
     internal static Solid3d Create(SolidFinishingCopySpec spec,Solid3d source,EntityRef reference,Action? cancel=null)
     {

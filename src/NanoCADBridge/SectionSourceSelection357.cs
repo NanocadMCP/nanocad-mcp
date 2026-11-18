@@ -122,8 +122,9 @@ internal static class SectionSourceSelection357
     internal static Plan Configure(Section section,McDocument sheet,McObjectId[] sources,JsonElement before,DocumentState state,Action cancel)
     {
         cancel();using var tx=state.Document.Database.TransactionManager.StartTransaction();using var native=Native(section,state,tx,cancel);var raw=native.Value;
-        Need(section.DbEntity.DocumentID==sheet.ID&&sheet.IsModel&&state.Document.Database.CurrentSpaceId==raw.OwnerId,
-            "Configure only the fresh Section in the exact active Model sheet.","DOCUMENT_CONTEXT_MISMATCH");
+        var db=state.Document.Database;var lookup=CadDrawingViewEditState.Context(state);var table=(Db.BlockTable)tx.GetObject(db.BlockTableId,Db.OpenMode.ForRead);var model=table[Db.BlockTableRecord.ModelSpace];
+        Need(raw.OwnerId==model&&section.DbEntity.DocumentID==sheet.ID&&sheet.IsModel&&sheet.TopDoc.ID==lookup.TopDoc.ID,
+            "Configure only the fresh Section owned by this drawing's Model sheet.","DOCUMENT_CONTEXT_MISMATCH");
         string handle=H(raw.ObjectId);Need(before.EnumerateArray().All(row=>row.GetProperty("section_handle").GetString()!=handle),"Section source configuration cannot edit an existing Section.","OBJECT_IDENTITY_MISMATCH");
         using var settingsBinding=Settings(raw,tx,Db.OpenMode.ForWrite,cancel);var settings=settingsBinding.Value;var settingsId=settings.ObjectId;
         Need(before.EnumerateArray().All(row=>row.GetProperty("settings_handle").GetString()!=H(settingsId)),"Fresh Section reused existing native settings.","OBJECT_IDENTITY_MISMATCH");
@@ -132,7 +133,6 @@ internal static class SectionSourceSelection357
         var inventory=Inventory(state.Document,tx,cancel);
         Need(inventory.EnumerateArray().Count(row=>row.GetProperty("settings_handle").GetString()==H(settingsId))==1,
             "Fresh Section settings are shared by another resident Section.","OBJECT_IDENTITY_MISMATCH");
-        var db=state.Document.Database;var lookup=CadDrawingViewEditState.Context(state);var table=(Db.BlockTable)tx.GetObject(db.BlockTableId,Db.OpenMode.ForRead);var model=table[Db.BlockTableRecord.ModelSpace];
         using var ids=new Db.ObjectIdCollection();var handles=new List<string>();var measured=new ModelInventoryBudget(cancel);
         foreach(var source in sources)
         {
@@ -159,7 +159,7 @@ internal static class SectionSourceSelection357
         Need(section.State==Section.StateType.Plane&&!section.LiveSectionEnabled,"Source selection must not enable live sectioning or change the cut state.");
         tx.Commit();return new(section.ID,raw.ObjectId,settingsId,expectedValue,handles.OrderBy(value=>value,StringComparer.Ordinal).ToArray(),sources.ToArray());
     }
-    internal static void Verify(Plan plan,Section section,DrawingView view,DocumentState state,Action cancel)
+    internal static void Verify(Plan plan,Section section,DrawingView view,DocumentState state,Action cancel,Db.ObjectId? viewOwner=null)
     {
         cancel();using var tx=state.Document.Database.TransactionManager.StartTransaction();using var native=Native(section,state,tx,cancel);var raw=native.Value;
         Need(section.ID==plan.SectionId&&raw.ObjectId==plan.SectionEntity&&raw.Settings==plan.SettingsId,
@@ -173,7 +173,8 @@ internal static class SectionSourceSelection357
             "The selected Section view has no exact resident native identity.","OBJECT_IDENTITY_MISMATCH");
         var representation=tx.GetObject(viewId,Db.OpenMode.ForRead);
         Need(representation.ObjectId==viewId&&representation.Database?.UnmanagedObject==db.UnmanagedObject&&
-            representation.OwnerId==raw.OwnerId&&view.DbEntity.DocumentID==section.DbEntity.DocumentID&&
+            representation.OwnerId==(viewOwner??raw.OwnerId)&&representation is Db.Entity en&&en.Layer=="VIEWS"&&view.DbEntity.DocumentID==McObjectId.FromHandle(representation.OwnerId.Handle.Value,lookup.ID)&&
+            view.DbEntity.Document.TopDoc.ID==section.DbEntity.Document.TopDoc.ID&&
             view.SectionID==plan.SectionId&&view.IsBasedOnSection&&view.IsRootSectionView&&!view.IsSlice,
             "The exact resident view does not belong to its selected Section and local sheet.","OBJECT_IDENTITY_MISMATCH");
         // SDK get3dEntsForProcessing is configuration-derived Section processing
@@ -183,8 +184,8 @@ internal static class SectionSourceSelection357
         // distinct; exact view participation remains a required ownership proof.
         var processing=DrawingViewSources356.Capture(section,cancel);
         var sources=DrawingViewSources356.Capture(view,cancel);
-        Need(processing.native_owner_document_id==sources.native_owner_document_id&&
-            sources.native_owner_document_id==section.DbEntity.DocumentID.ToString(),
+        Need(processing.native_owner_document_id==section.DbEntity.DocumentID.ToString()&&
+            sources.native_owner_document_id==view.DbEntity.DocumentID.ToString(),
             "Section processing and selected view observations belong to different native sheets.","OBJECT_IDENTITY_MISMATCH");
         try
         {

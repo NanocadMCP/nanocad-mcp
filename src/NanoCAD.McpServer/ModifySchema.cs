@@ -60,8 +60,8 @@ internal static class ModifySchema
         var mtextReplacement = Operation("replace_mtext", ("expected_paragraphs", Paragraphs()), ("paragraphs", Paragraphs()));
         mtextReplacement["properties"]!["handles"]!["maxItems"] = 1;
         mtextReplacement["description"] = "Replace literal paragraphs of native MTEXT while retaining attachment, location, background and one uniform inline formatting run. Read existing literal paragraphs first; mixed formatting runs, fields and columns require a separate owning content route.";
-        JsonObject DimensionText() => new() { ["type"] = "string", ["maxLength"] = 256 };
-        var dimensionReplacement = Operation("replace_dimension_text", ("expected_text", DimensionText()), ("text", DimensionText()));
+        JsonObject DimensionText(int limit) => new() { ["type"] = "string", ["maxLength"] = limit };
+        var dimensionReplacement = Operation("replace_dimension_text", ("expected_text", DimensionText(DimensionTextContent.CreatedOverrideLength)), ("text", DimensionText(DimensionTextContent.EditLength)));
         dimensionReplacement["properties"]!["handles"]!["maxItems"] = 1;
         dimensionReplacement["description"] = "Plain dimension prefix/suffix preserving measurement: text must contain exactly one <> or be empty to restore the native value. One exact automatic-placement aligned/rotated/radial Dimension handle, or a manual diametric Dimension with existing effective DIMTMOVE=2, no persistent dependencies, fields, controls or CAD formatting. Measured endpoints/style/orientation and the dimension line remain unchanged; DimLinePoint may slide along that same line; automatic native text placement may adapt; manual diametric TextPosition and its existing movement policy remain unchanged. Expected text must match after preceding edits. only set_dimension_line may share an aligned/rotated target.";
         JsonObject Sizes(int max) => new()

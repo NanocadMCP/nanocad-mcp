@@ -16,6 +16,8 @@ internal static class DimensionTextEditTests
             if (edit.Handles.Single() != "AF" || edit.Text != "Length <> mm") throw new Exception("Literal/identity changed.");
             if (args.Fingerprint() == Parse(Edit(text: "Radius <> mm")).Fingerprint() || args.Fingerprint() == Parse(Edit(expected: "old")).Fingerprint()) throw new Exception("Replay loses text intent.");
             if (args.Fingerprint() != Parse(Edit(handles: new[] { "AF" })).Fingerprint()) throw new Exception("Normalization differs.");
+            Parse(Edit(expected: new string('x', 4096), text: "<>")); Reject(Edit(expected: new string('x', 4097)));
+            if (DimensionTextContent.DisplayMode("999", false) != "literal_override" || DimensionTextContent.DisplayMode("<>", false) != "automatic_measurement") throw new Exception("Measured and literal dimension labels were conflated.");
             Parse(Edit(text: "")); Parse(Edit(), Edit(expected: "Length <> mm", text: "<>"));
             return Task.CompletedTask;
         });

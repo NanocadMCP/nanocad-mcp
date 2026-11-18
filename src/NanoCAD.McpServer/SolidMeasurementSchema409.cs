@@ -53,8 +53,7 @@ internal static class SolidMeasurementSchema409
         {
             ["type"] = "object",
             ["description"] = Description + " " + AxisDescription,
-            ["oneOf"] = new JsonArray(Branch("solid_distance"), Branch("face_distance"), Branch("wall_thickness"),
-                Branch("cylinder_diameter"), Branch("axis_axis_distance"), Branch("axis_plane_distance"))
+            ["oneOf"] = new JsonArray(NanoCAD.Contracts.SolidMeasurementValidation409.Modes.Select(mode => (JsonNode?)Branch(mode)).ToArray())
         };
     }
 

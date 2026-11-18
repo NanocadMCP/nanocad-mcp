@@ -24,7 +24,7 @@ internal static class CadTableFormulaEditor343
         return result.ToArray();
     }
     internal static ContentValue NormalizeEvaluation(ContentValue before,ContentValue after)=>before.formula!=null&&before.formula==after.formula?
-        before with{native_value=after.native_value,double_bits=after.double_bits,evaluation_unavailable_reason=after.evaluation_unavailable_reason,
+        before with{native_value=after.native_value,native_value_source=after.native_value_source,double_bits=after.double_bits,evaluation_unavailable_reason=after.evaluation_unavailable_reason,
             scale=before.auto_scale&&after.auto_scale?after.scale:before.scale}:before;
     internal static bool FormulaCell(Snapshot snapshot,CellValue cell)=>snapshot.Values[checked(cell.row*snapshot.Columns+cell.column)]?.formula!=null;
     internal static void ObserveEvaluation(Snapshot before,Snapshot after,Action cancel,List<string> warnings)
@@ -99,7 +99,8 @@ internal static class CadTableFormulaEditor343
     }
     internal static void CheckSource(Table table,TableFormulaEditingSpec343 edit,Database db,Transaction tr,Action cancel)
     {var before=Read(table,cancel);Validate(table,before,edit,db,cancel);var metadata=CadTableValueEditor336.Metadata(table,tr,cancel);new ModelInventoryBudget(cancel).Add(new{before,metadata});}
-    internal static string[] Apply(Table table,TableFormulaEditingSpec343 edit,Database db,Transaction tr,Action cancel)
+    internal static string[] Apply(Table table,TableFormulaEditingSpec343 edit,Database db,Transaction tr,Action cancel,
+        int operationIndex, EntityRef target, out TableCellChange change)
     {
         var before=Read(table,cancel);Validate(table,before,edit,db,cancel);var metadata=CadTableValueEditor336.Metadata(table,tr,cancel);
         new ModelInventoryBudget(cancel).Add(new{before,metadata});var id=table.ObjectId;var owner=table.OwnerId;
@@ -110,9 +111,18 @@ internal static class CadTableFormulaEditor343
             table.SetDataType(row,column,0,new DataTypeParameter(DataType.Double,Enum.Parse<UnitType>(request.UnitType)));cancel();
             if(request.DataFormat is {} format){table.SetDataFormat(row,column,0,format);cancel();}
             table.SetFormula(row,column,0,NativeTableFormula343.NativeExpression(request.Formula,cancel));cancel();
+            // SetFormula can install a native Field with its own formatting.
+            // Reapply the requested type to that actual content after installation.
+            var installed=table.GetDataType(row,column,0);
+            var unit=Enum.Parse<UnitType>(request.UnitType);
+            if(installed.DataType!=DataType.Double || installed.UnitType!=unit)
+            {
+                table.SetDataType(row,column,0,new DataTypeParameter(DataType.Double,unit));cancel();
+            }
         }
         table.GenerateLayout();cancel();table.RecomputeTableBlock(true);cancel();var after=Read(table,cancel);var warnings=new List<string>();
         var selected=edit.Cells.Select(cell=>(cell.Row,cell.Column)).ToArray();
+        after=CadTableFormulaEvaluation.AfterWrite(table,tr,after,selected,warnings,cancel);
         CadTableFormulaField358.Verify(metadata,CadTableValueEditor336.Metadata(table,tr,cancel),before,after,selected,selected,cancel);
         if(before.Values.Any(value=>value?.native_formula_field!=null)||after.Values.Any(value=>value?.native_formula_field!=null))warnings.Add(CadTableFormulaField358.Warning);
         Need(table.ObjectId==id&&table.OwnerId==owner,
@@ -135,8 +145,12 @@ internal static class CadTableFormulaEditor343
                 new{row=cell.row,column=cell.column,requested_formula_sha256=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(request.Formula))),
                     observed_data_type=actualValue.data_type,observed_unit_type=actualValue.unit_type,native_formula_observed=false,
                     before_token=before.Token,after_token=after.Token,scope="completed_managed_native_formula_snapshot; no_rollback_claim"});
-            Need(actualValue.data_type=="Double"&&actualValue.unit_type==request.UnitType&&cell.content_count==1,
-                "Native formula/type/unit storage differs from the explicit request.","NATIVE_TABLE_MISMATCH");
+            if(actualValue.data_type!="Double"||actualValue.unit_type!=request.UnitType||cell.content_count!=1)
+                throw new DomainException("NATIVE_TABLE_MISMATCH","Native formula/type/unit storage differs from the explicit request.",false,
+                    new { cell.row,cell.column, expected_data_type="Double",expected_unit_type=request.UnitType,expected_content_count=1,
+                        observed_data_type=actualValue.data_type,observed_unit_type=actualValue.unit_type,observed_content_count=cell.content_count,
+                        stored_formula=actualFormula,storage_route="Table.SetFormula/GenerateLayout/RecomputeTableBlock",
+                        requested_formula=request.Formula,phase="post_native_layout",before_token=before.Token,after_token=after.Token });
             Need(NativeTableFormula343.SameMeaning(request.Formula,actualFormula,cancel),"Native stored formula changed the requested arithmetic or local cell references.","NATIVE_TABLE_MISMATCH");
             if(request.Formula!=actualFormula)warnings.Add("TABLE_FORMULA_NORMALIZED: Native formula text was normalized; read each selected cell's actual stored formula. Arithmetic/reference association and absolute-anchor flags remain checked.");
             if(request.DataFormat is {} format)Need(format.Length==0||actualFormat.data_format==format,"Native explicit formula data format differs from the request.","NATIVE_TABLE_MISMATCH");
@@ -149,7 +163,7 @@ internal static class CadTableFormulaEditor343
             {
                 int mask=1|(request.DataFormat!=null?2:0);
                 var expected=oldValue with{data_type=actualValue.data_type,unit_type=actualValue.unit_type,native_value=actualValue.native_value,double_bits=actualValue.double_bits,
-                    formula=actualFormula,evaluation_unavailable_reason=actualValue.evaluation_unavailable_reason,overrides=actualValue.overrides,
+                    formula=actualFormula,native_value_source=actualValue.native_value_source,evaluation_unavailable_reason=actualValue.evaluation_unavailable_reason,overrides=actualValue.overrides,
                     native_content_type=actualValue.native_content_type,native_formula_field=actualValue.native_formula_field,
                     scale=oldValue.auto_scale&&actualValue.auto_scale?actualValue.scale:oldValue.scale};
                 Need(Exact(expected,actualValue)&&(oldValue.overrides&~mask)==(actualValue.overrides&~mask),"Native formula changed unrequested content placement/scales/override bits.","NATIVE_TABLE_MISMATCH");
@@ -157,6 +171,7 @@ internal static class CadTableFormulaEditor343
         }
         ObserveEvaluation(before,after,cancel,warnings);
         if(!Exact(before.RowHeights,after.RowHeights)||!Exact(before.ColumnWidths,after.ColumnWidths))warnings.Add("TABLE_MINIMUM_SIZE_REFLOWED: Native formula layout changed observed row/column sizes; inspect actual table readability. Stored content, topology and placement remain checked.");
+        change = CadTableEditingReader.ObservedChanges(operationIndex, target, before, after, edit.Cells.Select(cell => (cell.Row, cell.Column)), cancel);
         return BoundedWarnings(warnings,cancel);
     }
 }

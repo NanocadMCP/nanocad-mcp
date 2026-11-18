@@ -141,7 +141,24 @@ internal sealed class CadWriter
             else if (DrawingViewLifecycleWriter345.Handles(structure)) DrawingViewLifecycleWriter345.Preflight(structure, state, tr, cancel ?? (() => { }));
             else if (structure.Operations is [StructureLifecycleEdit { Operation: "delete_layout" } layoutDelete])
                 CadEmptyLayoutDeletionWriter.Resolve(structure, layoutDelete, doc.Database, tr, cancel ?? (() => { }));
-            else CadStructureWriter.Resolve(structure, doc.Database, tr, cancel ?? (() => { }));
+            else
+            {
+                var resolved=CadStructureWriter.Resolve(structure,doc.Database,tr,cancel ?? (() => { }));
+                if (observePlan!=null)
+                {
+                    foreach (var reference in resolved.References.Values)
+                        CadExternalReferences385.CheckReplacementDrawing(reference,cancel ?? (() => { }));
+                    var calibrations=resolved.References.Where(pair=>pair.Value.Calibration!=null).Select(pair=>new
+                    {
+                        operation_index=pair.Key,handle=pair.Value.Target.Handle.ToString(),
+                        raster_calibration=pair.Value.Calibration!.Result,
+                        origin=new[]{pair.Value.Calibration.Frame.Origin.X,pair.Value.Calibration.Frame.Origin.Y},
+                        x_axis=new[]{pair.Value.Calibration.Frame.Xaxis.X,pair.Value.Calibration.Frame.Xaxis.Y},
+                        y_axis=new[]{pair.Value.Calibration.Frame.Yaxis.X,pair.Value.Calibration.Frame.Yaxis.Y}
+                    }).ToArray();
+                    if(calibrations.Length>0) observePlan(new{raster_calibrations=calibrations});
+                }
+            }
         }
         else if (args is ModelParameterArguments parameter)
         { if (parameter.ScopeHandles != null) ModelMultiExpressionWriter.Preflight(parameter, state, tr, cancel); else if (parameter.UsesExpressionPlan) ModelExpressionWriter.Preflight(parameter, state, tr, cancel); else ModelParameterWriter.Preflight(parameter, state, tr, cancel); }
@@ -346,6 +363,8 @@ internal sealed class CadWriter
         bool rollbackNotGuaranteed = WriteRecovery.NotGuaranteed(job.Arguments);
         var nativeFormatWarnings = new List<string>();
         Action? verifyAfterCommit = null;
+        var createdAssociationChecks = new List<Action>();
+        Result? pendingAssociationReceipt = null;
         const string verificationPending = "POST_COMMIT_VERIFICATION_PENDING: Commit is confirmed, but dependent geometry/readback requires transaction disposal. Inspect returned handles before relying on the result.";
         ReadContext? context = null;
 #if LAYER_RENAME_FAILURE_PROBE
@@ -540,7 +559,7 @@ internal sealed class CadWriter
                     if (create.Entities[i] is ArcLengthDimensionSpec356 or JoggedRadiusDimensionSpec356) CadExtendedDimensions356.VerifyCreated((Dimension)entities[i], create.Entities[i], dependencies.Styles[i], job.CheckCancellation);
                     if (create.Entities[i] is ToleranceSpec356 tolerance) { CadToleranceFrame356.VerifyCreated((FeatureControlFrame)entities[i], tolerance, dependencies.Styles[i], job.CheckCancellation); nativeFormatWarnings.Add(CadToleranceFrame356.Warning); rollbackNotGuaranteed = true; }
                     if (create.Entities[i] is DimensionSpec { Associations: not null } associated)
-                    { CadDimensionAssociationWriter385.CompleteCreation((Dimension)entities[i], associated, state.Document.Database, tr, job.CheckCancellation); }
+                    { createdAssociationChecks.Add(CadDimensionAssociationWriter385.CompleteCreation((Dimension)entities[i], associated, state.Document.Database, tr, job.CheckCancellation)); }
                     AnnotationCreator.Complete(entities[i], create.Entities[i]);
                     if (dependencies.HatchBoundaries[i] is { } boundary) CadAssociativeHatch.Complete((Hatch)entities[i], boundary, tr, job.CheckCancellation);
                     if (create.Entities[i] is MLeaderBlockSpec442 blockLeader) { CadMLeaderInstance442.VerifyCreated((MLeader)entities[i], blockLeader, state.Document.Database, tr, job.CheckCancellation); nativeFormatWarnings.Add(CadMLeaderInstance442.Warning); rollbackNotGuaranteed = true; }
@@ -733,8 +752,8 @@ internal sealed class CadWriter
             var committed = Result.Ok(job.OriginalRequestId, data, Context(state), warnings.Distinct(StringComparer.Ordinal).ToArray());
             job.BeginCommit(); commitAttempted = true;
             Trace("commit_begin"); tr.Commit();
-            job.RecordCommit(committed);
-            Trace("commit_recorded");
+            if (createdAssociationChecks.Count != 0) pendingAssociationReceipt = committed;
+            else { job.RecordCommit(committed); Trace("commit_recorded"); }
         }
         catch (DomainException e)
         {
@@ -801,6 +820,14 @@ internal sealed class CadWriter
 #if LAYER_RENAME_FAILURE_PROBE
         try{layerProbe?.VerifyRollback();}catch(System.Exception e){cleanupFailure??=e;}
 #endif
+        if (pendingAssociationReceipt is { } associationReceipt && cleanupFailure == null && failure == null)
+            return NativePostCommandVerification422.Defer(job, () =>
+            {
+                verifyAfterCommit?.Invoke();
+                foreach (var verify in createdAssociationChecks) verify();
+                var result = associationReceipt with { warnings = associationReceipt.warnings.Where(w=>w!=verificationPending).ToArray() };
+                job.RecordCommit(result);return result;
+            });
         if (job.CommittedResult is { } success)
         {
             var warnings = success.warnings.ToList();

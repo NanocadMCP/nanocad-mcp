@@ -59,8 +59,10 @@ internal static class CadSectionCutWriter351
             Require(before.Section.Token==fresh.Section.Token&&Same(before.Drawing.Context,fresh.Drawing.Context)&&Same(before.Drawing.Layouts,fresh.Drawing.Layouts)&&
                 Same(before.Drawing.Entities,fresh.Drawing.Entities)&&Same(before.Drawing.Sections,fresh.Drawing.Sections)&&
                 Same(Wire.Element(before.Drawing.Views.Select(view=>view.Metadata)),Wire.Element(fresh.Drawing.Views.Select(view=>view.Metadata)))&&
-                Same(Wire.Element(before.Drawing.Bodies.Select(body=>new{body.Id,body.Entity,body.Model,body.Geometry,body.Contents,body.Last,body.Nodes})),
-                    Wire.Element(fresh.Drawing.Bodies.Select(body=>new{body.Id,body.Entity,body.Model,body.Geometry,body.Contents,body.Last,body.Nodes}))),
+                before.Drawing.Bodies.Length==fresh.Drawing.Bodies.Length && before.Drawing.Bodies.All(body=>
+                    fresh.Drawing.Bodies.Any(current=>current.Entity==body.Entity && current.Id==body.Id &&
+                        current.Model==body.Model && current.Last==body.Last && current.Contents.SequenceEqual(body.Contents) &&
+                        Same(current.Geometry,body.Geometry) && Same(current.Nodes,body.Nodes))),
                 "PRECONDITION_FAILED","Native Section/view or drawing state changed before tracking.");
             job.CheckCancellation();tracker=new McUndoPoint(false);tracker.Start();started=true;Trace("native_set_vertices");
             var section=before.Section.Native;var up=section.VerticalDirection;var normal=section.ViewingDirection;

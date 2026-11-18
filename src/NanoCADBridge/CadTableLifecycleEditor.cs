@@ -29,6 +29,36 @@ internal static class CadTableLifecycleEditor
         return before.Cells[checked(row*before.Columns+column)];
     }
     private static bool Same(object? first,object? second)=>ModelParameterSnapshot.Equivalent(JsonSerializer.SerializeToElement(first,Wire.Json),JsonSerializer.SerializeToElement(second,Wire.Json));
+    private static void CheckDeletedReferences(Snapshot before, TableEditingSpec edit, bool rows, int index, int count,
+        IReadOnlyList<TableCellRangeSpec> crossedMerges, Action cancel)
+    {
+        var supplied = (edit.FormulaReplacements ?? []).Select(cell => (cell.Row, cell.Column)).ToHashSet();
+        var affected = new List<object>();
+        var budget = new ModelInventoryBudget(cancel);
+        foreach (var cell in before.Cells)
+        {
+            cancel();
+            int position = rows ? cell.row : cell.column;
+            if (position >= index && (long)position < (long)index + count || supplied.Contains((cell.row,cell.column))) continue;
+            var formula = before.Values[checked(cell.row * before.Columns + cell.column)]?.formula;
+            if (formula == null) continue;
+            try { _ = NativeTableFormula350.RemapStructural(formula, rows, false, index, count, cancel); }
+            catch (DomainException error) when (error.Error.code == "TABLE_FORMULA_REFERENCE_REMOVED")
+            {
+                var entry = new { row = cell.row, column = cell.column,
+                    address = NativeTableFormula343.CellName(new(cell.row, cell.column)), formula };
+                budget.Add(entry);
+                affected.Add(entry);
+            }
+        }
+        if (affected.Count != 0)
+        {
+            budget.Add(crossedMerges);
+            throw new DomainException("TABLE_FORMULA_REFERENCE_REMOVED",
+                "Deletion removes inputs of the listed retained formulas. Supply replacements at the listed original anchors in final table coordinates and resolve any intersected merges.",
+                false, new { affected_formulas = affected, intersected_merged_ranges = crossedMerges });
+        }
+    }
     private static ObjectId ResolveStyle(string handle,Database db,Transaction tr)
     {
         var id=CadStructureWriter.Find(db,handle);
@@ -53,12 +83,15 @@ internal static class CadTableLifecycleEditor
             }
             // Native range shifts are unambiguous when insertion does not cut a
             // merged span and deletion removes either none or its whole axis span.
+            var crossedMerges = new List<TableCellRangeSpec>();
             foreach(var range in before.Cells.Select(c=>c.merged_range).OfType<TableCellRangeSpec>().Distinct())
             {
                 int first=rows?range.TopRow:range.LeftColumn,last=rows?range.BottomRow:range.RightColumn;
                 bool crosses=insert?index>first&&index<=last:index<=last&&(long)index+count-1>=first&&!(index<=first&&(long)index+count-1>=last);
-                Need(!crosses,"The selected row/column change cuts an existing merged range; unmerge that exact range first.","INVALID_ARGUMENT");
+                if(crosses) crossedMerges.Add(range);
             }
+            if(delete) CheckDeletedReferences(before,edit,rows,index,count,crossedMerges,cancel);
+            Need(crossedMerges.Count==0,"The selected row/column change cuts an existing merged range; unmerge that exact range first.","INVALID_ARGUMENT");
             // Insertion may shift protected existing cells while retaining their
             // stored content/format. Only explicitly deleted cells need deletion permission.
             foreach(var cell in before.Cells.Where(c=>delete&&Anchor(c)&&(rows?c.row:c.column)>=index&&(long)(rows?c.row:c.column)<index+(long)count))

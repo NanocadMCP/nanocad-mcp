@@ -25,7 +25,7 @@ internal static class PointCloudSchemas
     static JsonObject Described(JsonObject schema, string description) { schema["description"] = description; return schema; }
     static JsonObject Array(JsonNode item) => new() { ["type"] = "array", ["items"] = item };
     static JsonObject Point() => new() { ["type"] = "array", ["minItems"] = 3, ["maxItems"] = 3, ["items"] = Number() };
-    static JsonObject Index() => new() { ["type"] = "string", ["pattern"] = "^(0|[1-9][0-9]{0,19})$", ["description"] = "Actual native UInt64 point index as canonical decimal text, at most18446744073709551615. It is scoped to the current cloud and document revision; use a returned index, not a row number or CloudInfo count." };
+    static JsonObject Index() => new() { ["type"] = "string", ["pattern"] = "^(0|[1-9][0-9]{0,19})$", ["description"] = "Returned native index in this cloud and revision. Canonical UInt64 decimal text, maximum 18446744073709551615." };
     static JsonObject FeatureId() => new() { ["type"] = "integer", ["minimum"] = 0, ["maximum"] = 4294967294L, ["description"] = "Current native feature ID from mode=features;4294967295 is the null sentinel." };
     static JsonObject PageSize() => new() { ["type"] = "integer", ["minimum"] = 1, ["maximum"] = int.MaxValue, ["default"] = 100, ["description"] = "Requested page size; actual byte and scan-time budgets can return a shorter or empty incomplete page. This does not impose a total cloud-size limit." };
     static JsonObject Cursor() => new() { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = 8192, ["description"] = "Opaque continuation from the preceding response. Keep every query field and the bridge/document/revision/handle unchanged; continue until complete=true. It is not a native point index." };

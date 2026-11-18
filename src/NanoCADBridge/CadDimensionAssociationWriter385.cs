@@ -28,7 +28,14 @@ internal static class CadDimensionAssociationWriter385
                 points=Bindings(edit.Bindings!,before.Kind,space,db,tr,cancel);MatchPoints(dimension,points);
             }
             else Need(before.Flags==3,"Update/detach needs a current supported active native association.");
-            var sources=SourcesFor(dimension,points,before.Association,db,tr,cancel);budget.Add(new{edit,before,sources});result.Add(new(index,edit,id,before,points,sources));
+            var sources=SourcesFor(dimension,points,before.Association,db,tr,cancel);
+            // ObjectId, Point3d and native database pointers are transaction state.
+            // Count only their wire representation and the retained CAD evidence.
+            budget.Add(new { edit, association_handle=Id(before.Association), before.Flags, before.Token,
+                before.Kind, before.Dimension, before.Sources, before.AssociationData, before.Metadata, before.Containers,
+                requested_sources=sources, points=points.Select(p=>new { p.Role, source=Id(p.Source),
+                    snap=p.Snap.ToString(), pick=Point(p.Pick), evaluated=Point(p.Evaluated), p.NearParameter }).ToArray() });
+            result.Add(new(index,edit,id,before,points,sources));
         }
         return result.ToArray();
     }
@@ -51,10 +58,11 @@ internal static class CadDimensionAssociationWriter385
         using var data=entity.XData;new ModelInventoryBudget(cancel).Add(data==null?null:NativeOwnedMetadata.Buffer(data,cancel,_=>{}));
         NativeOwnedMetadata.Capture(entity,tr,cancel,observeAssocManager:true);
     }
-    internal static void CompleteCreation(Dimension dimension,DimensionSpec spec,Database db,Transaction tr,Action cancel)
+    internal static Action CompleteCreation(Dimension dimension,DimensionSpec spec,Database db,Transaction tr,Action cancel)
     {
-        if(spec.Associations==null)return;var before=Capture(dimension,db,tr,cancel);Need(before.Association.IsNull,"The newly created dimension already has an unexpected native association.");
-        var points=Bindings(spec.Associations,spec.Kind,dimension.OwnerId,db,tr,cancel);MatchPoints(dimension,points);var sources=SourcesFor(dimension,points,ObjectId.Null,db,tr,cancel);
+        var requested=spec.Associations??throw new ArgumentException("Expected explicit dimension point associations.");
+        var before=Capture(dimension,db,tr,cancel);Need(before.Association.IsNull,"The newly created dimension already has an unexpected native association.");
+        var points=Bindings(requested,spec.Kind,dimension.OwnerId,db,tr,cancel);MatchPoints(dimension,points);var sources=SourcesFor(dimension,points,ObjectId.Null,db,tr,cancel);
         var posted=Post(dimension,points,db,tr,cancel);Snapshot after;
         try
         {
@@ -70,6 +78,14 @@ internal static class CadDimensionAssociationWriter385
             });
         }
         Retained(before.Metadata,after.Metadata,after.Association,tr,db,cancel,before.Containers);VerifySources(sources,SourcesFor(dimension,points,after.Association,db,tr,cancel),after.Association,tr,db,cancel);
+        var dimensionId=dimension.ObjectId;var associationId=posted.Association;
+        return ()=>
+        {
+            using var final=db.TransactionManager.StartTransaction();
+            var current=(Dimension)final.GetObject(dimensionId,OpenMode.ForRead);var snapshot=Capture(current,db,final,cancel);
+            Need(snapshot.Association==associationId,"Created dimension association identity changed at command completion.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+            VerifyPersisted(current,points,snapshot,final,cancel);
+        };
     }
     static void VerifyBound(PointState[] expected,Snapshot after)
     {
@@ -82,6 +98,11 @@ internal static class CadDimensionAssociationWriter385
                 "Native association differs from the requested source ObjectId, snap or measured point.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
         }
     }
+    static void VerifyPersisted(Dimension dimension,PointState[] requested,Snapshot snapshot,Transaction tr,Action cancel)
+    {
+        VerifyBound(requested,snapshot);MatchPoints(dimension,snapshot.Points);
+        VerifyConnections(Connections(dimension,snapshot.Association,requested,tr,cancel),"after_command_ended");
+    }
     static Result Outcome(ModifyArguments args,Binding[] bindings,Snapshot[] after,WriteJob job,ReadContext context)
     {
         var refs=bindings.Select(binding=>new EntityRef(args.BridgeId,args.DocumentId,binding.Edit.Handles.Single())).ToArray();
@@ -93,7 +114,7 @@ internal static class CadDimensionAssociationWriter385
     {cancel();Need(JsonSerializer.SerializeToUtf8Bytes(result,Wire.Json).Length<=Wire.PayloadBudget-4096,"The complete association receipt exceeds actual transport bytes; reduce the group before writing.","RESPONSE_LIMIT_EXCEEDED");}
     internal static Result Execute(ModifyArguments args,DocumentState state,WriteJob job,ReadContext context,JsonLog log)
     {
-        Transaction? tr=null;bool started=false;string stage="preparation";Exception? failure=null;
+        Transaction? tr=null;bool started=false;string stage="preparation";Exception? failure=null;Result? deferred=null;
         try
         {
             var db=state.Document.Database;tr=db.TransactionManager.StartTransaction();var bindings=Resolve(args,db,tr,job.CheckCancellation);
@@ -102,7 +123,11 @@ internal static class CadDimensionAssociationWriter385
             {
                 job.CheckCancellation();var dimension=(Dimension)tr.GetObject(binding.Id,OpenMode.ForWrite);Need(Capture(dimension,db,tr,job.CheckCancellation).Token==binding.Before.Token,"Native association changed before mutation.","DIMENSION_ASSOCIATION_CHANGED");
                 stage="resident_native_association";started=true;
-                if(binding.Edit.Action=="associate_dimension")Post(dimension,binding.Points,db,tr,job.CheckCancellation);
+                if(binding.Edit.Action=="associate_dimension")
+                {
+                    var posted=Post(dimension,binding.Points,db,tr,job.CheckCancellation);
+                    FinishNewAttachment(dimension,posted.Association,binding.Points,db,tr,job.CheckCancellation);
+                }
                 else if(binding.Edit.Action=="update_dimension_association")Refresh(dimension,binding.Before,db,tr,job.CheckCancellation);
                 else Detach(dimension,binding.Before,db,tr,job.CheckCancellation);
                 stage="native_association_readback";var current=Capture(dimension,db,tr,job.CheckCancellation,binding.Edit.Action=="detach_dimension_association"?binding.Before.Association:ObjectId.Null);
@@ -113,10 +138,37 @@ internal static class CadDimensionAssociationWriter385
                 VerifySources(binding.Sources,SourcesFor(dimension,binding.Points,binding.Edit.Action=="detach_dimension_association"?binding.Before.Association:current.Association,db,tr,job.CheckCancellation),binding.Edit.Action=="detach_dimension_association"?binding.Before.Association:current.Association,tr,db,job.CheckCancellation);
                 after.Add(current);
             }
-            var result=Outcome(args,bindings,after.ToArray(),job,context);Bytes(result,job.CheckCancellation);stage="native_commit";job.BeginCommit();tr.Commit();job.RecordCommit(result);
+            var expected=after.ToArray();Bytes(Outcome(args,bindings,expected,job,context),job.CheckCancellation);
+            stage="native_commit";job.BeginCommit();tr.Commit();
+            // The resident manager can change flags/point paths on object close
+            // or at command completion. A transaction-local match is insufficient
+            // for a receipt claiming both measured points remain connected.
+            Result VerifyFinished()
+            {
+                using var final=db.TransactionManager.StartTransaction();var observed=new Snapshot[bindings.Length];
+                for(int i=0;i<bindings.Length;i++)
+                {
+                    job.CheckCancellation();var binding=bindings[i];var detached=binding.Edit.Action=="detach_dimension_association";
+                    var dimension=(Dimension)final.GetObject(binding.Id,OpenMode.ForRead);
+                    var current=Capture(dimension,db,final,job.CheckCancellation,detached?binding.Before.Association:ObjectId.Null);
+                    if(detached)Need(current.Flags==0,"The dimension still has active native point references after detach.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+                    else
+                    {
+                        Need(current.Association==expected[i].Association,"The posted dimension association identity changed at command completion.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+                        VerifyPersisted(dimension,binding.Points,current,final,job.CheckCancellation);
+                    }
+                    VerifyDefinition(binding.Before,current,binding.Edit.Action=="update_dimension_association");
+                    observed[i]=current;
+                }
+                var result=Outcome(args,bindings,observed,job,context);Bytes(result,job.CheckCancellation);
+                job.RecordCommit(result);return result;
+            }
+            deferred=NativePostCommandVerification422.Defer(job,VerifyFinished);
         }
         catch(Exception error){failure=error;}
         Exception? cleanup=null;try{tr?.Dispose();}catch(Exception error){cleanup=error;}
+        if(deferred!=null&&cleanup==null)return deferred;
+        if(deferred!=null)NativePostCommandVerification422.Clear(job);
         if(job.CommittedResult is {} committed)
         {
             if(cleanup!=null){committed=committed with{warnings=committed.warnings.Append("POST_COMMIT_CLEANUP_FAILED: Native association commit is recorded; inspect current dimensions before another mutation.").ToArray()};job.RecordCommit(committed);}return committed;

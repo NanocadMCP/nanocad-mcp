@@ -33,6 +33,10 @@ internal static class Phase4Tests
                 Check(Validation.Parse("get_structure", Wire.Element(new { document_id = doc, section, page_size = 2 })).Section == section, "section lost");
             var block = Validation.Parse("inspect_block", Wire.Element(new { document_id = doc, handle = "000a", max_depth = 0, max_nodes = 1 }));
             Check(block.BlockHandle == "A" && block.MaxDepth == 0 && block.MaxNodes == 1, "block defaults/normalization");
+            var selected = Validation.Parse("inspect_block", Wire.Element(new { document_id = doc, handle = "a", occurrence_path = new[] { "0a", "bb" } }));
+            Check(selected.MaxDepth == 0 && selected.OccurrencePath!.SequenceEqual(new[] { "A", "BB" }), "selected occurrence path");
+            Domain("INVALID_ARGUMENT", () => Validation.Parse("inspect_block", Wire.Element(new { document_id = doc, handle = "A", occurrence_path = new[] { "B" } })));
+            Domain("INVALID_ARGUMENT", () => Validation.Parse("get_structure", Wire.Element(new { document_id = doc, section = "layers", record_handle = "A", page_size = 1 })));
             Domain("INVALID_ARGUMENT", () => Validation.Parse("get_structure", Wire.Element(new { section = "blocks" })));
             Domain("INVALID_ARGUMENT", () => Validation.Parse("get_structure", Wire.Element(new { document_id = doc, section = "commands" })));
             Domain("INVALID_ARGUMENT", () => Validation.Parse("inspect_block", Wire.Element(new { document_id = doc, handle = "A", max_depth = -1 })));
@@ -54,6 +58,13 @@ internal static class Phase4Tests
             Domain("STALE_DOCUMENT", () => pages.Next(first.next_cursor!, doc, "2", null, "blocks", 1));
             var rest = pages.Next(first.next_cursor!, doc, "1", null, "blocks", 500);
             Check(rest.complete && rest.items.Select(i => i.@ref.handle).SequenceEqual(new[] { "10", "FFFFFFFFFFFFFFFF" }), "structural page lost/repeated entries");
+            var keys = new SnapshotPages<string>(handle => handle);
+            var hydrated = new List<string>();
+            StructureRecord Read(string handle) { hydrated.Add(handle); return Item(handle); }
+            var firstKey = keys.First(doc, "1", null, "blocks", new[] { "10", "2", "A" }, 1, Read);
+            Check(firstKey.total_count == 3 && hydrated.SequenceEqual(new[] { "2" }), "first page eagerly read other native records");
+            var remaining = keys.Next(firstKey.next_cursor!, doc, "1", null, "blocks", 2, Read);
+            Check(remaining.complete && hydrated.SequenceEqual(new[] { "2", "A", "10" }), "lazy continuation duplicated or lost a record");
             return Task.CompletedTask;
         });
         await test("structural read validation rejects commands before contacting the host", async () =>

@@ -11,7 +11,13 @@ public static class DrawingViewCreateValidation
 {
     public static CreateDrawingViewsEdit Parse(JsonElement item, string path)
     {
-        StructureWriteValidation.Shape(item,path,"operation","source_handle","source_handles","source_scope","name_prefix","front_origin","top_origin","scale","projected_views","projection_plane","layout_handle");
+        StructureWriteValidation.Shape(item,path,"operation","source_handle","source_handles","source_scope","name_prefix","front_origin","top_origin","scale","projected_views","projection_plane","layout_handle","projection_method");
+        var method = item.TryGetProperty("projection_method",out _) ? StructureWriteValidation.Text(item,"projection_method",path,16) : "third_angle";
+        if (method is not ("first_angle" or "third_angle"))
+            throw StructureWriteValidation.Invalid(path+".projection_method","Choose first_angle or third_angle.");
+        // Only the placement of orthographic views changes. The SDK receives
+        // the original observation direction and the explicitly requested origin.
+        int side = method == "first_angle" ? -1 : 1;
         bool single=item.TryGetProperty("source_handle",out _), multiple=item.TryGetProperty("source_handles",out var sourcesValue), whole=item.TryGetProperty("source_scope",out _);
         if((single?1:0)+(multiple?1:0)+(whole?1:0)!=1)
             throw StructureWriteValidation.Invalid(path,"Choose exactly one of source_handle, source_handles or source_scope.");
@@ -47,7 +53,7 @@ public static class DrawingViewCreateValidation
         }
         var front=Point(StructureWriteValidation.Required(item,"front_origin",path),"front_origin");
         Point2? top=item.TryGetProperty("top_origin",out var topValue)?Point(topValue,"top_origin"):null;
-        if(top!=null && (front.X!=top.X || top.Y-front.Y<1e-3))throw StructureWriteValidation.Invalid(path,"Top view must be above the front view with the same X and at least 0.001 mm separation.");
+        if(top!=null && (front.X!=top.X || side*(top.Y-front.Y)<1e-3))throw StructureWriteValidation.Invalid(path+".top_origin","Align Top with Front on X and place it on the selected projection method's side with at least 0.001 mm separation.");
         SketchPlaneSpec? plane=null;
         if(item.TryGetProperty("projection_plane",out var planeValue))
         {
@@ -78,9 +84,9 @@ public static class DrawingViewCreateValidation
                 var dx=origin.X-front.X;var dy=origin.Y-front.Y;
                 bool valid=direction switch
                 {
-                    "bottom"=>dx==0 && dy<=-0.001,
-                    "left"=>dx<=-0.001 && dy==0,
-                    "right"=>dx>=0.001 && dy==0,
+                    "bottom"=>dx==0 && side*dy<=-0.001,
+                    "left"=>side*dx<=-0.001 && dy==0,
+                    "right"=>side*dx>=0.001 && dy==0,
                     "iso_top_left"=>dx<=-0.001 && dy>=0.001,
                     "iso_top_right"=>dx>=0.001 && dy>=0.001,
                     "iso_bottom_left"=>dx<=-0.001 && dy<=-0.001,

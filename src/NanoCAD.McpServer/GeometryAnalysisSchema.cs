@@ -14,7 +14,7 @@ internal static class GeometryAnalysisSchema
        "bridge_instance_id":{"type":"string","format":"uuid"},
        "document_id":{"type":"string","format":"uuid"},
        "expected_revision":{"type":"string","pattern":"^[0-9]{1,20}$"},
-       "mode":{"type":"string","enum":["metrics","intersections","distance","relations","containment"]},
+       "mode":{"type":"string"},
        "handles":{"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","pattern":"^[0-9A-Fa-f]{1,16}$"}},
        "point":{"type":"array","minItems":3,"maxItems":3,"items":{"type":"number","minimum":-1e12,"maximum":1e12}}
      },
@@ -23,6 +23,7 @@ internal static class GeometryAnalysisSchema
     """)!.AsObject();
         var frame=WorkplaneSchema.Input();frame["description"]="Optional plane for relations/containment on native Line/Circle/Arc/Polyline. Origin uses drawing units; axes are perpendicular unit WCS vectors. Input point and all output witness points remain WCS triples. No projection or UCS change. Omit for existing WCSXY/Z0 behavior.";
         root["properties"]!["workplane"]=frame;
+        root["properties"]!["mode"]!["enum"] = new JsonArray(NanoCAD.Contracts.GeometryAnalysisValidation.CurveModes.Select(m => (JsonNode?)JsonValue.Create(m)).ToArray());
         SolidGeometryAnalysisSchema.Extend(root);
         return JsonSerializer.SerializeToElement(new JsonObject{["type"]="object",["oneOf"]=new JsonArray(root,BoundaryTraceSchema408.Input(),SolidMeasurementSchema409.Input())});
     }

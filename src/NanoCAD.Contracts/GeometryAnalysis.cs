@@ -10,10 +10,14 @@ public sealed record GeometryAnalysisArguments(Arguments Read, string Mode, doub
 
 public static class GeometryAnalysisValidation
 {
+    public static IReadOnlyList<string> CurveModes { get; } = Array.AsReadOnly<string>(["metrics", "intersections", "distance", "relations", "containment"]);
+    public const string TraceBoundaryMode = "trace_boundary";
+    public static IReadOnlyList<string> Modes { get; } = CurveModes.Concat(SolidGeometryAnalysisValidation.Modes)
+        .Append(TraceBoundaryMode).Concat(SolidMeasurementValidation409.Modes).ToArray();
     public static GeometryAnalysisArguments Parse(JsonElement input)
     {
         if (input.ValueKind != JsonValueKind.Object) throw new DomainException("INVALID_ARGUMENT", "Arguments must be an object.");
-        if(input.TryGetProperty("mode",out var boundaryMode)&&boundaryMode.ValueKind==JsonValueKind.String&&boundaryMode.GetString()=="trace_boundary")
+        if(input.TryGetProperty("mode",out var boundaryMode)&&boundaryMode.ValueKind==JsonValueKind.String&&boundaryMode.GetString()==TraceBoundaryMode)
             return BoundaryTraceValidation408.Parse(input);
         if(input.TryGetProperty("mode",out var measurementMode)&&measurementMode.ValueKind==JsonValueKind.String&&SolidMeasurementValidation409.Handles(measurementMode.GetString()))
             return SolidMeasurementValidation409.Parse(input);
@@ -29,8 +33,8 @@ public static class GeometryAnalysisValidation
             throw new DomainException("INVALID_ARGUMENT", "Geometry analysis requires explicit bridge_instance_id and expected_revision.");
         if(input.TryGetProperty("mode",out var solidMode)&&solidMode.ValueKind==JsonValueKind.String&&SolidGeometryAnalysisValidation.Handles(solidMode.GetString()))
             return SolidGeometryAnalysisValidation.Parse(args,solidMode.GetString()!,input);
-        if (!input.TryGetProperty("mode", out var mode) || mode.ValueKind != JsonValueKind.String || mode.GetString() is not ("metrics" or "intersections" or "distance" or "relations" or "containment"))
-            throw new DomainException("INVALID_ARGUMENT", "mode must be metrics, intersections, distance, relations or containment.");
+        if (!input.TryGetProperty("mode", out var mode) || mode.ValueKind != JsonValueKind.String || !CurveModes.Contains(mode.GetString()))
+            throw new DomainException("INVALID_ARGUMENT", "Unknown geometry mode. Supported modes: " + string.Join(", ", Modes) + ".");
         if (mode.GetString() is "intersections" or "distance" or "relations" && args.Handles is not { Length: 2 })
             throw new DomainException("INVALID_ARGUMENT", "Pair analysis requires exactly two distinct handles; metrics accepts a nonempty handle set.");
         double[]? point = null;

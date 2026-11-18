@@ -3,6 +3,9 @@ using System.Text.Json.Serialization;
 
 namespace NanoCAD.Contracts;
 
+public sealed record ObservedTableCell(int row, int column, string origin, string? formula, string? data_type,
+    string? unit_type, JsonElement? native_value, string? value_source, string? evaluation_unavailable_reason);
+public sealed record TableCellChange(int operation_index, EntityRef source, string table_token, ObservedTableCell[] cells);
 public sealed record TableFormulaReplacement354(int Row,int Column,string Formula);
 public sealed record TableFormulaTopologyChange354(int before_row,int before_column,int row,int column,
     string action,string before_formula,string planned_formula,string formula,string data_type,string unit_type,

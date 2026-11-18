@@ -90,7 +90,7 @@ internal static class CadTableFormulaMTextMetadata362
                 if(!xdataAbsent||!reactorsEmpty||!extensionAllowed||!fieldAllowed)
                     throw new DomainException("NATIVE_TABLE_MISMATCH","Native layout regeneration introduced/lost an MText carrier with retained unrelated metadata or an unselected Field.",false,
                         CadTableFormulaMTextDiagnostics363.Carrier(record,had?prior:actual,had?oldFields:newFields,had?oldContainers:newContainers,
-                            had,xdataAbsent,reactorsEmpty,extensionAllowed,fieldAllowed,old,current,cancel));
+                            had?"lost":"introduced",xdataAbsent,reactorsEmpty,extensionAllowed,fieldAllowed,old,current,cancel));
                 continue;
             }
             var ca=a.GetProperty("common");var cb=b.GetProperty("common");
@@ -102,8 +102,20 @@ internal static class CadTableFormulaMTextMetadata362
             }
             Need(ca.EnumerateObject().Count()==cb.EnumerateObject().Count(),"Native MText carrier metadata observation shape changed.");
             var ea=ca.GetProperty("extension_handle");var eb=cb.GetProperty("extension_handle");
-            Need(Exact(ea,eb)||Extension(ea,oldContainers)&&Extension(eb,newContainers),
-                "Native cell formula editing replaced an MText extension containing unrelated data.");
+            if(!Exact(ea,eb)&&(!Extension(ea,oldContainers)||!Extension(eb,newContainers)))
+            {
+                JsonElement Describe(JsonElement record,Dictionary<string,JsonElement> inventory,HashSet<string> fields,HashSet<string> containers,string phase)
+                {
+                    var common=record.GetProperty("common");var field=record.GetProperty("table_cell_mtext_owner").GetProperty("field_handle");
+                    return CadTableFormulaMTextDiagnostics363.Carrier(record,inventory,fields,containers,phase,
+                        common.GetProperty("xdata").ValueKind==JsonValueKind.Null,common.GetProperty("reactors").GetArrayLength()==0,
+                        Extension(common.GetProperty("extension_handle"),containers),field.ValueKind==JsonValueKind.Null||fields.Contains(field.GetString()!),
+                        old,current,cancel);
+                }
+                throw new DomainException("NATIVE_TABLE_MISMATCH","A retained Table layout MText changed its extension dictionary. Exclusive ownership by the selected formula fields could not be established.",false,
+                    new{carrier_handle=id,before=Describe(a,prior,oldFields,oldContainers,"retained_before_extension_change"),
+                        after=Describe(b,actual,newFields,newContainers,"retained_after_extension_change")});
+            }
             var ra=a.GetProperty("table_cell_mtext_owner");var rb=b.GetProperty("table_cell_mtext_owner");
             foreach(var property in ra.EnumerateObject())
             {

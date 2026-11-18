@@ -20,7 +20,7 @@ internal static class ExternalReferenceSchema385
     static void Optional(JsonObject shape,params string[] names)
     {var required=shape["required"]!.AsArray();foreach(string name in names){var node=required.FirstOrDefault(n=>n?.GetValue<string>()==name);if(node!=null)required.Remove(node);}}
     static JsonObject Name()=>new(){["type"]="string",["minLength"]=1,["maxLength"]=255,["description"]="Unique ordinary native definition name; existing definitions are never replaced."};
-    static JsonObject Path()=>new(){["type"]="string",["minLength"]=4,["maxLength"]=240,["description"]="Existing absolute local drive file path, not UNC/device/relative/ADS. Source files are opened read-only and never modified or removed. Native format loader must be installed."};
+    static JsonObject Path()=>new(){["type"]="string",["minLength"]=1,["maxLength"]=240,["description"]="Local drive path or path relative to the named host DWG. Relative paths are stored for portability and the selected source is loaded from its resolved local file. UNC, device and alternate data streams are excluded."};
     public static IEnumerable<JsonNode> Operations()
     {
         var xref=Input("attach_xref",("source_path",Path()),("name",Name()),("position",Point(2)),("layer",Text(255)),("rotation",Number()),("scale",Number(true)),("overlay",new JsonObject{["type"]="boolean"}));
@@ -34,6 +34,18 @@ internal static class ExternalReferenceSchema385
         {
             var properties=kind=="raster_image"?Object(("position",Point(2)),("rotation",Number()),("width",Number(true)),("height",Number(true))):Object(("position",Point(2)),("rotation",Number()),("scale",Number(true)));
             Optional(properties,kind=="raster_image"?["position","rotation","width","height"]:["position","rotation","scale"]);properties["minProperties"]=1;
+            if (kind=="raster_image")
+            {
+                var pair=Object(("pixel",Point(2)),("drawing",Point(2)));
+                var controls=Object(("anchors",new JsonObject{["type"]="array",["items"]=pair.DeepClone(),["minItems"]=2,["maxItems"]=2}),
+                    ("check_point",pair),("max_check_error_mm",new JsonObject{["type"]="number",["minimum"]=0}));
+                Optional(controls,"check_point","max_check_error_mm");
+                controls["dependentRequired"]=new JsonObject{["max_check_error_mm"]=new JsonArray("check_point")};
+                controls["description"]="Two native pixel coordinates and their corresponding drawing XY coordinates (mm) define a uniform scale and rotation. An independent check_point reports its residual. A specified maximum stops the change if exceeded.";
+                properties["properties"]!["calibration"]=controls;
+                properties["if"]=new JsonObject{["required"]=new JsonArray("calibration")};
+                properties["then"]=new JsonObject{["maxProperties"]=1};
+            }
             var edit=Input("set_reference_placement",("reference_kind",new JsonObject{["const"]=kind}),("handle",Handle()),("reference_token",Token()),("properties",properties));
             edit["description"]="Edit one current top-level native reference with its entity token. Retain source/definition links, stored display/clipping and user data; WCS XY/Z0. Sparse properties preserve unspecified placement. No source file rewrite.";yield return edit;
         }
@@ -51,12 +63,19 @@ internal static class ExternalReferenceSchema385
         foreach(string operation in new[]{"reload_xref","detach_xref"})
         {
             var edit=Input(operation,("reference_kind",new JsonObject{["const"]="xref"}),("handle",Handle()),("reference_token",Token()));
-            edit["description"]=operation=="detach_xref"?"Definition handle/token from get_structure blocks or an insertion's geometry.definition. Native detach removes this direct xref definition and ALL disclosed top-level occurrences in Model/Paper. It does not delete the source file. Nested/custom occurrence ownership is outside this lifecycle.":"Reload the direct xref DEFINITION from its existing source file; all disclosed occurrences retain placement/display/user data. Does not reattach, bind or modify the source.";yield return edit;
+            if(operation=="reload_xref") edit["properties"]!["source_path"]=Path();
+            edit["description"]=operation=="detach_xref"?"Definition handle/token from get_structure blocks or an insertion's geometry.definition. Native detach removes this direct xref definition and ALL disclosed top-level occurrences in Model/Paper. It does not delete the source file. Nested/custom occurrence ownership is outside this lifecycle.":"Reload the direct xref definition. Optional source_path reassigns this same definition to the selected DWG; all disclosed occurrences retain placement/display/user data. Does not reattach, bind or modify the source.";yield return edit;
         }
-        var reload=Input("reload_reference",("reference_kind",Enum("raster_image","dwf","dgn","pdf")),("handle",Handle()),("reference_token",Token()));reload["description"]="Reload the native image/underlay DEFINITION with its definition token, affecting every disclosed linked occurrence. Source path/item and placements remain. No source write or implicit save.";yield return reload;
+        var reload=Input("reload_reference",("reference_kind",Enum("raster_image","dwf","dgn","pdf")),("handle",Handle()),("reference_token",Token()));reload["properties"]!["source_path"]=Path();reload["description"]="Reload the native image/underlay definition and every disclosed linked occurrence. Optional source_path reassigns this same definition to the selected file. The item name and placements remain. No source write or implicit save.";yield return reload;
         var delete=Input("delete_reference",("reference_kind",Enum("xref","raster_image","dwf","dgn","pdf")),("handle",Handle()),("reference_token",Token()));delete["description"]="Erase exactly one disclosed top-level reference ENTITY using its entity token. Retain the definition, source files and other occurrences; no purge. Use detach_xref to remove an entire xref definition.";yield return delete;
     }
-    static JsonObject Definition(JsonObject reference)=>Object(("definition_ref",reference.DeepClone()),("native_type",Text()),("reference_kind",Enum("xref","raster_image","dwf","dgn","pdf")),("name",Text()),("source_path",Text()),("item_name",Nullable(Text())),("overlay",new JsonObject{["type"]="boolean"}),("reference_refs",new JsonObject{["type"]="array",["items"]=reference.DeepClone()}),("loaded",Nullable(new JsonObject{["type"]="boolean"})),("image_pixel_size",Nullable(Point(2))),("status",Nullable(Text())),("reference_token",Nullable(Token())),("editing_unavailable_reason",Nullable(Text())));
+    static JsonObject Definition(JsonObject reference)
+    {
+        var value=Object(("definition_ref",reference.DeepClone()),("native_type",Text()),("reference_kind",Enum("xref","raster_image","dwf","dgn","pdf")),("name",Text()),("source_path",Text()),("item_name",Nullable(Text())),("overlay",new JsonObject{["type"]="boolean"}),("reference_refs",new JsonObject{["type"]="array",["items"]=reference.DeepClone()}),("loaded",Nullable(new JsonObject{["type"]="boolean"})),("image_pixel_size",Nullable(Point(2))),("status",Nullable(Text())),("reference_token",Nullable(Token())),("editing_unavailable_reason",Nullable(Text())));
+        value["properties"]!["resolved_source_path"]=Nullable(Text());
+        value["properties"]!["native_active_source_path"]=Nullable(Text());
+        return value;
+    }
     public static JsonObject DefinitionRead(JsonObject reference)=>Definition(reference);
     public static JsonObject Read(JsonObject reference)
     {

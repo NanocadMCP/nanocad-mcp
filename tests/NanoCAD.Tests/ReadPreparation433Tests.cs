@@ -152,6 +152,12 @@ internal static class ReadPreparation433Tests
                 variables = new[] { new { mc_id = Variable, name = "Height", expression, value = 36d, value_available = true, value_unit = "degrees", owner_kind = "feature", control_kind = "revolution_angle", host_object_id = Sketch } }
             }, Context());
             var variableSelection = Select("get_model_variables", "set_model_parameter");
+            var rename = Select("get_model_variables", "modify_entities", "name_model_parameter");
+            var named = ReadPreparation433.Build("get_model_variables", rename, variables);
+            CheckSources(named, variables, rename);
+            Check(named["candidate_count"]!.GetValue<int>() == 1 &&
+                Binding(named, "/operations/0/expected_name")?["value"]?.GetValue<string>() == "Height" &&
+                Binding(named, "/operations/0/variable_id")?["value"]?.GetValue<string>() == Variable, "Variable rename lost its observed name or identity.");
             var preparation = ReadPreparation433.Build("get_model_variables", variableSelection, variables);
             CheckSources(preparation, variables, variableSelection);
             var expected = Binding(preparation, "expected_expression");
@@ -195,6 +201,26 @@ internal static class ReadPreparation433Tests
             CheckSources(textHints, drawing, selectedText);
             Check(Binding(textHints, "expected_text")?["value"]!.GetValue<string>() == text && Binding(textHints, "text") is null, "Drawing content became an instruction or desired replacement.");
             Check(textHints["operation"]!.GetValue<string>() == "modify_entities" && textHints["variant"]!.GetValue<string>() == "replace_text" && Binding(textHints, "operation_id") is null, "Untrusted drawing content changed the selected operation or allocated write identity.");
+            return Task.CompletedTask;
+        });
+
+        await test("circle-to-circle dimension preparation distinguishes the dimension from its source circles", () =>
+        {
+            object Row(string handle,string type,object geometry) => new { handle, success = true,
+                entity = new { @ref = Ref(handle), type, coordinate_system = "WCS", space = "model", geometry } };
+            var result = Result.Ok("association", new { items = new[] {
+                Row("A1","Dimension",new { dimension_kind="AlignedDimension", measurement=40, association=new { association_token=Token } }),
+                Row("B1","Circle",new { center=new[]{0,0,0},radius=3 }),
+                Row("B2","Circle",new { center=new[]{40,0,0},radius=3 }) }, complete=true,failed_count=0 }, Context());
+            var selection=Select("inspect_objects","modify_entities","associate_dimension");
+            var hints=ReadPreparation433.Build("inspect_objects",selection,result);
+            CheckSources(hints,result,selection);
+            Check(Binding(hints,"association_token")?["value"]!.GetValue<string>()==Token,"Lost the current dimension token.");
+            var candidates=Objects(hints).Where(o=>o["target"] is JsonObject && o["current_values"] is JsonArray).ToArray();
+            var sources=candidates.Where(c=>c["target"]!["scope"]?.GetValue<string>()=="explicitly_inspected_source_for_binding").ToArray();
+            Check(sources.Length==2 && sources.All(c=>c["bindings"]!.AsArray().Count==0),"A source circle became the write target.");
+            var observed=sources.SelectMany(s=>s["current_values"]!.AsArray()).Where(v=>v!["name"]!.GetValue<string>()=="source_handle").Select(v=>v!["value"]!.GetValue<string>()).ToArray();
+            Check(observed.SequenceEqual(new[]{"B1","B2"}),"Explicit source handles were dropped or replaced.");
             return Task.CompletedTask;
         });
 

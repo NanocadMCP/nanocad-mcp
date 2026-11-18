@@ -34,7 +34,8 @@ internal static class CreateSchema
             {
                 ["type"] = "array",
                 ["minItems"] = 2,
-                ["items"] = Object(new JsonObject { ["point"] = Point(), ["bulge"] = Number(-1000, 1000) }, "point")
+                ["items"] = NativeCurveSnapSchema.WithPointAlternative(Object(new JsonObject { ["point"] = Point(), ["bulge"] = Number(-1000, 1000) }, "point"), "point"),
+                ["description"] = "Ordered vertices. Each outgoing bulge belongs to that vertex, including the last-to-first segment when closed. Two distinct vertices may close a non-retracing circular segment or lens."
             }, true),
                 ("closed", new JsonObject { ["type"] = "boolean", ["default"] = false }, false)),
             Entity("Text", ("text", Text(4096), true), ("position", Point(), true), ("height", Number(1e-9), true), ("text_style", style, false), ("format", TextFormatSchema442.CreateFormat(), false)));
@@ -112,15 +113,24 @@ internal static class CreateSchema
                     ["minimum"] = 0,
                     ["maximum"] = int.MaxValue,
                     ["description"] = $"Current visible {geometry} index from get_drawing_views."
-                }, true),
+                }, kind != "projected_angular"),
                 ("dimline_point", placement, true));
             if (kind is "projected_radial" or "projected_arc_length" or "projected_angular")
-                projected["description"] = "Create an associative native DWG dimension from the actual visible circular primitive in an ordinary auto-updating Paper view of one local body at 1:1. " +
+                projected["description"] = "Create an associative native DWG dimension from the actual visible circular primitive in an ordinary auto-updating Paper view of one local body, including 1:1 and scaled Paper views (native DScale is the denominator). " +
                     (kind == "projected_radial" ? "Measure the native radius of a full circle or finite circular arc. " :
                         kind == "projected_arc_length" ? "Measure the length of the selected finite non-full circular arc. " :
-                        "Measure the angle subtended by the selected finite non-full circular arc. This is an arc-based angle, not a two-line angle. ") +
+                        "Measure the angle subtended by the selected finite non-full circular arc. ") +
                     "Use arc_index from the current get_drawing_views geometry page and place dimline_point in sheet XY. Native original-view parameters retain the association; this does not invent a 3D source-edge key. " +
                     "No independent defining coordinates, generic _snap inputs, workplane, text override or dimension_style is accepted. Create projected dimensions as their own group. Native preflight verifies the actual primitive, source/owner and placement. No implicit save.";
+            if (kind == "projected_angular")
+            {
+                projected["properties"]!["line_indices"]=new JsonObject { ["type"]="array", ["minItems"]=2, ["maxItems"]=2, ["uniqueItems"]=true,
+                    ["items"]=new JsonObject { ["type"]="integer", ["minimum"]=0, ["maximum"]=int.MaxValue },
+                    ["description"]="Two distinct current visible projected lines sharing one endpoint in this Paper view; the first line anchors the common vertex." };
+                projected["oneOf"]=new JsonArray(new JsonObject { ["required"]=new JsonArray("arc_index") },new JsonObject { ["required"]=new JsonArray("line_indices") });
+                projected["properties"]!["dimline_point"]!["description"]="Paper XY point strictly inside the intended angular sector.";
+                projected["description"]="Create an associative angular dimension on one ordinary auto-updating Paper view, including 1:1 and scaled views. Supply exactly one selector from the current original-view geometry: arc_index for a finite circular arc, or line_indices for two straight rays with a common endpoint. The second mode binds the two outer ends and the first line's common endpoint. Place dimline_point strictly inside the desired sector. Native verification reads the resident view anchor identities and measured sector for a two-line angle.";
+            }
             entities.Add(projected);
         }
         JsonObject Points(int min) => new() { ["type"] = "array", ["minItems"] = min, ["items"] = Point() };

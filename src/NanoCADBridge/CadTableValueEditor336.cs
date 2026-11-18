@@ -124,7 +124,8 @@ internal static class CadTableValueEditor336
                 "Native appearance changed raw scalar values/types/units, rotation/scale or unrelated content overrides.","NATIVE_TABLE_MISMATCH");
         }
     }
-    internal static string[] Apply(Table table,TableValueEditingSpec edit,Database db,Transaction tr,Action cancel)
+    internal static string[] Apply(Table table,TableValueEditingSpec edit,Database db,Transaction tr,Action cancel,
+        int operationIndex, EntityRef target, out TableCellChange change)
     {
         var before=Read(table,cancel);var warnings=Validate(table,before,edit,db,tr,cancel).ToList();var metadata=Metadata(table,tr,cancel);
         var id=table.ObjectId;var owner=table.OwnerId;
@@ -144,6 +145,8 @@ internal static class CadTableValueEditor336
         }
         cancel();table.GenerateLayout();cancel();table.RecomputeTableBlock(true);cancel();
         var after=Read(table,cancel);
+        if(edit.Cells is {} inputs)
+            after=CadTableFormulaEvaluation.AfterWrite(table,tr,after,inputs.Select(cell=>(cell.Row,cell.Column)),warnings,cancel);
         try
         {
             if(edit.TableStyleHandle!=null)foreach(var cell in after.Cells)
@@ -153,15 +156,17 @@ internal static class CadTableValueEditor336
                     Coverage(table,cell,CadStructureWriter.Find(db,cell.format.text_style_handle),tr,cancel,warnings);
             }
             var selected=edit.TableStyleHandle==null?edit.Cells!.Select(cell=>(cell.Row,cell.Column)).ToArray():Array.Empty<(int Row,int Column)>();
-            CadTableFormulaField358.Verify(metadata,Metadata(table,tr,cancel),before,after,selected,selected,cancel);
+            var priorCells=CadTableFormulaField358.Verify(metadata,Metadata(table,tr,cancel),before,after,selected,selected,cancel,
+                retainedCarrierWarnings:edit.Cells!=null?warnings:null);
             if(before.Values.Any(value=>value?.native_formula_field!=null)||after.Values.Any(value=>value?.native_formula_field!=null))warnings.Add(CadTableFormulaField358.Warning);
             Need(table.ObjectId==id&&table.OwnerId==owner,
                 "Native scalar/style editing changed table identity, owning space or retained owned metadata.","NATIVE_TABLE_MISMATCH");
             bool reflow=CadTableNativeLayout356.VerifyTopology(before,after,cancel);
             if(reflow)warnings.Add(CadTableNativeLayout356.Warning);
             if(edit.TableStyleHandle is {} requestedStyle)VerifyStyle(before,after,requestedStyle,cancel);
-            else VerifyValues(before,after,edit.Cells!,cancel,warnings);
+            else VerifyValues(priorCells,after,edit.Cells!,cancel,warnings);
             CadTableFormulaEditor343.ObserveEvaluation(before,after,cancel,warnings);
+            change = CadTableEditingReader.ObservedChanges(operationIndex, target, before, after, selected, cancel);
             return before.Values.Any(value=>value?.formula!=null)||after.Values.Any(value=>value?.formula!=null)?
                 CadTableFormulaEditor343.BoundedWarnings(warnings,cancel):warnings.Distinct(StringComparer.Ordinal).ToArray();
         }

@@ -23,6 +23,14 @@ internal static class TableTopology354Tests
             Refuse("TABLE_FORMULA_REFERENCE_REMOVED",()=>NativeTableFormula350.RemapStructural("COUNT(A3:B4)",true,false,2,2));
             return Task.CompletedTask;
         });
+        await test("cut-list insertion preserves row products and extends the total range",()=>
+        {
+            Need(NativeTableFormula350.RemapStructural("=B3*C3",true,true,3,1)=="=B3*C3","The first cut row must remain unchanged.");
+            Need(NativeTableFormula350.RemapStructural("=B4*C4",true,true,3,1)=="=B5*C5","The moved quantity and length must keep their row.");
+            Need(NativeTableFormula350.RemapStructural("=SUM(D3:D4)",true,true,3,1)=="=SUM(D3:D5)","The total must include the inserted schedule row.");
+            Refuse("TABLE_FORMULA_REFERENCE_REMOVED",()=>NativeTableFormula350.RemapStructural("=B5*C5",false,false,2,1));
+            return Task.CompletedTask;
+        });
         await test("block354 replacements use final coordinates with complete cycle and boundary admission",()=>
         {
             var input=Wire.Element(new{operation="delete_table_rows",handles=new[]{"A5"},table_token=new string('A',64),index=0,count=1,

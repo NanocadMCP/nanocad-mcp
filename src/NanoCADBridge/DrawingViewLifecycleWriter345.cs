@@ -289,11 +289,13 @@ internal static class DrawingViewLifecycleWriter345
         Need(child.Native.HostSolidID == parent.Native.HostSolidID, "New child changed its parent's native history host.", "DRAWING_VIEW_UPDATE_MISMATCH");
         var dbParent = child.Native.DbEntity.ParentId;
         Need(dbParent.IsNull || dbParent == parent.Id || !child.Native.HostSolidID.IsNull && dbParent == child.Native.HostSolidID, "New child has an unrelated native storage parent.", "DRAWING_VIEW_UPDATE_MISMATCH");
-        Need(child.Native.Name == edit.Name && child.Native.DirectionType == Direction(edit.Direction) && child.Native.DbEntity.DScale == edit.ModelScale && child.Native.DbEntity.Scale == 1 && !child.Native.AlignOnParent,
+        Need(child.Native.Name == edit.Name && child.Native.DirectionType == Direction(edit.Direction) && child.Native.DbEntity.DScale == edit.ModelScale && child.Native.DbEntity.Scale == 1 && child.Native.AlignOnParent == edit.AlignOnParent,
             "New child name/direction/scale/alignment differs from the request.", "DRAWING_VIEW_UPDATE_MISMATCH");
         Need(child.Native.ChildViews.Count == 0 && Ids(parent.Native.GetTop3dEntitiesInView(), "Parent sources").SequenceEqual(Ids(child.Native.GetTop3dEntitiesInView(), "Child sources")), "New child source set/descendants differ.", "DRAWING_VIEW_UPDATE_MISMATCH");
         var plane = child.Native.ViewPlane; var expected = new Plane3d(new Point3d(edit.Origin.X, edit.Origin.Y, parent.Native.ViewPlane.Origin.Z), parent.Native.ViewPlane.DirU, parent.Native.ViewPlane.DirV);
-        Need(ModelParameterSnapshot.Equivalent(Wire.Element(Plane(plane)), Wire.Element(Plane(expected))), "New child placed view plane differs from request.", "DRAWING_VIEW_UPDATE_MISMATCH");
+        if (!ModelParameterSnapshot.Equivalent(Wire.Element(Plane(plane)), Wire.Element(Plane(expected))))
+            throw new DomainException("DRAWING_VIEW_UPDATE_MISMATCH", "New child placed view plane differs from request.", false,
+                new { component = "child_view_plane", expected = Plane(expected), observed = Plane(plane) });
     }
     private static void Geometry(View view, Action cancel)
     {
@@ -327,8 +329,13 @@ internal static class DrawingViewLifecycleWriter345
                 parent.Native.TryModify((uint)McDbObject.ObjChangesType.Geom);
                 newChild = parent.Native.CreateChildView(Direction(child.Direction), new Plane3d(new Point3d(child.Origin.X, child.Origin.Y, plane.Origin.Z), plane.DirU, plane.DirV));
                 Need(newChild != null && !newChild.ID.IsNull && plan.Before.Views.All(view => view.Id != newChild.ID), "Native child factory returned an invalid/existing identity.", "OBJECT_IDENTITY_MISMATCH");
-                newChild!.AlignOnParent = false; newChild.Name = child.Name; newChild.DbEntity.DScale = child.ModelScale; newChild.DbEntity.Scale = 1;
+                newChild!.AlignOnParent = child.AlignOnParent;
                 Need(newChild.DbEntity.AddToCurrentDocument(), "Native child insertion refused.", "NATIVE_INSERT_FAILED");
+                // Registration assigns nanoCAD's numbered default name. Set the
+                // caller's name on the resident view, as for sibling creation.
+                newChild.Name = child.Name;
+                newChild.DbEntity.DScale = child.ModelScale;
+                newChild.DbEntity.Scale = 1;
             }
             McObjectManager.UpdateAll(); job.CheckCancellation();
             (StructureChange[] Changes, DrawingViewLifecycleChange345[] Lifecycle, McObjectId[] Detached) Readback()
@@ -373,6 +380,7 @@ internal static class DrawingViewLifecycleWriter345
                 {
                     cause,
                     error_type = error.GetType().Name,
+                    cause_message = error is DomainException native ? native.Error.message : null,
                     cleanup_error = cleanup?.GetType().Name,
                     verification = error is DomainException diagnostic && diagnostic.Error.code is "DRAWING_VIEW_UPDATE_MISMATCH" or "DOCUMENT_CONTEXT_MISMATCH" ? diagnostic.Error.details : null
                 });

@@ -107,7 +107,7 @@ public sealed class Entry : IExtensionApplication
                 geometry_analysis = new
                 {
                     types = new[] { "Line", "Circle", "Arc", "Ellipse", "Spline", "Polyline", "Solid3d" },
-                    modes = new[] { "metrics", "intersections", "distance", "relations", "containment", "solid_containment", "solid_interference", "solid_distance", "face_distance", "wall_thickness", "cylinder_diameter", "axis_axis_distance", "axis_plane_distance" },
+                    modes = GeometryAnalysisValidation.Modes,
                     tolerance_policy = "native_kernel",
                     overlap_classification = true,
                     relations_scope = "WCS_XY_Z0_or_explicit_workplane_finite_Line_Circle_Arc_Polyline",

@@ -6,9 +6,9 @@ namespace NanoCADBridge;
 internal static class CadDimensionTextEditor
 {
     internal static bool Supported(Type type)=>type==typeof(AlignedDimension) || type==typeof(RotatedDimension) || type==typeof(RadialDimension) || type==typeof(DiametricDimension);
-    internal static void CheckSource(Entity entity)
+    internal static void CheckSource(Entity entity, bool allowCreatedLength = false)
     {
-        if(!Supported(entity.GetType()) || entity is not Dimension d || d.HasFields || !DimensionTextContent.IsPlain(d.DimensionText))
+        if(!Supported(entity.GetType()) || entity is not Dimension d || d.HasFields || !DimensionTextContent.IsPlain(d.DimensionText, allowCreatedLength ? DimensionTextContent.CreatedOverrideLength : DimensionTextContent.EditLength))
             throw new DomainException("UNSUPPORTED_DIMENSION_CONTENT","Requires a supported native dimension with plain text and no fields.");
         //107 observed stable text AND rendered MText centers only for the fresh
         //manual diametric DIMTMOVE=2 case. Never change the user's movement style.
@@ -36,7 +36,7 @@ internal static class CadDimensionTextEditor
     }
     internal static void Apply(Entity entity,ReplaceDimensionTextSpec edit,Action cancel,bool regenerate)
     {
-        cancel();CheckSource(entity);var dimension=(Dimension)entity;
+        cancel();CheckSource(entity, allowCreatedLength: true);var dimension=(Dimension)entity;
         if(dimension.DimensionText!=edit.ExpectedText)throw new DomainException("TEXT_CONTENT_CHANGED","Dimension text differs from expected_text after preceding edits.");
         var before=Wire.Element(DimensionGeometryReader.Definition(dimension));
         var style=dimension.DimensionStyle;var rotation=dimension.TextRotation;var normal=dimension.Normal;var elevation=dimension.Elevation;

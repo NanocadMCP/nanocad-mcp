@@ -19,16 +19,22 @@ public sealed class SnapshotPages<T>
     public void Clear() => _snapshots.Clear();
     public SnapshotPage<T> First(string documentId, string revision, string? selectionRevision, string filter, T[] items, int pageSize)
     {
-        Expire();
         if (JsonSerializer.SerializeToUtf8Bytes(items, Wire.Json).Length > 8 * 1024 * 1024)
             throw new DomainException("QUERY_LIMIT_EXCEEDED", "Snapshot exceeds its actual 8MiB serialized-byte budget; narrow the query.");
+        return First(documentId, revision, selectionRevision, filter, items, pageSize, item => item);
+    }
+    public SnapshotPage<TResult> First<TResult>(string documentId, string revision, string? selectionRevision, string filter, T[] items, int pageSize, Func<T,TResult> read)
+    {
+        Expire();
         while (_snapshots.Count >= 2) Remove(_snapshots.Values.OrderBy(s => s.Expires).First().Id);
         var snapshot = new Snapshot(Convert.ToHexString(RandomNumberGenerator.GetBytes(16)), documentId, revision, selectionRevision, filter,
             items.OrderBy(i => ulong.Parse(_handle(i), NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToArray(), _now().AddSeconds(60));
         _snapshots.Add(snapshot.Id, snapshot);
-        return Slice(snapshot, 0, pageSize);
+        return Slice(snapshot, 0, pageSize, read);
     }
     public SnapshotPage<T> Next(string cursor, string documentId, string revision, string? selectionRevision, string filter, int pageSize)
+        => Next(cursor, documentId, revision, selectionRevision, filter, pageSize, item => item);
+    public SnapshotPage<TResult> Next<TResult>(string cursor, string documentId, string revision, string? selectionRevision, string filter, int pageSize, Func<T,TResult> read)
     {
         Expire();
         if (cursor.Length != 104 || !cursor.All(Uri.IsHexDigit)) throw new DomainException("INVALID_CURSOR", "Malformed cursor.");
@@ -43,14 +49,15 @@ public sealed class SnapshotPages<T>
         if (snapshot.Revision != revision) throw new DomainException("STALE_DOCUMENT", "The document changed since this snapshot.", true);
         if (snapshot.SelectionRevision != selectionRevision) throw new DomainException("STALE_SELECTION", "The implied selection changed since this snapshot.", true);
         if (offset < 0 || offset >= snapshot.Items.Length) throw new DomainException("INVALID_CURSOR", "Invalid cursor position.");
-        return Slice(snapshot, offset, pageSize);
+        return Slice(snapshot, offset, pageSize, read);
     }
-    private SnapshotPage<T> Slice(Snapshot snapshot, int offset, int pageSize)
+    private SnapshotPage<TResult> Slice<TResult>(Snapshot snapshot, int offset, int pageSize, Func<T,TResult> read)
     {
-        var page = new List<T>();
+        var page = new List<TResult>();
         int bytes = 2048;
-        foreach (var item in snapshot.Items.Skip(offset).Take(pageSize))
+        foreach (var key in snapshot.Items.Skip(offset).Take(pageSize))
         {
+            var item = read(key);
             int size = JsonSerializer.SerializeToUtf8Bytes(item, Wire.Json).Length + 1;
             if (bytes + size > Wire.PayloadBudget - 4096) break;
             page.Add(item); bytes += size;

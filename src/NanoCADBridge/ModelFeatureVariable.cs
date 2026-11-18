@@ -53,6 +53,20 @@ internal sealed record ModelFeatureVariable(McObjectId ID, McObjectId Variable, 
         if (ModelTaperParameter412.Handles(Role)) { ModelTaperParameter412.RemoveObservedValue(parameters, Role); return; }
         if (Role == "shell_thickness") { ModelShellParameter412.RemoveObservedValue(parameters, Role); return; }
         if (Role is "hole_offset1" or "hole_offset2") { ModelHoleParameter412.RemoveObservedValue(parameters, Role); return; }
+        if (Role == "thread_pitch" && parameters["internal"]?.GetValue<bool>() == false &&
+            string.Equals(parameters["pitch_variable_id"]?.GetValue<string>(), Variable.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            // IMcThreadFeature exposes these values only as derived getters.
+            // The support, major diameter, length, direction, both variable IDs
+            // and native owner remain in the before/after comparison.
+            double minor = parameters["minimum_diameter"]!.GetValue<double>();
+            double major = parameters["maximum_diameter"]!.GetValue<double>();
+            if (!double.IsFinite(minor) || !double.IsFinite(major) || minor <= 0 || minor > major ||
+                string.IsNullOrWhiteSpace(parameters["designation"]?.GetValue<string>()))
+                throw new DomainException("MODEL_STATE_UNAVAILABLE", "The external thread has no consistent native designation and diameters.");
+            parameters.Remove("minimum_diameter");
+            parameters.Remove("designation");
+        }
         if (IsPlacement) { if (parameters[IsAngle ? "angles_degrees" : "displacement"] is JsonArray vector) vector[PlacementComponent] = null; return; }
         string field = Role switch { "revolution_angle" => "angle", "extrusion_distance2" => "distance2", "fillet_radius" => "radius", "chamfer_distance2" => "distance2", "thread_pitch" => "pitch", "thread_length" => "length", "rect_count_x" => "count_x", "rect_count_y" => "count_y", "rect_step_x" => "step_x", "rect_step_y" => "step_y", "circular_count" => "count", "circular_angle" => "angle_degrees", "datum_offset" => "support_offset", _ => "distance" };
         parameters.Remove(field); if (parameters["terminal"] is JsonObject terminal) terminal.Remove(field); if (Role == "revolution_angle") parameters.Remove("full_turn");

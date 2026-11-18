@@ -9,7 +9,7 @@ namespace NanoCADBridge;
 internal sealed class StructureReader
 {
     private readonly string _instance;
-    private readonly SnapshotPages<StructureRecord> _pages = new(i => i.@ref.handle);
+    private readonly SnapshotPages<string> _pages = new(handle => handle);
     public StructureReader(string instance) => _instance = instance;
     private EntityRef Ref(ObjectId id, string doc) => new(_instance, doc, Validation.NormalizeHandle(id.Handle.ToString()));
     private static string Text(string text) => text.Length <= 16384 ? text : throw new DomainException("ENTITY_TOO_LARGE", "Structural text exceeds 16384 characters.");
@@ -39,125 +39,119 @@ internal sealed class StructureReader
 
     public StructurePage Read(Arguments args, DocumentState state, Transaction tr, CancellationToken cancellation)
     {
-        var section = args.Section!; var key = args.FilterKey("get_structure");
-        StructurePage Page(SnapshotPage<StructureRecord> page) => new(section, page.items, page.total_count, page.returned_count, page.complete, page.next_cursor);
-        if (args.Cursor != null) return Page(_pages.Next(args.Cursor, state.Id, state.Revision, null, key, args.PageSize));
-        var records = new List<StructureRecord>(); int bytes = 0;
-        void Check()
-        {
-            CheckTime();
-        }
-        void CheckTime()
-        {
-            cancellation.ThrowIfCancellationRequested();
-        }
-        void Add(DBObject obj, string name, object properties)
-        {
-            var record = new StructureRecord(Ref(obj.ObjectId, state.Id), section, Text(name), properties);
-            bytes += JsonSerializer.SerializeToUtf8Bytes(record, Wire.Json).Length;
-            if (bytes > 8 * 1024 * 1024) throw new DomainException("QUERY_LIMIT_EXCEEDED", "Structure snapshot exceeds the actual 8 MiB memory budget; no record-count truncation occurred.");
-            records.Add(record);
-        }
+        var section = args.Section!;
         var db = state.Document.Database;
-        if (section == "groups")
+        void Check() => cancellation.ThrowIfCancellationRequested();
+        var ownerId = section switch
         {
-            var groups = (DBDictionary)tr.GetObject(db.GroupDictionaryId, OpenMode.ForRead);
-            foreach (DBDictionaryEntry entry in groups)
+            "groups" => db.GroupDictionaryId,
+            "table_styles" => db.TableStyleDictionaryId,
+            "mleader_styles" => db.MLeaderStyleDictionaryId,
+            "layouts" or "viewports" or "viewport_clipping" => db.LayoutDictionaryId,
+            "layers" => db.LayerTableId,
+            "linetypes" => db.LinetypeTableId,
+            "text_styles" => db.TextStyleTableId,
+            "dimension_styles" => db.DimStyleTableId,
+            "blocks" => db.BlockTableId,
+            _ => throw new DomainException("INVALID_ARGUMENT", "Unknown structure section.")
+        };
+        var owner = tr.GetObject(ownerId, OpenMode.ForRead);
+        var dictionary = owner as DBDictionary;
+        bool viewports = section is "viewports" or "viewport_clipping";
+        IEnumerable<string> Identities()
+        {
+            if (dictionary == null)
             {
-                Check(); if (entry.Value.IsErased) continue;
-                if (tr.GetObject(entry.Value, OpenMode.ForRead) is Group group) Add(group, entry.Key, CadDrawingGroups431.Read(group, entry.Key, db, tr, Check));
+                foreach (ObjectId id in (SymbolTable)owner)
+                {
+                    Check();
+                    if (!id.IsErased) yield return id.Handle.ToString();
+                }
+                yield break;
             }
-        }
-        else if (section is "table_styles" or "mleader_styles")
-        {
-            var dictionaryId = section == "table_styles" ? db.TableStyleDictionaryId : db.MLeaderStyleDictionaryId;
-            var dictionary = (DBDictionary)tr.GetObject(dictionaryId, OpenMode.ForRead);
             foreach (DBDictionaryEntry entry in dictionary)
             {
-                Check(); if (entry.Value.IsErased) continue;
-                var style = tr.GetObject(entry.Value, OpenMode.ForRead);
-                bool native = style.OwnerId == dictionaryId && (section == "table_styles" ? style.GetType() == typeof(TableStyle) : style.GetType() == typeof(MLeaderStyle));
-                bool local = !entry.Key.Contains('|');
-                if (native && style is MLeaderStyle leaderStyle)
-                    Add(style, entry.Key, CadMLeaderStyleWriter337.ReadProperties(leaderStyle, entry.Key, db, tr, Check));
-                else if (native && local && style is TableStyle tableStyle)
+                Check();
+                if (entry.Value.IsErased) continue;
+                if (viewports)
                 {
-                    var extended = CadTableStyleWriter337.TryReadProperties(tableStyle, db, tr, Check);
-                    if (extended.Value is { } details)
-                        Add(style, entry.Key, new { native_type = style.GetType().Name, is_local = local, can_reference = true, is_current = style.ObjectId == db.Tablestyle, table_style = details });
-                    else Add(style, entry.Key, new { native_type = style.GetType().Name, is_local = local, can_reference = true, is_current = style.ObjectId == db.Tablestyle, table_style_unavailable_reason = extended.Reason });
-                }
-                else Add(style, entry.Key, new { native_type = style.GetType().Name, is_local = local, can_reference = native && local });
-            }
-        }
-        else if (section is "layouts" or "viewports" or "viewport_clipping")
-        {
-            var layouts = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
-            foreach (DBDictionaryEntry entry in layouts)
-            {
-                Check(); var layout = (Layout)tr.GetObject(entry.Value, OpenMode.ForRead);
-                if (section == "viewport_clipping" && layout.ModelType) continue;
-                if (section == "layouts") Add(layout, layout.LayoutName, LayoutMetadataReader.ReadLayout(layout, tr, db, id => Ref(id, state.Id), CheckTime, Check));
-                else
-                {
+                    var layout = (Layout)tr.GetObject(entry.Value, OpenMode.ForRead);
+                    if (section == "viewport_clipping" && layout.ModelType) continue;
                     var space = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead);
                     foreach (ObjectId id in space)
                     {
-                        Check(); if (id.IsErased) continue;
-                        if (tr.GetObject(id, OpenMode.ForRead) is not Viewport viewport) continue;
-                        Add(viewport, layout.LayoutName + ":" + viewport.Number.ToString(CultureInfo.InvariantCulture),
-                            section == "viewport_clipping" ? CadViewportClipping358.Read(viewport, layout, Ref(viewport.ObjectId, state.Id), db, tr, Check) :
-                            LayoutMetadataReader.ReadViewport(viewport, layout, tr, db, item => Ref(item, state.Id), CheckTime, Check));
+                        Check();
+                        if (!id.IsErased && id.ObjectClass.IsDerivedFrom(Teigha.Runtime.RXObject.GetClass(typeof(Viewport))))
+                            yield return id.Handle.ToString();
                     }
                 }
+                else if (section != "groups" || tr.GetObject(entry.Value, OpenMode.ForRead) is Group)
+                    yield return entry.Value.Handle.ToString();
             }
         }
-        else
+        StructureRecord ReadRecord(string handle)
         {
-            var tableId = section switch
+            Check();
+            var nativeHandle = new Handle(unchecked((long)ulong.Parse(handle, NumberStyles.HexNumber, CultureInfo.InvariantCulture)));
+            if (!db.TryGetObjectId(nativeHandle, out var id) || id.IsNull || !id.IsValid || id.IsErased || id.IsEffectivelyErased)
+                throw new DomainException("OBJECT_NOT_FOUND", "Structural record is unavailable.");
+            var obj = tr.GetObject(id, OpenMode.ForRead);
+            StructureRecord Row(string name, object properties) => new(Ref(id, state.Id), section, Text(name), properties);
+            EntityRef Reference(ObjectId item) => Ref(item, state.Id);
+            var mismatch = new DomainException("OUT_OF_SCOPE", "The requested record does not belong to this structure section.");
+            if (viewports)
             {
-                "layers" => db.LayerTableId,
-                "linetypes" => db.LinetypeTableId,
-                "text_styles" => db.TextStyleTableId,
-                "dimension_styles" => db.DimStyleTableId,
-                "blocks" => db.BlockTableId,
-                _ => throw new DomainException("INVALID_ARGUMENT", "Unknown structure section.")
-            };
-            foreach (ObjectId id in (SymbolTable)tr.GetObject(tableId, OpenMode.ForRead))
-            {
-                Check(); if (id.IsErased) continue;
-                var record = (SymbolTableRecord)tr.GetObject(id, OpenMode.ForRead);
-                switch (record)
-                {
-                    case LayerTableRecord layer:
-                        using (var color = layer.Color) Add(layer, layer.Name, new
-                        {
-                            is_off = layer.IsOff,
-                            is_frozen = layer.IsFrozen,
-                            is_locked = layer.IsLocked,
-                            is_dependent = layer.IsDependent,
-                            is_current = layer.ObjectId == db.Clayer,
-                            is_plottable = layer.IsPlottable,
-                            color = Color(color),
-                            linetype = Ref(layer.LinetypeObjectId, state.Id),
-                            lineweight = (int)layer.LineWeight,
-                            transparency = CadAppearanceProperties.ReadTransparency(layer.Transparency),
-                            description = CadAppearanceProperties.ReadDescription(layer)
-                        });
-                        break;
-                    case LinetypeTableRecord line:
-                        Add(line, line.Name, LinetypeMetadataReader.Read(line, tr, db, id => Ref(id, state.Id), CheckTime, Check)); break;
-                    case TextStyleTableRecord text:
-                        Add(text, text.Name, CurrentStyleProperties(TextStyleMetadataReader.Read(text, CheckTime), text.ObjectId == db.Textstyle)); break;
-                    case DimStyleTableRecord dimension:
-                        Add(dimension, dimension.Name, CurrentStyleProperties(DimensionStyleMetadataReader.Read(dimension, tr, db,
-                            id => Ref(id, state.Id), CheckTime, Check), dimension.ObjectId == db.Dimstyle)); break;
-                    case BlockTableRecord block: Add(block, block.Name, Block(block, state.Id, db, tr, Check)); break;
-                    default: throw new DomainException("OBJECT_READ_FAILED", "Unexpected symbol table record type.");
-                }
+                if (obj is not Viewport viewport || tr.GetObject(obj.OwnerId, OpenMode.ForRead) is not BlockTableRecord { IsLayout: true } space ||
+                    tr.GetObject(space.LayoutId, OpenMode.ForRead) is not Layout layout || layout.OwnerId != ownerId ||
+                    layout.BlockTableRecordId != space.ObjectId || section == "viewport_clipping" && layout.ModelType) throw mismatch;
+                return Row(layout.LayoutName + ":" + viewport.Number.ToString(CultureInfo.InvariantCulture),
+                    section == "viewport_clipping" ? CadViewportClipping358.Read(viewport, layout, Reference(id), db, tr, Check) :
+                    LayoutMetadataReader.ReadViewport(viewport, layout, tr, db, Reference, Check, Check));
             }
+            if (obj.OwnerId != ownerId) throw mismatch;
+            if (section == "layouts" && obj is Layout sheet)
+                return Row(sheet.LayoutName, LayoutMetadataReader.ReadLayout(sheet, tr, db, Reference, Check, Check));
+            if (dictionary != null)
+            {
+                string name = dictionary.NameAt(id);
+                if (section == "groups") return obj is Group group ? Row(name, CadDrawingGroups431.Read(group, name, db, tr, Check)) : throw mismatch;
+                if (section is not ("table_styles" or "mleader_styles")) throw mismatch;
+                bool local = !name.Contains('|');
+                bool native = section == "table_styles" ? obj.GetType() == typeof(TableStyle) : obj.GetType() == typeof(MLeaderStyle);
+                if (native && obj is MLeaderStyle leader) return Row(name, CadMLeaderStyleWriter337.ReadProperties(leader,name,db,tr,Check));
+                if (native && local && obj is TableStyle table)
+                {
+                    var observed = CadTableStyleWriter337.TryReadProperties(table,db,tr,Check);
+                    return observed.Value is { } details
+                        ? Row(name, new { native_type = obj.GetType().Name, is_local = local, can_reference = true, is_current = id == db.Tablestyle, table_style = details })
+                        : Row(name, new { native_type = obj.GetType().Name, is_local = local, can_reference = true, is_current = id == db.Tablestyle, table_style_unavailable_reason = observed.Reason });
+                }
+                return Row(name, new { native_type = obj.GetType().Name, is_local = local, can_reference = native && local });
+            }
+            if (obj is LayerTableRecord layer)
+            {
+                using var color = layer.Color;
+                return Row(layer.Name, new { is_off = layer.IsOff, is_frozen = layer.IsFrozen, is_locked = layer.IsLocked,
+                    is_dependent = layer.IsDependent, is_current = id == db.Clayer, is_plottable = layer.IsPlottable,
+                    color = Color(color), linetype = Reference(layer.LinetypeObjectId), lineweight = (int)layer.LineWeight,
+                    transparency = CadAppearanceProperties.ReadTransparency(layer.Transparency), description = CadAppearanceProperties.ReadDescription(layer) });
+            }
+            return obj switch
+            {
+                LinetypeTableRecord line => Row(line.Name, LinetypeMetadataReader.Read(line,tr,db,Reference,Check,Check)),
+                TextStyleTableRecord text => Row(text.Name, CurrentStyleProperties(TextStyleMetadataReader.Read(text,Check),id==db.Textstyle)),
+                DimStyleTableRecord dim => Row(dim.Name, CurrentStyleProperties(DimensionStyleMetadataReader.Read(dim,tr,db,Reference,Check,Check),id==db.Dimstyle)),
+                BlockTableRecord block => Row(block.Name, Block(block,state.Id,db,tr,Check)),
+                _ => throw mismatch
+            };
         }
-        return Page(_pages.First(state.Id, state.Revision, null, key, records.ToArray(), args.PageSize));
+        if (args.StructureRecordHandle != null)
+            return new(section, [ReadRecord(args.StructureRecordHandle)], 1, 1, true, null);
+        var key = args.FilterKey("get_structure");
+        var page = args.Cursor == null
+            ? _pages.First(state.Id,state.Revision,null,key,Identities().ToArray(),args.PageSize,ReadRecord)
+            : _pages.Next(args.Cursor,state.Id,state.Revision,null,key,args.PageSize,ReadRecord);
+        return new(section,page.items,page.total_count,page.returned_count,page.complete,page.next_cursor);
     }
 
     private static JsonElement CurrentStyleProperties(object properties, bool current)
@@ -267,6 +261,35 @@ internal sealed class StructureReader
                 }
                 finally { stack.Remove(children.ObjectId); }
             }
+        }
+        if (args.OccurrencePath is { } occurrence)
+        {
+            Entity? selected = root;
+            Matrix3d frame = Matrix3d.Identity;
+            for (int i = 1; i < occurrence.Length; i++)
+            {
+                Check();
+                BlockTableRecord parent;
+                if (i == 1 && directDefinition != null) parent = directDefinition;
+                else
+                {
+                    if (selected is not BlockReference reference || reference.GetType() != typeof(BlockReference) || reference.IsDynamicBlock)
+                        throw new DomainException("OUT_OF_SCOPE", "The occurrence path does not traverse an ordinary native insertion.");
+                    parent = (BlockTableRecord)tr.GetObject(reference.BlockTableRecord, OpenMode.ForRead);
+                    frame *= reference.BlockTransform;
+                }
+                if (parent.IsLayout || parent.IsFromExternalReference || parent.IsFromOverlayReference || parent.IsDependent ||
+                    parent.IsDynamicBlock || parent.OwnerId != db.BlockTableId || !stack.Add(parent.ObjectId))
+                    throw new DomainException("OUT_OF_SCOPE", "The occurrence path enters an external, dynamic or cyclic definition.");
+                var handle = new Handle(unchecked((long)ulong.Parse(occurrence[i], NumberStyles.HexNumber, CultureInfo.InvariantCulture)));
+                if (!db.TryGetObjectId(handle, out var childId) || childId.IsNull || !childId.IsValid || childId.IsErased || childId.IsEffectivelyErased ||
+                    tr.GetObject(childId, OpenMode.ForRead) is not Entity child || child.OwnerId != parent.ObjectId)
+                    throw new DomainException("OBJECT_NOT_FOUND", "The occurrence path no longer belongs to this parent definition.");
+                selected = child;
+            }
+            if (selected == null) throw new DomainException("INVALID_ARGUMENT", "For a definition select a member occurrence_path or omit the path to inspect the definition.");
+            Visit(selected, occurrence[..^1], frame, 0);
+            return new BlockInspection(Ref(rootId, state.Id), nodes.ToArray(), warnings.Count == 0, warnings.OrderBy(s => s, StringComparer.Ordinal).ToArray());
         }
         if (directDefinition != null)
         {

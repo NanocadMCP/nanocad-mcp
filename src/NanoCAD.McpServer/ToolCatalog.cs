@@ -197,13 +197,13 @@ public static class ToolCatalog
         JsonObject String(int max, string? description = null) => new() { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = max, ["description"] = description };
         JsonObject Uuid(string description) { var value = String(36, description); value["format"] = "uuid"; return value; }
         JsonObject ArraySchema(int max, JsonObject items) => new() { ["type"] = "array", ["minItems"] = 1, ["items"] = items };
-        properties["bridge_instance_id"] = Uuid("Bridge instance from get_status. Required when multiple nanoCAD processes are connected.");
+        properties["bridge_instance_id"] = Uuid("From get_status. Required with multiple bridges.");
         if (operation == "get_document") properties["include_view"] = new JsonObject { ["type"] = "boolean", ["default"] = false, ["description"] = "Read camera metadata and a context-scoped camera_token for an orthographic, unclipped Model tab or Paper sheet (CVPORT1). A model camera entered through a Paper viewport uses its viewport adapter. Target/direction are WCS; center is in view coordinates; twist is radians. Unsupported projection/layout returns view=null with a reason. No camera change." };
         if (operation is "get_selection" or "query_objects" or "inspect_objects")
         {
-            properties["document_id"] = Uuid("Open-document identity from get_document; never a filename. The tab must still be active.");
+            properties["document_id"] = Uuid("Active tab ID from get_document.");
             required.Add("document_id");
-            var revision = String(20, "Revision from a previous read. Changed documents fail with STALE_DOCUMENT.");
+            var revision = String(20, "Observed revision. Stale reads fail.");
             revision["pattern"] = "^[0-9]{1,20}$";
             properties["expected_revision"] = revision;
         }

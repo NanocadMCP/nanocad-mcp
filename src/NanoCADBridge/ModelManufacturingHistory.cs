@@ -3,10 +3,31 @@ using Multicad.Mc3D;
 namespace NanoCADBridge;
 internal static class ModelManufacturingHistory
 {
+    internal sealed record FixedFrame(double[]? Center,double[]? Normal,string? Unavailable);
+    internal static FixedFrame FixedPlacement(IppDefinition placement)
+    {
+        var frame=new Multicad.Geometry.Matrix3d();
+        Multicad.hresult status;
+        try{status=placement.GetPosition(out frame,0);}
+        catch(Exception error) when(error is not OperationCanceledException){return new(null,null,error.GetType().Name);}
+        if(!status.IsSuccess())return new(null,null,status.ToString());
+        var origin=Multicad.Geometry.Point3d.Origin.TransformBy(frame);
+        var normal=new Multicad.Geometry.Point3d(0,0,1).TransformBy(frame)-origin;
+        double[] center=[origin.X,origin.Y,origin.Z], axis=[normal.X,normal.Y,normal.Z];
+        return center.All(double.IsFinite)&&axis.All(double.IsFinite)&&axis.Any(v=>v!=0)
+            ?new(center,axis,null):new(null,null,"nonfinite_or_degenerate_placement");
+    }
     static object? Placement(IppDefinition? p)
     {
         if(p==null)return null;
-        return new{placement_type=p.DefType.ToString(),offset1=p.Param1,offset2=p.Param2,sector=p.Sector,support_face_id=p.TargetPlaneId.ToString()};
+        string placement_type=p.DefType.ToString(),support_face_id=p.TargetPlaneId.ToString();
+        if(p.DefType==IppDefinitionType.Fixed)
+        {
+            var actual=FixedPlacement(p);
+            return new{placement_type,support_face_id,center=actual.Center,support_normal_wcs=actual.Normal,position_unavailable_reason=actual.Unavailable};
+        }
+        if(p.DefType==IppDefinitionType.TwoEdges)return new{placement_type,support_face_id,offset1=p.Param1,offset2=p.Param2,sector=p.Sector};
+        return new{placement_type,support_face_id};
     }
     internal static object? Parameters(McObjectId id,Action? cancel=null)
     {
@@ -20,20 +41,28 @@ internal static class ModelManufacturingHistory
         var extrusion=id.GetObjectOfType<ExtrudeFeature>();if(extrusion!=null)return ModelExtrusionExtentEditor.Read(extrusion);
         var loft=id.GetObjectOfType<LoftFeature>();
         if(loft!=null){
-            var sections=Enumerable.Range(0,loft.SectionsCount).Select(i=>{cancel?.Invoke();var section=loft.GetSection(i);if(section==null){budget.Add<object?>(null);return null;}return Ref(section.ID);}).ToArray();
+            var sources=Enumerable.Range(0,loft.SectionsCount).Select(index=>{
+                cancel?.Invoke();var section=loft.GetSection(index);
+                var item=new{index,profile_id=section==null?null:Ref(section.ID),sketch_id=section==null?null:Ref(section.ParentSketchID),
+                    host_solid_id=section==null?null:Ref(section.HostSolidID),document_id=section?.DbEntity.Document?.ID.ToString()};
+                budget.Add(item);return item;
+            }).ToArray();
+            var sections=sources.Select(section=>section.profile_id).ToArray();
             var guides=Enumerable.Range(0,loft.GuideRailsCount).Select(i=>{cancel?.Invoke();return loft.GetGuideRailsParams(i)?.Select(p=>{cancel?.Invoke();if(p==null){budget.Add<object?>(null);return null;}return Ref(p.ID);}).ToArray();}).ToArray();
-            return new{kind="loft",profile_id=loft.ProfileID.ToString(),section_profile_ids=sections,
-                sections_complete=sections.Length>0&&sections.All(s=>s!=null),loft_type=loft.LoftType.ToString(),closed=loft.Closed,
+            return new{kind="loft",profile_id=loft.ProfileID.ToString(),section_profile_ids=sections,section_sources=sources,
+                section_sources_complete=sources.Length>=2&&sources.All(s=>s.profile_id!=null&&s.sketch_id!=null&&s.document_id!=null),
+                sections_complete=sections.Length>=2&&sections[0]==loft.ProfileID.ToString()&&sections.All(s=>s!=null),loft_type=loft.LoftType.ToString(),closed=loft.Closed,
                 path_id=loft.LoftType==LoftType.WithCenterLine?loft.Path?.ID.ToString():null,guide_ids=guides,
-                guide_bindings_complete=guides.All(g=>g!=null&&g.Length>0&&g.All(s=>s!=null))};
+                guide_bindings_complete=(loft.LoftType!=LoftType.WithRails||guides.Length>0)&&guides.All(g=>g!=null&&g.Length>0&&g.All(s=>s!=null)),
+                first_section_condition=loft.FirstSectionCondition.ToString(),last_section_condition=loft.LastSectionCondition.ToString(),part_operation=loft.PartOperation.ToString()};
         }
         var sweep=id.GetObjectOfType<ExtrudeAlongPathFeature>();
         if(sweep!=null){var paths=sweep.GetPath();return new{kind="sweep",profile_id=sweep.ProfileID.ToString(),orientation=sweep.ProfileOrientation.ToString(),taper_angle=sweep.Angle,part_operation=sweep.PartOperation.ToString(),taper_variable_id=sweep.TaperAngleParamVarID.ToString(),
             path_ids=paths?.Select(p=>{cancel?.Invoke();if(p==null){budget.Add<object?>(null);return null;}return Ref(p.ID);}).ToArray(),path_bindings_complete=paths!=null&&paths.Count>0&&paths.All(p=>p!=null&&!p.ID.IsNull)};}
         var h=id.GetObjectOfType<HoleFeature>();
-        if(h!=null){var p=h.GetPlacement();return new{kind="hole",diameter=h.Diameter,through=h.IsFullDepth,depth=h.Depth,seat=h.SeatType.ToString(),seat_diameter=h.SeatDiameter,seat_depth=h.SeatDepth,seat_angle_degrees=h.SeatAngle*180/Math.PI,flat_bottom=h.FlatBottom,bottom_angle_degrees=h.BottomAngle*180/Math.PI,face_id=h.FaceId.ToString(),terminal_face_id=h.TerminalFaceId.ToString(),placement=Placement(p),thread_id=h.GetThread()?.ID.ToString()};}
+        if(h!=null){using var p=h.GetPlacement();bool angleActive=!h.IsFullDepth&&!h.FlatBottom;return new{kind="hole",diameter=h.Diameter,through=h.IsFullDepth,depth=h.Depth,seat=h.SeatType.ToString(),seat_diameter=h.SeatDiameter,seat_depth=h.SeatDepth,seat_angle_degrees=h.SeatAngle*180/Math.PI,flat_bottom=h.FlatBottom,bottom_angle_applicable=angleActive,bottom_angle_degrees=angleActive?(double?)(h.BottomAngle*180/Math.PI):null,face_id=h.FaceId.ToString(),terminal_face_id=h.TerminalFaceId.ToString(),placement=Placement(p),thread_id=h.GetThread()?.ID.ToString()};}
         var t=id.GetObjectOfType<ThreadFeature>();
-        if(t!=null)return new{kind="thread",pitch=t.Pitch,right_handed=t.IsRight,@internal=t.IsInternal,full_length=t.IsFullLength,length=t.Length,minimum_diameter=t.MinDiameter,maximum_diameter=t.MaxDiameter,designation=t.Designation,face_id=t.ThreadFaceId.ToString(),front_edge_id=t.FrontEdgeId.ToString(),pitch_variable_id=t.PitchVarID.ToString(),length_variable_id=t.LengthVarID.ToString(),representation="native_thread_feature_helical_brep_unverified"};
+        if(t!=null)return new{kind="thread",pitch=t.Pitch,right_handed=t.IsRight,@internal=t.IsInternal,full_length=t.IsFullLength,length_applicable=!t.IsFullLength,length=t.Length,minimum_diameter=t.MinDiameter,maximum_diameter=t.MaxDiameter,designation=t.Designation,face_id=t.ThreadFaceId.ToString(),front_edge_id=t.FrontEdgeId.ToString(),pitch_variable_id=t.PitchVarID.ToString(),length_variable_id=t.LengthVarID.ToString(),representation="native_thread_feature_helical_brep_unverified"};
         var c=id.GetObjectOfType<CircularPatternFeature>();
         if(c!=null)
         {

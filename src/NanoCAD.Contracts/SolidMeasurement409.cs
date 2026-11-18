@@ -8,7 +8,8 @@ public sealed record SolidMeasurement409(string Mode, SolidFaceSelection409[]? F
 
 public static class SolidMeasurementValidation409
 {
-    public static bool Handles(string? mode) => mode is "solid_distance" or "face_distance" or "wall_thickness" || IsAxisMeasurement(mode);
+    public static IReadOnlyList<string> Modes { get; } = Array.AsReadOnly<string>(["solid_distance", "face_distance", "wall_thickness", "cylinder_diameter", "axis_axis_distance", "axis_plane_distance"]);
+    public static bool Handles(string? mode) => Modes.Contains(mode);
 
     public static bool IsAxisMeasurement(string? mode) => mode is "cylinder_diameter" or "axis_axis_distance" or "axis_plane_distance";
 

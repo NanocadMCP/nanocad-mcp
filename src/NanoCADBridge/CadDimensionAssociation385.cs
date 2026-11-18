@@ -27,7 +27,7 @@ internal static class CadDimensionAssociation385
     static bool Live(ObjectId id)=>!id.IsNull&&id.IsValid&&!id.IsErased&&!id.IsEffectivelyErased;
     static bool Local(DBObject item,Database db)=>item.Database?.UnmanagedObject==db.UnmanagedObject&&db.UnmanagedObject!=IntPtr.Zero;
     internal static bool Supported(Type type)=>type==typeof(AlignedDimension)||type==typeof(RotatedDimension)||type==typeof(RadialDimension)||type==typeof(DiametricDimension);
-    static double[] Point(Point3d p)
+    internal static double[] Point(Point3d p)
     {Need(double.IsFinite(p.X)&&double.IsFinite(p.Y)&&double.IsFinite(p.Z),"A source/reference point is non-finite.");return[p.X,p.Y,p.Z];}
     static bool Same(Point3d a,Point3d b)=>a.DistanceTo(b)<=1e-7;
     internal static (string First,string Second) Roles(string kind)=>kind switch
@@ -119,7 +119,7 @@ internal static class CadDimensionAssociation385
             return new PointState(binding.Role,id,snap.Mode,snap.Point,evaluated,reference.NearPointParam);
         }).ToArray();ValidateKind(kind,result,db,tr,cancel);return result.OrderBy(item=>(int)NativeRole(item.Role)).ToArray();
     }
-    static void Ownership(DimAssoc association,Dimension dimension,Database db,Transaction tr,Action cancel)
+    static bool Ownership(DimAssoc association,Dimension dimension,Database db,Transaction tr,Action cancel)
     {
         Need(Live(association.ObjectId)&&Local(association,db)&&association.DimObjId==dimension.ObjectId,"The native association does not identify this resident dimension.");
         var visited=new HashSet<ObjectId>();DBObject child=association;
@@ -138,6 +138,60 @@ internal static class CadDimensionAssociation385
             var nod=(DBDictionary)tr.GetObject(db.NamedObjectsDictionaryId,OpenMode.ForRead);int matches=0;
             foreach(DBDictionaryEntry entry in nod){cancel();if(entry.Value==child.ObjectId)matches++;}Need(matches==1,"The association dictionary path is not actually in this document's NOD.");
         }
+        return child.OwnerId==dimension.ObjectId;
+    }
+    internal sealed record SourceNotification(string? source_handle,int count);
+    internal sealed record AssociationConnections(string? association_handle,string? dimension_handle,string? owner_handle,
+        bool owned_by_dimension,int dimension_reverse_count,SourceNotification[] source_reverse_links);
+
+    static int ReverseCount(DBObject obj,ObjectId association,Action cancel)
+    {
+        using var links=obj.GetPersistentReactorIds();int count=0;
+        foreach(ObjectId id in links){cancel();if(id==association)count++;}
+        return count;
+    }
+    internal static AssociationConnections Connections(Dimension dimension,ObjectId association,PointState[] points,Transaction tr,Action cancel)
+    {
+        using var native=CadNativeDimAssocBinding434.TryBind(tr.GetObject(association,OpenMode.ForRead));
+        Need(native!=null,"Expected the actual resident DimAssoc for source notification checks.");
+        var db=dimension.Database;bool owned=Ownership(native.Value,dimension,db,tr,cancel);
+        var sources=points.Select(p=>p.Source).Distinct().Select(id=>new SourceNotification(Id(id),
+            ReverseCount(Source(id,dimension.OwnerId,db,tr,cancel),association,cancel))).ToArray();
+        return new(Id(association),Id(dimension.ObjectId),Id(native.Value.OwnerId),owned,ReverseCount(dimension,association,cancel),sources);
+    }
+    internal static void VerifyConnections(AssociationConnections actual,string stage)
+    {
+        // The dimension's extension dictionary and DimObjId establish its
+        // association ownership. Source curves require notification links
+        // for subsequent geometry edits. A NOD-owned record additionally
+        // needs the actual dimension reactor to discover it from the target.
+        if(actual.dimension_reverse_count>1 || (!actual.owned_by_dimension && actual.dimension_reverse_count!=1) ||
+            actual.source_reverse_links.Any(s=>s.count!=1))
+            throw new DomainException("NATIVE_DIMENSION_ASSOCIATION_MISMATCH","The resident dimension association has incomplete ownership or source notification links.",
+                false,new{stage,connections=actual});
+    }
+    static void CompleteNewSourceNotifications(DimAssoc assoc,Dimension dimension,PointState[] points,Transaction tr,Action cancel)
+    {
+        var db=dimension.Database;var ids=points.Select(p=>p.Source).Distinct().ToArray();
+        var missing=ids.Where(id=>ReverseCount(Source(id,dimension.OwnerId,db,tr,cancel),assoc.ObjectId,cancel)==0).ToArray();
+        if(missing.Length==ids.Length && missing.Length!=0)
+        {
+            try{cancel();assoc.AddToPointRefReactor();}
+            catch(Teigha.Runtime.Exception e) when(e.ErrorStatus.ToString()=="NotOpenForWrite")
+            { /* Register each exact source under its required native write access below. */ }
+        }
+        foreach(var id in missing)
+        {
+            var source=Source(id,dimension.OwnerId,db,tr,cancel);
+            if(ReverseCount(source,assoc.ObjectId,cancel)!=0)continue;
+            bool wasWritable=source.IsWriteEnabled;
+            var writable=tr.GetObject(id,OpenMode.ForWrite);
+            Need(writable.ObjectId==id && writable.IsWriteEnabled && writable.OwnerId==dimension.OwnerId && Local(writable,db),
+                "The exact dimension source could not be opened to finish its native notification link.");
+            writable.AddPersistentReactor(assoc.ObjectId);
+            if(!wasWritable)writable.DowngradeOpen();
+        }
+        VerifyConnections(Connections(dimension,assoc.ObjectId,points,tr,cancel),"after_source_notification_registration");
     }
     static CadNativeDimAssocBinding434? Find(Dimension dimension,Database db,Transaction tr,Action cancel,ObjectId retiring)
     {
@@ -238,7 +292,7 @@ internal static class CadDimensionAssociation385
         {
             Need(!assoc.TransSpatial&&!assoc.HasFields&&assoc.ExtensionDictionary.IsNull,"Trans-spatial, Field-bearing or extended association storage needs its own adapter.");
             using(var data=assoc.XData)Need(data==null,"Custom association XData needs its own adapter.");flags=(int)assoc.AssocFlag;
-            if(flags is not(0 or 3))throw new DomainException("UNSUPPORTED_DIMENSION_ASSOCIATION","This two-point route requires exactly the native first/second flags, or an observed inactive native record.",false,
+            if(flags is not(0 or 3))throw new DomainException("UNSUPPORTED_DIMENSION_ASSOCIATION",$"Native DimAssoc {Id(association)} on dimension {Id(dimension.ObjectId)} reports flags {flags}. This two-point route requires both first/second flags (3) or inactive storage (0).",false,
                 new{association_handle=Id(association),dimension_handle=Id(dimension.ObjectId),actual_flags=flags});var roles=Roles(dimension.GetType().Name);
             foreach(string role in flags==3?new[]{roles.First,roles.Second}:Array.Empty<string>())
             {
@@ -278,18 +332,71 @@ internal static class CadDimensionAssociation385
         {
             var db=dimension.Database;Need(db!=null&&db.UnmanagedObject!=IntPtr.Zero,"Dimension database is unavailable.");using var tr=db!.TransactionManager.StartTransaction();
             var current=(Dimension)tr.GetObject(dimension.ObjectId,OpenMode.ForRead);var snapshot=Capture(current,db,tr,cancel);
-            return new{association_token=snapshot.Token,association_handle=Id(snapshot.Association),active=snapshot.Flags==3,points=snapshot.AssociationData,
-                source_handles=snapshot.Points.Select(point=>Id(point.Source)).Distinct().ToArray(),editing_unavailable_reason=(string?)null,
+            AssociationConnections? connections=null;string? notificationReason=null;
+            if(!snapshot.Association.IsNull)
+                try{connections=Connections(current,snapshot.Association,snapshot.Points,tr,cancel);}
+                catch(Exception e) when(e is DomainException or Teigha.Runtime.Exception or InvalidOperationException)
+                {notificationReason=e is Teigha.Runtime.Exception native?native.ErrorStatus.ToString():e.Message;}
+            return new{binding_state=snapshot.Association.IsNull?"no_native_dimassoc":snapshot.Flags==3?"active_native_dimassoc":"inactive_native_dimassoc",association_token=snapshot.Token,association_handle=Id(snapshot.Association),active=snapshot.Flags==3,points=snapshot.AssociationData,
+                source_handles=snapshot.Points.Select(point=>Id(point.Source)).Distinct().ToArray(),notification_links=connections,
+                notification_unavailable_reason=notificationReason,editing_unavailable_reason=(string?)null,
                 scope="ordinary_local_DWG_whole_entity_OsnapPointRef; resident_manager_anchors_and_readable_owned_data_observed_private_manager_internals_unobserved; no_DrawingView_alias_or_trans_spatial_binding"};
         }
         catch(OperationCanceledException){throw;}
         catch(Exception error)
         {
-            string reason=error is DomainException domain?domain.Error.code+": "+domain.Error.message:error is Teigha.Runtime.Exception native?native.ErrorStatus+": "+native.Message:error.GetType().Name+": "+error.Message;
+            string reason=error is DomainException domain?domain.Error.code+": "+domain.Error.message:error is Teigha.Runtime.Exception nativeError?nativeError.ErrorStatus+": "+nativeError.Message:error.GetType().Name+": "+error.Message;
             if(System.Text.Encoding.UTF8.GetByteCount(reason)>2048)reason=error.GetType().Name+": native association observation exceeded its diagnostic budget.";
-            return new{association_token=(string?)null,association_handle=(string?)null,active=(bool?)null,points=(object?)null,source_handles=(string[]?)null,editing_unavailable_reason=reason,
+            if(error is DomainException { Error.code: "UNSUPPORTED_DIMENSION_ASSOCIATION" } &&
+                Supported(dimension.GetType()) && dimension.Database is { } database)
+            {
+                try
+                {
+                    using var tr=database.TransactionManager.StartTransaction();
+                    using var native=Find(dimension,database,tr,cancel,ObjectId.Null);
+                    if(native!=null && (int)native.Value.AssocFlag is not (0 or 3))
+                        return ReadPartial(dimension,native.Value,cancel,reason);
+                }
+                catch(OperationCanceledException){throw;}
+                catch(Exception detailError) when(detailError is DomainException or Teigha.Runtime.Exception or InvalidOperationException)
+                { reason+="; stored slot inspection: "+detailError.GetType().Name; }
+            }
+            return new{binding_state="unavailable",association_token=(string?)null,association_handle=(string?)null,active=(bool?)null,points=(object?)null,source_handles=(string[]?)null,editing_unavailable_reason=reason,
                 scope="Association unavailable for this object; stored dimension geometry remains independently readable."};
         }
+    }
+    // The NRX SDK defines the point index and its active bit separately.
+    // Open only native non-null slot pointers and keep each actual path, even
+    // if another slot is inactive or no longer resolves after source edits.
+    static object ReadPartial(Dimension dimension,DimAssoc association,Action cancel,string reason)
+    {
+        int flags=(int)association.AssocFlag;var roles=Roles(dimension.GetType().Name);
+        var sources=new HashSet<string>();var slots=new List<object>();
+        foreach(var role in new[]{roles.First,roles.Second})
+        {
+            cancel();var index=NativeRole(role);bool enabled=(flags&(1<<(int)index))!=0;
+            try
+            {
+                using var reference=association.PointRef(index);
+                if(reference==null || reference.IsDisposed || reference.UnmanagedObject==IntPtr.Zero)
+                {slots.Add(new{role,enabled,stored=false});continue;}
+                var path=reference.IdPath;var ids=path.GetObjectIds();
+                var handles=ids.Select(id=>Live(id)?Id(id):null).ToArray();
+                foreach(var h in handles)if(h!=null)sources.Add(h);
+                double[]? evaluated=null;string? unavailable=null;
+                try{evaluated=Point(reference.EvalPoint());}
+                catch(Exception e) when(e is Teigha.Runtime.Exception or DomainException or InvalidOperationException)
+                { unavailable=e is Teigha.Runtime.Exception native?native.ErrorStatus.ToString():e.GetType().Name; }
+                slots.Add(new{role,enabled,stored=true,source_path=handles,subentity_type=path.SubentId.Type.ToString(),
+                    osnap_type=reference.OsnapType.ToString(),evaluated_point=evaluated,evaluation_unavailable_reason=unavailable});
+            }
+            catch(Exception e) when(e is Teigha.Runtime.Exception or InvalidOperationException or ArgumentException)
+            {slots.Add(new{role,enabled,stored=(bool?)null,unavailable_reason=e is Teigha.Runtime.Exception native?native.ErrorStatus.ToString():e.GetType().Name});}
+        }
+        return new{binding_state="partial_native_dimassoc",association_token=(string?)null,association_handle=Id(association.ObjectId),
+            active=(bool?)null,points=new{flags,owner_handle=Id(association.OwnerId),dimension_handle=Id(dimension.ObjectId),slots},
+            source_handles=sources.OrderBy(s=>s,StringComparer.Ordinal).ToArray(),editing_unavailable_reason=reason,
+            scope="Persisted native point-reference mask and independent stored slots on the current dimension."};
     }
     internal static void MatchPoints(Dimension dimension,PointState[] points)
     {foreach(var point in points)Match(Same(DefinitionPoint(dimension,point.Role),point.Evaluated),"/defining_points/"+point.Role,Point(point.Evaluated),Point(DefinitionPoint(dimension,point.Role)));}
@@ -352,7 +459,7 @@ internal static class CadDimensionAssociation385
             cancel();postEntered=true;assoc.Post(dimension.ObjectId,ObjectId.Null,true);resident=Live(assoc.ObjectId)&&Local(assoc,db);
             Need(resident,"Native Post did not expose this association's actual resident ObjectId; its by-value output argument is not assumed.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
             var postedId=assoc.ObjectId;
-            tr.AddNewlyCreatedDBObject(assoc,true);Ownership(assoc,dimension,db,tr,cancel);
+            tr.AddNewlyCreatedDBObject(assoc,true);bool ownedByDimension=Ownership(assoc,dimension,db,tr,cancel);
             bool Linked(DBObject value)
             {
                 using var reactors=value.GetPersistentReactorIds();int count=0;foreach(ObjectId id in reactors){cancel();if(id==assoc.ObjectId)count++;}
@@ -376,11 +483,14 @@ internal static class CadDimensionAssociation385
                 if(missing.Sources.Length!=0)
                 {
                     var sourceIds=points.Select(point=>point.Source).Distinct().ToArray();
+                    var openedSources=new List<DBObject>();
                     foreach(var id in sourceIds)
                     {
-                        cancel();Source(id,dimension.OwnerId,db,tr,cancel);var writable=tr.GetObject(id,OpenMode.ForWrite);
+                        cancel();var src=Source(id,dimension.OwnerId,db,tr,cancel);bool alreadyWrite=src.IsWriteEnabled;
+                        var writable=tr.GetObject(id,OpenMode.ForWrite);
                         Need(writable.ObjectId==id&&Local(writable,db)&&writable.OwnerId==dimension.OwnerId&&writable.IsWriteEnabled,
                             "A verified native dimension source could not be opened for persistent-reactor registration.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+                        if(!alreadyWrite)openedSources.Add(writable);
                     }
                     cancel();assoc.AddToPointRefReactor();
                     // Complete only an absent native reverse link, using the
@@ -396,6 +506,22 @@ internal static class CadDimensionAssociation385
                         if(count!=1)throw new DomainException("NATIVE_DIMENSION_ASSOCIATION_MISMATCH","A native dimension source did not retain exactly one reverse reactor link.",false,
                             new{association_handle=Id(assoc.ObjectId),dimension_handle=Id(dimension.ObjectId),source_handle=Id(id),actual_flags=(int)assoc.AssocFlag,actual_source_reactor_count=count,stage="public_source_reverse_link_completion"});
                     }
+                    // Deliver notifications for both newly registered source objects
+                    // while the selected association and its actual point refs are
+                    // still available, before its final update and verification.
+                    foreach(var source in openedSources)
+                    {cancel();source.DowngradeOpen();Need(source.IsReadEnabled&&!source.IsWriteEnabled,"Native source registration did not finish its write-open interval.");}
+                }
+                if((int)assoc.AssocFlag is 0 or 1 or 2)
+                {
+                    // Only the newly posted record is eligible. Reinstall each
+                    // missing role from the same preflighted native point reference.
+                    for(int index=0;index<points.Length;index++)
+                    {
+                        var role=NativeRole(points[index].Role);
+                        if(((int)assoc.AssocFlag&(1<<(int)role))==0)
+                        {cancel();assoc.SetPointRef(role,references[index]);}
+                    }
                 }
                 missing=MissingLinks();flags=(int)assoc.AssocFlag;
             }
@@ -405,11 +531,12 @@ internal static class CadDimensionAssociation385
                     new{association_handle=Id(assoc.ObjectId),dimension_handle=Id(dimension.ObjectId),actual_flags=flags,missing_dimension_reactor=missing.Dimension,
                         missing_source_reactor_handles=missing.Sources,native_status=error.ErrorStatus.ToString(),stage="last_observation_before_native_registration_error"});
             }
-            if(missing.Dimension||missing.Sources.Length!=0||flags!=3)throw new DomainException("NATIVE_DIMENSION_ASSOCIATION_MISMATCH","Native point association did not retain both active references and their actual dimension/source reactors before update.",false,
+            if((missing.Dimension&&!ownedByDimension)||missing.Sources.Length!=0||flags!=3)throw new DomainException("NATIVE_DIMENSION_ASSOCIATION_MISMATCH","Native point association did not retain both active references and their actual dimension/source links before update.",false,
                 new{association_handle=Id(assoc.ObjectId),dimension_handle=Id(dimension.ObjectId),actual_flags=flags,expected_flags=3,missing_dimension_reactor=missing.Dimension,
                     missing_source_reactor_handles=missing.Sources,stage="after_native_reactor_registration"});
             var beforeUpdate=ObservePosted434(dimension,points,postedId,tr,"before_UpdateDimension");
             cancel();assoc.UpdateDimension(true,false);cancel();
+            CompleteNewSourceNotifications(assoc,dimension,points,tr,cancel);
             var afterUpdate=ObservePosted434(dimension,points,postedId,tr,"after_UpdateDimension_before_PointRef_cleanup");
             MatchPoints(dimension,points);
             return new(postedId,beforeUpdate,afterUpdate);
@@ -422,6 +549,29 @@ internal static class CadDimensionAssociation385
     }
     internal static void Refresh(Dimension dimension,Snapshot before,Database db,Transaction tr,Action cancel)
     {Need(before.Flags==3,"The dimension has no current supported active association.");using var native=CadNativeDimAssocBinding434.TryBind(tr.GetObject(before.Association,OpenMode.ForWrite));Need(native!=null,"The selected native association descriptor changed.");var assoc=native!.Value;Ownership(assoc,dimension,db,tr,cancel);cancel();assoc.UpdateDimension(true,false);cancel();MatchPoints(dimension,before.Points);}
+    internal static void FinishNewAttachment(Dimension dimension,ObjectId posted,PointState[] points,Database db,Transaction tr,Action cancel)
+    {
+        // Finish the actual dimension's own notifications as well as those
+        // of its sources. Only this operation's newly posted record may change.
+        if(dimension.IsWriteEnabled)dimension.DowngradeOpen();
+        using var native=CadNativeDimAssocBinding434.TryBind(tr.GetObject(posted,OpenMode.ForWrite));
+        Need(native!=null && native.Value.ObjectId==posted && native.Value.DimObjId==dimension.ObjectId,
+            "The newly posted DimAssoc changed during dimension close notification.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+        var assoc=native.Value;Ownership(assoc,dimension,db,tr,cancel);
+        int flags=(int)assoc.AssocFlag;
+        if(flags==3){CompleteNewSourceNotifications(assoc,dimension,points,tr,cancel);return;}
+        Need(flags is 0 or 1 or 2,"Additional native defining roles need their own association adapter.","NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+        foreach(var point in points)
+        {
+            var role=NativeRole(point.Role);
+            if((((int)assoc.AssocFlag)&(1<<(int)role))!=0)continue;
+            using var reference=Reference(Source(point.Source,dimension.OwnerId,db,tr,cancel),point.Snap,point.Pick);
+            Match(Same(reference.EvalPoint(),point.Evaluated),"/post_notification/"+point.Role,Point(point.Evaluated),Point(reference.EvalPoint()));
+            assoc.SetPointRef(role,reference);
+        }
+        cancel();assoc.UpdateDimension(true,false);cancel();
+        CompleteNewSourceNotifications(assoc,dimension,points,tr,cancel);
+    }
     internal static void Detach(Dimension dimension,Snapshot before,Database db,Transaction tr,Action cancel)
     {Need(before.Flags==3,"The dimension has no current supported active association.");using var native=CadNativeDimAssocBinding434.TryBind(tr.GetObject(before.Association,OpenMode.ForWrite));Need(native!=null,"The selected native association descriptor changed.");var assoc=native!.Value;Ownership(assoc,dimension,db,tr,cancel);cancel();assoc.RemoveAssociativity(true);cancel();}
 

@@ -110,9 +110,11 @@ public static class ReadPreparationBindings433
                 "set_polyline_geometry" or "set_polyline_vertices" or "set_polyline_corners" or "reverse_polyline" => ["closed", "elevation", "normal", "thickness", "constant_width", "vertex_count", "vertices"],
                 "replace_text" => ["text", "position", "alignment_point", "rotation"],
                 "replace_mtext" => ["contents", "plain_text", "location", "direction", "normal"],
-                "replace_dimension_text" => ["dimension_kind", "dimension_text", "text_position"],
+                "replace_dimension_text" => ["dimension_kind", "measurement", "measurement_unit", "measurement_unavailable_reason", "dimension_text", "dimension_text_mode", "text_position"],
+                "associate_dimension" or "update_dimension_association" or "detach_dimension_association" =>
+                    ["dimension_kind", "definition", "measurement", "measurement_unit", "dimension_text", "dimension_text_mode", "association"],
                 "set_dimension_definition" => ["dimension_kind", "definition", "normal", "elevation"],
-                "set_dimension_display" => ["dimension_kind", "dimension_text", "display", "display_unavailable_reason"],
+                "set_dimension_display" => ["dimension_kind", "measurement", "measurement_unit", "dimension_text", "dimension_text_mode", "display", "display_unavailable_reason"],
                 "set_dimension_line" => ["dimension_kind", "definition", "text_position"],
                 "set_dimension_text_position" => ["dimension_kind", "text_position", "display"],
                 "replace_mleader_text" => ["plain_text", "contents", "content_location", "content_type"],
@@ -139,8 +141,20 @@ public static class ReadPreparationBindings433
                     !Get(entity, "ref", out var reference) || !Reference(reference)) continue;
                 string? type = Text(entity, "type");
                 Get(entity, "geometry", out var geometry);
-                if (!ObjectVariant(type, geometry)) continue;
                 var ep = ip + "/entity"; var gp = ep + "/geometry";
+                if (Variant("associate_dimension") && type is "Circle" or "Arc" or "Line")
+                {
+                    var source = Candidate(ep, Target(reference));
+                    source["target"]!["scope"] = "explicitly_inspected_source_for_binding";
+                    source["target"]!["type"] = type;
+                    Current(source, "source_handle", reference, "handle", ep + "/ref");
+                    foreach (string field in new[] { "center", "start", "end", "start_point", "end_point", "radius", "normal" })
+                        Current(source, field, geometry, field, gp);
+                    Note(source, "mapping_note", "Use this source_handle with its intended defining role and native snap. Two selected circle centers can supply xline1 and xline2 without coordinate input.", ep);
+                    output.Add(source);
+                    continue;
+                }
+                if (!ObjectVariant(type, geometry)) continue;
                 var candidate = Candidate(ep, Target(reference));
                 candidate["target"]!["type"] = type;
                 Handle(candidate, reference, ep + "/ref");
@@ -154,6 +168,12 @@ public static class ReadPreparationBindings433
                     case "replace_text": Bind(candidate, "expected_text", geometry, "text", gp); break;
                     case "replace_dimension_text": Bind(candidate, "expected_text", geometry, "dimension_text", gp); break;
                     case "replace_mleader_text": Bind(candidate, "expected_text", geometry, "plain_text", gp); break;
+                    case "associate_dimension":
+                    case "update_dimension_association":
+                    case "detach_dimension_association":
+                        if (Get(geometry, "association", out var association))
+                            Bind(candidate, "association_token", association, "association_token", gp + "/association");
+                        break;
                     case "set_dimension_definition":
                         Bind(candidate, "dimension_kind", geometry, "dimension_kind", gp);
                         Bind(candidate, "expected_definition", geometry, "definition", gp);
@@ -186,6 +206,7 @@ public static class ReadPreparationBindings433
             "set_polyline_geometry" or "set_polyline_vertices" or "set_polyline_corners" or "reverse_polyline" => type == "Polyline",
             "replace_text" => type == "Text",
             "replace_mtext" => type == "MText",
+            "associate_dimension" or "update_dimension_association" or "detach_dimension_association" or
             "replace_dimension_text" or "set_dimension_definition" or "set_dimension_display" or "set_dimension_line" or "set_dimension_text_position" => type == "Dimension",
             "replace_mleader_text" or "set_mleader_vertices" => type == "MLeader",
             "set_hatch_properties" or "set_hatch_boundary" => type == "Hatch",
@@ -201,7 +222,7 @@ public static class ReadPreparationBindings433
 
         internal void Variables(JsonElement data)
         {
-            if (!(operation == "set_model_parameter" || Variant("set_model_parameter_name")) ||
+            if (!(operation == "set_model_parameter" || Variant("name_model_parameter")) ||
                 !Get(data, "source_ref", out var source) || !Reference(source)) return;
             foreach (var (variable, pointer) in Array(data, "variables", "/data"))
             {

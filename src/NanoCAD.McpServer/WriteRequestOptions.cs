@@ -125,13 +125,13 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
                 {
                     ["type"] = "boolean",
                     ["default"] = false,
-                    ["description"] = "Run available preflight checks without writing."
+                    ["description"] = "Preflight only."
                 };
                 fields["return_state"] = new JsonObject
                 {
                     ["type"] = "boolean",
                     ["default"] = false,
-                    ["description"] = "Include current observations of returned objects after a confirmed write."
+                    ["description"] = "Read after commit."
                 };
                 var optional = new HashSet<string>(StringComparer.Ordinal) { "bridge_instance_id" };
                 if (UnitsDefault(operation) && fields["units"] is JsonObject units)
@@ -143,11 +143,11 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
                 {
                     revision.Remove("maxLength");
                     revision["pattern"] = "^(?:(?:" + UuidPattern + "/" + UuidPattern + "/)?" + NumericRevision + ")$";
-                    revision["description"] = "Use context.write_revision to omit document_id for the sole open active drawing.";
+                    revision["description"] = "Sole open drawing: context.write_revision implies document_id.";
                     optional.Add("document_id");
                 }
                 if (fields["bridge_instance_id"] is JsonObject bridge)
-                    bridge["description"] = "Omit only when there is exactly one local bridge.";
+                    bridge["description"] = "Optional with one local bridge.";
                 if (node["required"] is JsonArray required)
                     for (int i = required.Count - 1; i >= 0; --i)
                         if (required[i] is JsonValue field && field.TryGetValue<string>(out var key) && optional.Contains(key)) required.RemoveAt(i);

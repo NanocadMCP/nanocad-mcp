@@ -89,10 +89,67 @@ internal static class NativeSketchConstraintWriter385
             bool? parameterCoherent = control.ParameterValue.HasValue ? ModelParameterSnapshot.Near(control.ParameterValue.Value, control.Value) : null;
             bool descriptorMatches = ModelParameterSnapshot.Near(control.RelationValue, control.Value) && (string.IsNullOrWhiteSpace(control.RelationExpression) || double.TryParse(control.RelationExpression, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double descriptorValue) && ModelParameterSnapshot.Near(descriptorValue, control.Value)); bool resolution = !geometryCoherent || parameterCoherent == false;
             return new(id, true, ParameterToken(control), null, Key(control.Variable), Key(control.Member), spec.Kind, control.Value, control.Kind == "angle" ? "radians" : "millimeters", control.Expression, control.VariableState.GetProperty("host_object_id").GetString(), null,
-                value.Sketch.Profiles.EnumerateArray().Select(p => p.GetProperty("profile_id").GetString()!).ToArray(), Consumers(value), NativeSketchConstraintState385.Scope + (resolution ? " The exact retained literal is eligible for native reconciliation; current geometry/bound evaluated parameter differs and is not claimed coherent. A write must verify requested literal, control and solved geometry agree." : ""), Wire.Element(new { value.Relations, member_bindings = value.Inputs.Stored, control_geometry_coherent = geometryCoherent, control_parameter_coherent = parameterCoherent, control_variable_value_coherent = true, needs_native_resolution = resolution, parameter_binding_getter_available = !control.ParameterVariable.IsNull, parameter_value_getter_available = control.ParameterValue.HasValue, parameter_raw_value_available = control.ParameterRawValue.HasValue, parameter_variable_id = control.ParameterVariable.IsNull ? null : Key(control.ParameterVariable), parameter_value = control.ParameterValue, parameter_raw_value = control.ParameterRawValue, raw_parameter_value_matches_literal = control.ParameterRawValue.HasValue ? (bool?)ModelParameterSnapshot.Near(control.ParameterRawValue.Value, control.Value) : null, relation_control_value = control.RelationValue, relation_variable_expression = control.RelationExpression, descriptor_matches_current_variable = descriptorMatches, descriptor_lifetime = "dynamic synchronization with the owner MCS value is not guaranteed", variable_value = control.Value }));
+                value.Sketch.Profiles.EnumerateArray().Select(p => p.GetProperty("profile_id").GetString()!).ToArray(), Consumers(value), NativeSketchConstraintState385.Scope + (resolution ? " The exact retained literal is eligible for native reconciliation; current geometry/bound evaluated parameter differs and is not claimed coherent. A write must verify requested literal, control and solved geometry agree." : ""), Wire.Element(new { value.Relations, control_links=ControlLinks(control,cancel),smooth_relations=SmoothObservations(value,cancel),solver_status="not_evaluated", member_bindings = value.Inputs.Stored, control_geometry_coherent = geometryCoherent, control_parameter_coherent = parameterCoherent, control_variable_value_coherent = true, needs_native_resolution = resolution, parameter_binding_getter_available = !control.ParameterVariable.IsNull, parameter_value_getter_available = control.ParameterValue.HasValue, parameter_raw_value_available = control.ParameterRawValue.HasValue, parameter_variable_id = control.ParameterVariable.IsNull ? null : Key(control.ParameterVariable), parameter_value = control.ParameterValue, parameter_raw_value = control.ParameterRawValue, raw_parameter_value_matches_literal = control.ParameterRawValue.HasValue ? (bool?)ModelParameterSnapshot.Near(control.ParameterRawValue.Value, control.Value) : null, relation_control_value = control.RelationValue, relation_variable_expression = control.RelationExpression, descriptor_matches_current_variable = descriptorMatches, descriptor_lifetime = "dynamic synchronization with the owner MCS value is not guaranteed", variable_value = control.Value }));
         }
         catch (OperationCanceledException) { throw; }
-        catch (Exception error) { return new(id, false, null, error is DomainException d ? d.Error.code + ": " + d.Message : error.GetType().Name, null, null, null, null, "relation_declared_mm_or_radians", null, null, null, [], [], NativeSketchConstraintState385.Scope, error is DomainException failure && failure.Error.code == "CONSTRAINT_PARAMETER_UNAVAILABLE" && failure.Error.details != null ? Wire.Element(new { parameter_read_failure = failure.Error.details }) : null); }
+        catch (Exception error) { return new(id, false, null, error is DomainException d ? d.Error.code + ": " + d.Message : error.GetType().Name, null, null, null, null, "relation_declared_mm_or_radians", null, null, null, [], [], NativeSketchConstraintState385.Scope, error is DomainException failure ? Wire.Element(new { requested_constraint_id=id, parameter_read_failure=failure.Error.details, code=failure.Error.code, solver_status="not_evaluated" }) : null); }
+    }
+    static object ControlLinks(NativeSketchConstraintState385.Control control, Action cancel)
+    {
+        var upstream=new List<string>(); bool upstreamComplete=true;
+        foreach(var row in control.State.Part.Preserved.GetProperty("variables").EnumerateArray())
+        {
+            cancel();
+            if(!row.TryGetProperty("downstream_variables",out var links)||links.ValueKind!=JsonValueKind.Array){upstreamComplete=false;continue;}
+            if(links.EnumerateArray().Any(id=>NativeSketchConstraintState385.Same(id.GetString(),Key(control.Variable))))
+                upstream.Add(row.GetProperty("mc_id").GetString()!);
+        }
+        return new{scope="observed_native_variable_inventory",variable_id=Key(control.Variable),member_id=Key(control.Member),
+            upstream_variable_ids=upstream,upstream_complete_in_observed_inventory=upstreamComplete,
+            downstream_variable_ids=control.VariableState.GetProperty("downstream_variables"),
+            downstream_object_ids=control.VariableState.GetProperty("downstream_objects")};
+    }
+    sealed record NumericControlAvailability(string constraint_id,bool eligible,string? variable_id,string? member_id,string? unavailable_reason);
+    static NumericControlAvailability[] NumericControls(NativeSketchConstraintState385.Snapshot state, Action cancel)
+    {
+        var result=new List<NumericControlAvailability>();
+        foreach(var relation in state.Relations.GetProperty("constraints").EnumerateArray())
+        {
+            cancel();if(!relation.GetProperty("dimensional").GetBoolean())continue;
+            string id=relation.GetProperty("id").GetString()!;
+            try
+            {
+                var control=NativeSketchConstraintState385.ControlOf(state,id,cancel);
+                ControlSpec(control,control.Value);
+                result.Add(new(id,true,Key(control.Variable),Key(control.Member),null));
+            }
+            catch(DomainException error){result.Add(new(id,false,null,null,error.Error.code));}
+            catch(Exception error) when(error is not OperationCanceledException){result.Add(new(id,false,null,null,error.GetType().Name));}
+        }
+        return result.ToArray();
+    }
+    static object[] SmoothObservations(NativeSketchConstraintState385.Snapshot state,Action cancel)
+    {
+        var result=new List<object>();
+        foreach(var row in state.Relations.GetProperty("constraints").EnumerateArray())
+        {
+            cancel();if(row.GetProperty("type").GetString()!="GeomSmooth")continue;
+            var id=row.GetProperty("id").GetString();
+            try
+            {
+                NativeSketchMembers385.ValidateSmoothRelations(Wire.Element(new{constraints=new[]{row}}),state.Inputs,cancel);
+                result.Add(new{constraint_id=id,continuity="G1",verification="coincident_endpoints_and_common_tangent"});
+            }
+            catch(DomainException error)
+            {
+                result.Add(new{constraint_id=id,continuity=(string?)null,unavailable_reason=error.Error.code,message=error.Message});
+            }
+            catch(Exception error) when(error is not OperationCanceledException)
+            {
+                result.Add(new{constraint_id=id,continuity=(string?)null,unavailable_reason=error.GetType().Name});
+            }
+        }
+        return result.ToArray();
     }
     static string[] Consumers(NativeSketchConstraintState385.Snapshot state)
     {
@@ -143,6 +200,8 @@ internal static class NativeSketchConstraintWriter385
         NativeSketchConstraintState385.Snapshot? literalExpectedBefore = null;
         NativeSketchEditorSolve445.Pending? pendingLiteralSolve = null;
         NativeSketchEditorSolve445.Transition? completedLiteralTransition = null;
+        NumericControlAvailability[] beforeControls=[];
+        object? originalControlLinks=null;
         void Trace(string value) { stage = value; log.Write(job.Operation, job.OriginalRequestId, "native_sketch385_checkpoint", transaction: value, operationId: job.OperationId); }
         void Exit() { if (!editing) return; var sketch = activeEditor ?? before!.Sketch.Sketch; Need(sketch.ExitEditMode(), "MODEL_UPDATE_FAILED", "Native sketch edit mode did not close."); editing = false; Need(!sketch.IsInEditMode && !before!.Sketch.Sketch.IsInEditMode, "MODEL_UPDATE_FAILED", "Native sketch edit mode remains active."); }
         void Close() { var value = tracker; tracker = null; if (value == null) return; try { value.Stop(); } finally { value.Dispose(); } }
@@ -163,14 +222,23 @@ internal static class NativeSketchConstraintWriter385
                 warnings.Add("NATIVE_SKETCH_MEMBER_IDS_UPDATED: The native editor updated sketch input or relation IDs through observed native bindings; inspect current history for persistent input and relation IDs.");
             if (project) warnings.AddRange([ModelFeatureReorderState345.ValidityWarning, ModelSketchConstraintObservation353.Warning, ModelSketchConstraintMetadata379.Warning]); else if (storageChanged) warnings.Add(ModelSketchConstraintMetadata379.Warning);
             if (selected == null) return Result.Ok(job.OriginalRequestId, new ModifiedEntities(args.OperationId, "committed", false, [body], replaced ? [source] : [], replaced ? [body] : [], [], "not_guaranteed", sketch_constraint_changes: changes), context, warnings.Distinct().ToArray());
-            var actualMember = project ? selected.Member : NativeSketchConstraintState385.ControlOf(after, Key(selected.Constraint), job.CheckCancellation).Member;
-            var edit = (ModelSketchConstraintParameterSpec379)args.Operations[0]; var change = new ModelSketchConstraintParameterChange379(0, source, body, Key(after.Part.Body.ID), Sketch(args), Key(selected.Constraint), Key(selected.Variable), Key(actualMember), selected.Kind, selected.Value, edit.Value, selected.Kind == "angle" ? "radians" : "millimeters", selected.Expression, edit.Value, null, null, after.Sketch.Profiles.EnumerateArray().Select(p => p.GetProperty("profile_id").GetString()!).ToArray(), Consumers(after), replaced, storageChanged ? "unverified_native_storage_changes" : "exact_observed_storage", project ? Wire.Element(new { reservation = new string('X', 5120) }) : details == null ? null : Wire.Element(details));
+            var currentControl=project?selected:NativeSketchConstraintState385.ControlOf(after,Key(selected.Constraint),job.CheckCancellation);
+            var actualMember=currentControl.Member;
+            var edit = (ModelSketchConstraintParameterSpec379)args.Operations[0]; var change = new ModelSketchConstraintParameterChange379(0, source, body, Key(after.Part.Body.ID), Sketch(args), Key(selected.Constraint), Key(selected.Variable), Key(actualMember), selected.Kind, selected.Value, edit.Value, selected.Kind == "angle" ? "radians" : "millimeters", selected.Expression, edit.Value, null, null, after.Sketch.Profiles.EnumerateArray().Select(p => p.GetProperty("profile_id").GetString()!).ToArray(), Consumers(after), replaced, storageChanged ? "unverified_native_storage_changes" : "exact_observed_storage", project ? Wire.Element(new { reservation = new string('X', 5120) }) : details == null ? null : Wire.Element(details)) with { control_observation = Wire.Element(new{ before=originalControlLinks, after=ControlLinks(currentControl,job.CheckCancellation), smooth_relations=SmoothObservations(after,job.CheckCancellation),solver_status="not_evaluated" }) };
+            var afterControls=project?beforeControls:NumericControls(after,job.CheckCancellation);
+            var previousIds=beforeControls.Where(row=>row.eligible).Select(row=>completedLiteralTransition?.Mapping.Map(row.constraint_id)??row.constraint_id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var currentIds=afterControls.Where(row=>row.eligible).Select(row=>row.constraint_id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            change=change with{control_availability=Wire.Element(new{scope="numeric_literal_editor_in_selected_native_sketch",body_mc_id=Key(after.Part.Body.ID),sketch_id=Sketch(args),
+                before=beforeControls,after=afterControls,identity_basis=completedLiteralTransition==null?"same_native_ids":"verified_local_native_correspondence",
+                prior_eligible_ids_in_current_scope=previousIds.OrderBy(id=>id,StringComparer.OrdinalIgnoreCase).ToArray(),became_eligible=currentIds.Except(previousIds,StringComparer.OrdinalIgnoreCase).ToArray(),
+                no_longer_eligible=previousIds.Except(currentIds,StringComparer.OrdinalIgnoreCase).ToArray()})};
             return Result.Ok(job.OriginalRequestId, new ModelSketchConstraintParameterOutput379(args.OperationId, "committed", false, [body], replaced ? [source] : [], replaced ? [body] : [], [], "not_guaranteed", [change]), context, warnings.Distinct().ToArray());
         }
         try
         {
             using (var tx = state.Document.Database.TransactionManager.StartTransaction()) before = Resolve(args, state, tx, job.CheckCancellation);
             SketchConstraintSpec[] specs = args.Operations[0] is SketchConstraintsEdit add ? add.Constraints : [ControlSpec(selected = NativeSketchConstraintState385.ControlOf(before, ((ModelSketchConstraintParameterSpec379)args.Operations[0]).ConstraintId, job.CheckCancellation), ((ModelSketchConstraintParameterSpec379)args.Operations[0]).Value)];
+            if(selected!=null){beforeControls=NumericControls(before,job.CheckCancellation);originalControlLinks=ControlLinks(selected,job.CheckCancellation);}
             var reserve = specs.Select(s => new SketchConstraintChange(Sketch(args), "{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}", s.Kind, s.First, s.Second, "{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}", s.Value, s.Third)).ToArray(); Bytes(Outcome(before, reserve, project: true), job.CheckCancellation);
             if (selected == null)
             {

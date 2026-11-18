@@ -15,7 +15,7 @@ internal static class CadExternalReferences385
     internal sealed record FileStamp(string Path,long Length,string Sha256);
     internal sealed record Resolved(ExternalReferenceEdit385 Edit,ObjectId Space,ObjectId Layer,ObjectId Target,ObjectId Definition,
         string Kind,string Name,FileStamp? Source,JsonElement Before,Dictionary<ObjectId,JsonElement> Peers)
-    { internal JsonElement DefinitionBefore {get;init;} }
+    { internal JsonElement DefinitionBefore {get;init;} internal CadRasterCalibration.Plan? Calibration {get;init;} }
     internal sealed record Prepared(DBObject? Definition,Entity? Entity)
     {
         // The caller releases these wrappers after its transaction has closed.
@@ -136,7 +136,9 @@ internal static class CadExternalReferences385
     {
         var state=DefinitionState(item,kind,db,tr,cancel);string? reason=null;string? token=null;
         try{RequireDefinition(item.ObjectId,kind,db,tr);References(item.ObjectId,kind,db,tr,cancel);token=Token(state);}catch(DomainException e){reason=e.Error.message;}
-        return new{definition_ref=Ref(item.ObjectId,context),native_type=item.GetType().Name,reference_kind=kind,name=state.GetProperty("name").GetString(),source_path=state.GetProperty("source_path").GetString(),item_name=state.GetProperty("item_name"),overlay=state.GetProperty("overlay"),reference_refs=state.GetProperty("reference_handles").EnumerateArray().Select(h=>new EntityRef(context.bridge_instance_id,context.document_id,h.GetString()!)).ToArray(),loaded=item is RasterImageDef image?(bool?)image.IsLoaded:item is UnderlayDefinition u?u.Loaded:null,image_pixel_size=item is RasterImageDef pixels?new[]{N(pixels.Size.X),N(pixels.Size.Y)}:null,status=item is BlockTableRecord block?block.XrefStatus.ToString():null,reference_token=token,editing_unavailable_reason=reason};
+        string? resolvedPath=null;
+        try { resolvedPath=SourcePath(item,kind,db); } catch (DomainException) { }
+        return new{definition_ref=Ref(item.ObjectId,context),resolved_source_path=resolvedPath,native_active_source_path=ActiveSource(item),native_type=item.GetType().Name,reference_kind=kind,name=state.GetProperty("name").GetString(),source_path=state.GetProperty("source_path").GetString(),item_name=state.GetProperty("item_name"),overlay=state.GetProperty("overlay"),reference_refs=state.GetProperty("reference_handles").EnumerateArray().Select(h=>new EntityRef(context.bridge_instance_id,context.document_id,h.GetString()!)).ToArray(),loaded=item is RasterImageDef image?(bool?)image.IsLoaded:item is UnderlayDefinition u?u.Loaded:null,image_pixel_size=item is RasterImageDef pixels?new[]{N(pixels.Size.X),N(pixels.Size.Y)}:null,status=item is BlockTableRecord block?block.XrefStatus.ToString():null,reference_token=token,editing_unavailable_reason=reason};
     }
     internal static object Read(Entity entity,EntityRef context,Transaction tr,Action cancel)
     {
@@ -147,9 +149,54 @@ internal static class CadExternalReferences385
         var result=new{reference_kind=kind,native_type=entity.GetType().Name,owner_ref=Ref(entity.OwnerId,context),definition_ref=Ref(def,context),placement=Pose(entity),definition=ReadDefinition(item,kind,context,db,tr,cancel),reference_token=token,editing_unavailable_reason=reason};
         Element(result,cancel);return result;
     }
-    static string SourcePath(DBObject definition,string kind,Database db)
+    static string StoredSource(DBObject definition) => definition switch
     {
-        string path=definition switch{BlockTableRecord b=>b.PathName,RasterImageDef image=>image.SourceFileName,UnderlayDefinition u=>u.SourceFileName,_=>""};
+        BlockTableRecord block => block.PathName,
+        RasterImageDef image => image.SourceFileName,
+        UnderlayDefinition underlay => underlay.SourceFileName,
+        _ => throw new DomainException("OUT_OF_SCOPE", "Unexpected native reference definition.")
+    };
+    static string? ActiveSource(DBObject definition)
+    {
+        try
+        {
+            // The xref database belongs to the host. Request its existing
+            // borrowed database without incrementing the reference count.
+            var active=definition switch
+            {
+                BlockTableRecord {XrefStatus:XrefStatus.Resolved} block=>block.GetXrefDatabase(false)?.Filename,
+                RasterImageDef {IsLoaded:true} image=>image.ActiveFileName,
+                UnderlayDefinition {Loaded:true} underlay=>underlay.ActiveFileName,
+                _=>null
+            };
+            return string.IsNullOrWhiteSpace(active) ? null : active;
+        }
+        catch(Teigha.Runtime.Exception){return null;}
+        catch(NotSupportedException){return null;}
+        catch(InvalidOperationException){return null;}
+    }
+    static void SetStoredSource(DBObject definition, string path)
+    {
+        if (StoredSource(definition) == path) return;
+        bool upgrade = !definition.IsWriteEnabled;
+        if (upgrade) definition.UpgradeOpen();
+        try
+        {
+            switch (definition)
+            {
+                case BlockTableRecord block: block.PathName = path; break;
+                case RasterImageDef raster: raster.SourceFileName = path; break;
+                case UnderlayDefinition underlay: underlay.SourceFileName = path; break;
+                default: throw new DomainException("OUT_OF_SCOPE", "Unexpected native reference definition.");
+            }
+        }
+        finally { if (upgrade) definition.DowngradeOpen(); }
+    }
+    static string SourcePath(DBObject definition,string kind,Database db) => ResolvePath(StoredSource(definition),kind,db);
+    static string ResolvePath(string path,string kind,Database db)
+    {
+        // Source acquisition always uses the named host DWG as its base.
+        // An existing DWG may already contain a valid absolute or relative link.
         if(!Path.IsPathRooted(path))
         {Need(!string.IsNullOrEmpty(db.Filename)&&Path.IsPathRooted(db.Filename),"A relative reference source requires a named host drawing.");path=Path.GetFullPath(Path.Combine(Path.GetDirectoryName(db.Filename)!,path));}
         return ExternalReferenceValidation385.NormalizePath(path,kind);
@@ -189,6 +236,7 @@ internal static class CadExternalReferences385
         var layer=ObjectId.Null;var target=ObjectId.Null;var definition=ObjectId.Null;JsonElement before=Wire.Element(new{});var peers=new Dictionary<ObjectId,JsonElement>();
         if(path!=null)
         {
+            path=ResolvePath(path,kind,db);
             Need(string.IsNullOrEmpty(db.Filename)||!string.Equals(Path.GetFullPath(db.Filename),path,StringComparison.OrdinalIgnoreCase),"The host drawing cannot attach itself.");
             if(kind=="xref")Need(!((BlockTable)tr.GetObject(db.BlockTableId,OpenMode.ForRead)).Has(name),"Xref definition name already exists.","BLOCK_EXISTS");
             else{ObjectId dictionary=ExistingDictionary(db,tr,kind);if(Live(dictionary))Need(!((DBDictionary)tr.GetObject(dictionary,OpenMode.ForRead)).Contains(name),"Reference definition name already exists.","DEFINITION_EXISTS");}
@@ -203,7 +251,9 @@ internal static class CadExternalReferences385
             definition=target;var item=RequireDefinition(definition,kind,db,tr);before=DefinitionState(item,kind,db,tr,cancel);name=before.GetProperty("name").GetString()!;
             foreach(ObjectId id in References(definition,kind,db,tr,cancel))
             {var entity=(Entity)tr.GetObject(id,OpenMode.ForRead);RequireRoot(entity,db,tr);layers(entity.LayerId).RequireAttributeWrite();peers.Add(id,Root(entity,tr,cancel));}
-            path=SourcePath(item,kind,db);
+            path=edit is ReferenceLifecycle385 { SourcePath: { } replacement } ? ResolvePath(replacement,kind,db) : SourcePath(item,kind,db);
+            if (edit is ReferenceLifecycle385 { SourcePath: not null } && kind=="xref")
+                Need(string.IsNullOrEmpty(db.Filename)||!string.Equals(Path.GetFullPath(db.Filename),path,StringComparison.OrdinalIgnoreCase),"The host drawing cannot reference itself.");
         }
         else
         {
@@ -226,7 +276,9 @@ internal static class CadExternalReferences385
         }
         Element(peers.Select(pair=>new{handle=Handle(pair.Key),snapshot=pair.Value}).ToArray(),cancel);
         return new(edit,space,layer,target,definition,kind,name,File(path,edit is ReferenceLifecycle385{Action:"reload_xref" or "reload_reference"},cancel),before,peers)
-        {DefinitionBefore=DefinitionState(RequireDefinition(definition,kind,db,tr),kind,db,tr,cancel)};
+        {DefinitionBefore=DefinitionState(RequireDefinition(definition,kind,db,tr),kind,db,tr,cancel),
+         Calibration=edit is SetReferencePlacement385 {Properties.Calibration:{} controls}
+             ? CadRasterCalibration.Prepare((RasterImage)tr.GetObject(target,OpenMode.ForRead),controls) : null};
     }
     static void Place(Entity entity,Point2 position,double rotation,double scale,double width=0,double height=0)
     {
@@ -248,9 +300,25 @@ internal static class CadExternalReferences385
             Need(Same(actual)&&Near(Math.Cos(angle),Math.Cos(rotation))&&Near(Math.Sin(angle),Math.Sin(rotation))&&Near(factors.X,scale)&&Near(factors.Y,scale)&&Near(factors.Z,scale),"Native reference placement did not retain the requested position, rotation and scale.","API_EXCEPTION");
         }
     }
+    internal static void CheckReplacementDrawing(Resolved resolved, Action cancel)
+    {
+        if (resolved.Edit is not ReferenceLifecycle385 { SourcePath: not null } || resolved.Kind!="xref") return;
+        cancel();
+        var path=resolved.Source!.Path;
+        try
+        {
+            using var candidate=new Database(false,true);
+            candidate.ReadDwgFile(path, FileOpenMode.OpenForReadAndAllShare, false, "");
+        }
+        catch(Teigha.Runtime.Exception error)
+        {throw new DomainException("SOURCE_FILE_UNAVAILABLE","The replacement DWG could not be opened read-only.",false,new{source_path=path,api_status=error.ErrorStatus.ToString()});}
+    }
     internal static Prepared Preview(Resolved resolved,List<DBObject> owned,Action cancel,Action<string>? trace=null)
     {
         cancel();DBObject? definition=null;Entity? entity=null;
+        // A side database can raise host revision events. Inspect it once in
+        // the admitted command before opening the existing reference for write.
+        CheckReplacementDrawing(resolved,cancel);
         if(resolved.Edit is AttachXref385 or InsertRasterImage385)
         {
             // Source readability/current owner/name/layer and complete output
@@ -262,7 +330,7 @@ internal static class CadExternalReferences385
         else if(resolved.Edit is AttachUnderlay385 underlay)
         {
             trace?.Invoke("underlay_definition_allocate_before");var data=underlay.Format=="dwf"?(UnderlayDefinition)new DwfDefinition():underlay.Format=="dgn"?new DgnDefinition():new PdfDefinition();definition=data;owned.Add(data);trace?.Invoke("underlay_definition_allocate_returned");
-            data.SourceFileName=underlay.SourcePath;data.ItemName=underlay.ItemName;trace?.Invoke("underlay_definition_load_before");data.Load("");trace?.Invoke("underlay_definition_load_returned");Need(data.Loaded,"Native underlay item is unavailable; check the declared item_name and installed format loader.","SOURCE_FILE_UNAVAILABLE");
+            data.SourceFileName=resolved.Source!.Path;data.ItemName=underlay.ItemName;trace?.Invoke("underlay_definition_load_before");data.Load("");trace?.Invoke("underlay_definition_load_returned");Need(data.Loaded,"Native underlay item is unavailable; check the declared item_name and installed format loader.","SOURCE_FILE_UNAVAILABLE");
             trace?.Invoke("underlay_entity_allocate_before");entity=underlay.Format=="dwf"?new DwfReference():underlay.Format=="dgn"?new DgnReference():new PdfReference();owned.Add(entity);trace?.Invoke("underlay_entity_allocate_returned");
             trace?.Invoke("underlay_frame_before");Place(entity,underlay.Position,underlay.Rotation,underlay.Scale);((UnderlayReference)entity).IsOn=true;trace?.Invoke("underlay_frame_returned");
         }
@@ -290,10 +358,11 @@ internal static class CadExternalReferences385
     internal static StructureChange Apply(StructureWriteArguments args,int index,Resolved resolved,Prepared prepared,Database db,Transaction tr,WriteJob job,Action<string>? trace=null)
     {
         void Stage(string value)=>trace?.Invoke("reference_"+index+"_"+resolved.Kind+"_"+value);
+        RasterCalibrationResult? calibrationResult=null;
         job.CheckCancellation();Stage("source_verify_before");CheckSource(resolved.Source,job.CheckCancellation);Stage("source_verify_returned");ObjectId target=resolved.Target;ObjectId definition=resolved.Definition;bool created=false;StructureChild[]? children=null;
         if(resolved.Edit is AttachXref385 attach)
         {
-            var createdObjects=prepared.CreatedObjects;Need(createdObjects!=null,"Reference creation wrapper ownership was not prepared.","API_EXCEPTION");Stage("xref_attach_before");definition=attach.Overlay?db.OverlayXref(attach.SourcePath,attach.Name):db.AttachXref(attach.SourcePath,attach.Name);Stage("xref_attach_returned");var data=(BlockTableRecord)RequireDefinition(definition,"xref",db,tr);
+            var createdObjects=prepared.CreatedObjects;Need(createdObjects!=null,"Reference creation wrapper ownership was not prepared.","API_EXCEPTION");Stage("xref_attach_before");definition=attach.Overlay?db.OverlayXref(resolved.Source!.Path,attach.Name):db.AttachXref(resolved.Source!.Path,attach.Name);Stage("xref_attach_returned");var data=(BlockTableRecord)RequireDefinition(definition,"xref",db,tr);
             Need(data.Name==attach.Name&&data.IsFromOverlayReference==attach.Overlay&&data.XrefStatus==XrefStatus.Resolved,"Native xref did not resolve with the requested name/mode.","API_EXCEPTION");
             Stage("xref_entity_allocate_before");var entity=new BlockReference(new Point3d(attach.Position.X,attach.Position.Y,0),definition);createdObjects.Add(entity);Stage("xref_entity_allocate_returned");
             Stage("xref_frame_before");Place(entity,attach.Position,attach.Rotation,attach.Scale);Stage("xref_frame_returned");target=Append(entity,resolved,tr,job,Stage);created=true;
@@ -303,7 +372,7 @@ internal static class CadExternalReferences385
             var createdObjects=prepared.CreatedObjects;Need(createdObjects!=null,"Raster creation wrapper ownership was not prepared.","API_EXCEPTION");
             Stage("raster_definition_allocate_before");var data=new RasterImageDef();createdObjects.Add(data);Stage("raster_definition_allocate_returned");
             definition=AddDefinition(data,resolved,db,tr,job,Stage);
-            Stage("raster_source_path_before");data.SourceFileName=rasterEdit.SourcePath;Stage("raster_source_path_returned");
+            Stage("raster_source_path_before");data.SourceFileName=resolved.Source!.Path;Stage("raster_source_path_returned");
             Stage("raster_definition_load_before");data.Load();Stage("raster_definition_load_returned");
             Need(data.IsLoaded,"Native raster loader did not load the image.","SOURCE_FILE_UNAVAILABLE");
             var pixels=data.Size;Need(double.IsFinite(pixels.X)&&double.IsFinite(pixels.Y)&&pixels.X>0&&pixels.Y>0,"Native raster loader did not decode a nonempty image.","SOURCE_FILE_UNAVAILABLE");
@@ -323,7 +392,9 @@ internal static class CadExternalReferences385
         else if(resolved.Edit is SetReferencePlacement385 placement)
         {
             var entity=(Entity)tr.GetObject(target,OpenMode.ForWrite);Need(Exact(Root(entity,tr,job.CheckCancellation),resolved.Before),"Reference changed after preflight.","REFERENCE_CONFLICT");var retained=Root(entity,tr,job.CheckCancellation,false);
-            if(entity is RasterImage raster)
+            if(entity is RasterImage calibrated && placement.Properties.Calibration is {} controls)
+                calibrationResult=CadRasterCalibration.Apply(calibrated,controls,resolved.Calibration!);
+            else if(entity is RasterImage raster)
             {var frame=raster.Orientation;double rotation=Math.Atan2(frame.Xaxis.Y,frame.Xaxis.X);Place(entity,placement.Properties.Position??new(frame.Origin.X,frame.Origin.Y),placement.Properties.Rotation??rotation,1,placement.Properties.Width??frame.Xaxis.Length,placement.Properties.Height??frame.Yaxis.Length);}
             else if(entity is BlockReference b)Place(entity,placement.Properties.Position??new(b.Position.X,b.Position.Y),placement.Properties.Rotation??b.Rotation,placement.Properties.Scale??b.ScaleFactors.X);
             else{var u=(UnderlayReference)entity;Place(entity,placement.Properties.Position??new(u.Position.X,u.Position.Y),placement.Properties.Rotation??u.Rotation,placement.Properties.Scale??u.ScaleFactors.X);}
@@ -355,10 +426,33 @@ internal static class CadExternalReferences385
             else
             {
                 var data=RequireDefinition(definition,resolved.Kind,db,tr);Need(Exact(DefinitionState(data,resolved.Kind,db,tr,job.CheckCancellation),resolved.Before),"Reference definition changed after preflight.","REFERENCE_CONFLICT");
+                if (lifecycle.SourcePath != null) SetStoredSource(data,resolved.Source!.Path);
                 if(lifecycle.Action=="detach_xref"){db.DetachXref(definition);Need(!Live(definition)&&resolved.Peers.Keys.All(id=>!Live(id)),"Native detach did not remove the selected definition and its disclosed references.","API_EXCEPTION");}
                 else if(lifecycle.Action=="reload_xref"){using var ids=new ObjectIdCollection();ids.Add(definition);db.ReloadXrefs(ids);Need(((BlockTableRecord)RequireDefinition(definition,resolved.Kind,db,tr)).XrefStatus==XrefStatus.Resolved,"Native xref reload did not resolve the source.","API_EXCEPTION");}
                 else if(data is RasterImageDef raster){raster.UpgradeOpen();raster.Unload(true);raster.Load();Need(raster.IsLoaded,"Native raster reload did not load the source.","API_EXCEPTION");}
                 else{var underlay=(UnderlayDefinition)data;underlay.UpgradeOpen();underlay.Unload();underlay.Load("");Need(underlay.Loaded,"Native underlay reload did not load the declared item.","API_EXCEPTION");}
+            }
+        }
+        string? requestedPath=resolved.Edit switch
+        {
+            AttachXref385 x=>x.SourcePath, InsertRasterImage385 x=>x.SourcePath,
+            AttachUnderlay385 x=>x.SourcePath, ReferenceLifecycle385 x=>x.SourcePath, _=>null
+        };
+        if (requestedPath!=null)
+        {
+            var data=RequireDefinition(definition,resolved.Kind,db,tr);
+            SetStoredSource(data,requestedPath);
+            Need(string.Equals(StoredSource(data),requestedPath,StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(SourcePath(data,resolved.Kind,db),resolved.Source!.Path,StringComparison.OrdinalIgnoreCase),
+                "The native definition did not retain the requested stored and resolved paths.","API_EXCEPTION");
+            Need(data switch {BlockTableRecord b=>b.XrefStatus==XrefStatus.Resolved,RasterImageDef r=>r.IsLoaded,UnderlayDefinition u=>u.Loaded,_=>false},
+                "The native reference lost its loaded source after retaining the requested path.","SOURCE_FILE_UNAVAILABLE");
+            if(resolved.Edit is ReferenceLifecycle385 {SourcePath:not null} || !Path.IsPathFullyQualified(requestedPath))
+            {
+                var actual=ActiveSource(data);
+                if(actual==null||!Path.IsPathFullyQualified(actual)||!string.Equals(Path.GetFullPath(actual),resolved.Source.Path,StringComparison.OrdinalIgnoreCase))
+                    throw new DomainException("SOURCE_RESOLUTION_UNVERIFIED","The loaded native reference did not identify the selected local file.",false,
+                        new{definition_handle=Handle(definition),stored_path=requestedPath,expected_active_path=resolved.Source.Path,native_active_source_path=actual});
             }
         }
         bool detached=resolved.Edit is ReferenceLifecycle385{Action:"detach_xref"};
@@ -366,7 +460,7 @@ internal static class CadExternalReferences385
         {
             var current=DefinitionState(RequireDefinition(definition,resolved.Kind,db,tr),resolved.Kind,db,tr,job.CheckCancellation);
             foreach(var field in resolved.DefinitionBefore.EnumerateObject())
-                if(field.Name!="reference_handles")Need(Exact(field.Value,current.GetProperty(field.Name)),"Reference operation changed definition identity, path/item or overlay mode.","API_EXCEPTION");
+                if(field.Name!="reference_handles" && !(field.Name=="source_path" && requestedPath!=null))Need(Exact(field.Value,current.GetProperty(field.Name)),"Reference operation changed definition identity, path/item or overlay mode.","API_EXCEPTION");
             string? retired=resolved.Edit is ReferenceLifecycle385{Action:"delete_reference"}?Handle(target):null;
             var expected=resolved.DefinitionBefore.GetProperty("reference_handles").EnumerateArray().Select(h=>h.GetString()).Where(h=>h!=retired).ToArray();
             Need(expected.SequenceEqual(current.GetProperty("reference_handles").EnumerateArray().Select(h=>h.GetString())),"Reference operation changed unrequested occurrence bindings.","API_EXCEPTION");
@@ -376,7 +470,7 @@ internal static class CadExternalReferences385
         var context=new EntityRef(args.BridgeId,args.DocumentId,Handle(target));
         if(created)children=[new(new(args.BridgeId,args.DocumentId,Handle(definition)),resolved.Kind+"_definition",-1,null)];
         else if(resolved.Edit is ReferenceLifecycle385{Action:"detach_xref" or "reload_xref" or "reload_reference"})children=resolved.Peers.Keys.Select(id=>new StructureChild(new(args.BridgeId,args.DocumentId,Handle(id)),resolved.Kind,0,null)).ToArray();
-        return new(index,resolved.Edit.Operation,context,resolved.Kind,resolved.Name,created,children);
+        return new(index,resolved.Edit.Operation,context,resolved.Kind,resolved.Name,created,children,calibrationResult);
     }
     internal static void Batch(IEnumerable<Resolved> operations)
     {
@@ -402,6 +496,6 @@ internal static class CadExternalReferences385
     {
         bool created=resolved.Edit is AttachXref385 or InsertRasterImage385 or AttachUnderlay385;
         StructureChild[]? children=created?[new(new(args.BridgeId,args.DocumentId,"FFFFFFFFFFFFFFFF"),resolved.Kind+"_definition",-1,null)]:resolved.Edit is ReferenceLifecycle385{Action:"detach_xref" or "reload_xref" or "reload_reference"}?resolved.Peers.Keys.Select(id=>new StructureChild(new(args.BridgeId,args.DocumentId,Handle(id)),resolved.Kind,0,null)).ToArray():null;
-        return new(index,resolved.Edit.Operation,new(args.BridgeId,args.DocumentId,"FFFFFFFFFFFFFFFF"),resolved.Kind,resolved.Name,created,children);
+        return new(index,resolved.Edit.Operation,new(args.BridgeId,args.DocumentId,"FFFFFFFFFFFFFFFF"),resolved.Kind,resolved.Name,created,children,resolved.Calibration?.Result);
     }
 }

@@ -4,6 +4,26 @@ internal static class SolidMachiningEditTests
 {
     public static async Task Run(Func<string,Func<Task>,Task> test)
     {
+        await test("direct drill verifies a small local removal, a miss and residual interference",()=>
+        {
+            const double stock=1_000_000_000;
+            DrilledSolidCopySpec.VerifyRemoval(stock,stock-Math.PI/4,()=>(Math.PI/4,Math.PI/4));
+            DrilledSolidCopySpec.VerifyRemoval(stock,stock,()=>(1e-14,1e-14));
+            DrilledSolidCopySpec.VerifyRemoval(stock,stock-100,()=>throw new Exception("Unnecessary local measurement."));
+            try { DrilledSolidCopySpec.VerifyRemoval(stock,stock,()=>(0,0)); throw new Exception("Empty cut accepted."); }
+            catch(DomainException error) when(error.Error.code=="NO_MATERIAL_REMOVED"){}
+            try { DrilledSolidCopySpec.VerifyRemoval(stock,stock,()=>(Math.PI/4,Math.PI/8)); throw new Exception("Residual material accepted."); }
+            catch(DomainException error) when(error.Error.code=="DRILL_EFFECT_UNVERIFIED"){}
+            return Task.CompletedTask;
+        });
+        await test("every chamfer edge belongs to the selected base face",()=>
+        {
+            var spec=new SolidFinishingCopySpec("chamfer_copy","72","",["11","12"],"4",1,2,"0");
+            spec.RequireBoundaryEdges(new HashSet<string>{"11","12","13"});
+            try {spec.RequireBoundaryEdges(new HashSet<string>{"11","13"}); throw new Exception("Nonincident edge accepted.");}
+            catch(DomainException error) when(error.Error.code=="EDGE_NOT_ON_BASE_FACE"){}
+            return Task.CompletedTask;
+        });
         string bridge=Guid.NewGuid().ToString("D"),doc=Guid.NewGuid().ToString("D"),operation=Guid.NewGuid().ToString("D");
         ModifyArguments Parse(params object[] operations)=>ModifyValidation.Parse(Wire.Element(new
         {bridge_instance_id=bridge,document_id=doc,operation_id=operation,expected_revision="1",units="Millimeters",operations}));

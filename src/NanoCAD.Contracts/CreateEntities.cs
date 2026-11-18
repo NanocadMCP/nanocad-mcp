@@ -193,31 +193,7 @@ public static partial class CreateValidation
                         if (!allowDimensions) throw Invalid(path, "Sampled smooth construction is a top-level Polyline branch; inline block members use explicit vertices.");
                         specs.Add(ParseSmoothPolyline409(item, path, layer)); break;
                     }
-                    Shape(item, path, "type", "layer", "vertices", "closed");
-                    bool closed = Boolean(item, "closed", path, false);
-                    var array = Required(item, "vertices", path);
-                    if (array.ValueKind != JsonValueKind.Array || array.GetArrayLength() < (closed ? 3 : 2))
-                        throw Invalid(path + ".vertices", "Expected at least two vertices, at least three for a closed polyline.", "INVALID_GEOMETRY");
-                    var points = new List<Vertex2>();
-                    foreach (var vertex in array.EnumerateArray())
-                    {
-                        string vertexPath = path + $".vertices[{points.Count}]"; Shape(vertex, vertexPath, "point", "bulge");
-                        var point = Point(vertex, "point", vertexPath);
-                        double bulge = vertex.TryGetProperty("bulge", out var b) ? Number(b, vertexPath + ".bulge", -1000, 1000) : 0;
-                        if (points.Count > 0 && Coincident(points[^1].Point, point)) throw Invalid(vertexPath, "Zero-length segment.", "INVALID_GEOMETRY");
-                        points.Add(new(point, bulge));
-                    }
-                    if (closed && Coincident(points[0].Point, points[^1].Point)) throw Invalid(path, "Closed polyline must not repeat its first point.", "INVALID_GEOMETRY");
-                    if (!closed && points[^1].Bulge != 0) throw Invalid(path, "Last bulge of an open polyline must be zero.", "INVALID_GEOMETRY");
-                    // Reject a closed shape consisting only of collinear straight segments.
-                    if (closed && points.All(p => p.Bulge == 0))
-                    {
-                        var origin = points[0].Point; var direction = points[1].Point;
-                        if (points.Skip(2).All(p => Math.Abs((direction.X - origin.X) * (p.Point.Y - origin.Y) -
-                            (direction.Y - origin.Y) * (p.Point.X - origin.X)) < Minimum * Minimum))
-                            throw Invalid(path, "Closed polyline is collinear.", "INVALID_GEOMETRY");
-                    }
-                    specs.Add(new PolylineSpec(points.ToArray(), closed, layer)); break;
+                    specs.Add(ParsePlanarPolyline(item, path, layer, allowDimensions)); break;
                 case "Text":
                     Shape(item, path, "type", "layer", "text", "position", "height", "text_style", "format");
                     var text = Text(item, "text", path, 4096);

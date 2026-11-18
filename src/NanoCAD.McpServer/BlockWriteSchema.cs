@@ -35,6 +35,13 @@ public static class BlockWriteSchema
         {
             var properties = variant!["properties"]!.AsObject();properties.Remove("workplane");
             properties["layer"] = new JsonObject { ["type"] = "string", ["const"] = "0", ["default"] = "0" };
+            if (properties["type"]!["const"]!.GetValue<string>() == "Polyline")
+            {
+                var vertex = properties["vertices"]!["items"]!.AsObject();
+                vertex["properties"]!.AsObject().Remove("point_snap");
+                vertex.Remove("allOf");
+                vertex["required"] = new JsonArray("point");
+            }
             if (properties["type"]!["const"]!.GetValue<string>() == "Text") properties["text"] = PlainText(1);
         }
         void LocalCoordinates(JsonNode? node)

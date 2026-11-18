@@ -10,10 +10,12 @@ public sealed record InsertRasterImage385(string SourcePath,string Name,Point2 P
     : ExternalReferenceEdit385("insert_raster_image");
 public sealed record AttachUnderlay385(string Format,string SourcePath,string ItemName,string Name,Point2 Position,string Layer,double Rotation,double Scale)
     : ExternalReferenceEdit385("attach_underlay");
-public sealed record ReferencePlacement385(Point2? Position,double? Rotation,double? Scale,double? Width,double? Height);
+public sealed record ReferencePlacement385(Point2? Position,double? Rotation,double? Scale,double? Width,double? Height,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] RasterCalibration? Calibration=null);
 public sealed record SetReferencePlacement385(string ReferenceKind,string Handle,string ReferenceToken,ReferencePlacement385 Properties)
     : ExternalReferenceEdit385("set_reference_placement");
-public sealed record ReferenceLifecycle385(string Action,string ReferenceKind,string Handle,string ReferenceToken)
+public sealed record ReferenceLifecycle385(string Action,string ReferenceKind,string Handle,string ReferenceToken,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? SourcePath=null)
     : ExternalReferenceEdit385(Action);
 
 public static class ExternalReferenceValidation385
@@ -26,7 +28,7 @@ public static class ExternalReferenceValidation385
             throw Invalid(path,positive?"Expected a finite positive number.":"Expected a finite number.","INVALID_GEOMETRY");
         return number==0?0:number;
     }
-    static Point2 Point(JsonElement value,string path)
+    internal static Point2 Point(JsonElement value,string path)
     {
         if(value.ValueKind!=JsonValueKind.Array||value.GetArrayLength()!=2)throw Invalid(path,"Expected a WCS XY pair at Z=0.");
         return new(Number(value[0],path+"[0]"),Number(value[1],path+"[1]"));
@@ -48,6 +50,20 @@ public static class ExternalReferenceValidation385
         if(kind=="xref"&&extension!=".dwg"||kind=="dwf"&&extension is not (".dwf" or ".dwfx")||kind=="dgn"&&extension!=".dgn"||kind=="pdf"&&extension!=".pdf")
             throw new DomainException("UNSUPPORTED_FORMAT","Xrefs use DWG; DWF/DGN/PDF underlays use their declared format. Raster files must be decodable by the native image loader.");
         return System.IO.Path.GetFullPath(path);
+    }
+    public static string StoredPath(string path, string kind)
+    {
+        path = path.Replace('/', '\\');
+        if (System.IO.Path.IsPathFullyQualified(path)) return NormalizePath(path, kind);
+        if (path.Length == 0 || path.Length > 240 || path[0] == '\\' || path.Contains(':'))
+            throw new DomainException("INVALID_PATH", "Use a local drive path or a path relative to the named host DWG.");
+        var components = path.Split('\\');
+        if (components[^1] is "" or "." or "..")
+            throw new DomainException("INVALID_PATH", "A reference path must identify a file.");
+        foreach (var component in components.Where(part => part is not ("." or "..")))
+            _ = NormalizePath("C:\\" + component, "raster_image");
+        _ = NormalizePath("C:\\" + components[^1], kind);
+        return path;
     }
     static string Name(JsonElement value,string path)
     {
@@ -78,7 +94,7 @@ public static class ExternalReferenceValidation385
             Shape(value,path,new[]{"operation","source_path","name","position","layer","rotation"}.Concat(extra).ToArray());
             string kind=operation=="attach_xref"?"xref":operation=="insert_raster_image"?"raster_image":Text(value,"format",path,3);
             if(operation=="attach_underlay"&&kind is not ("dwf" or "dgn" or "pdf"))throw Invalid(path+".format","Use dwf, dgn or pdf matching the native file format.");
-            string file=NormalizePath(Text(value,"source_path",path,240),kind),name=Name(value,path),layer=Text(value,"layer",path,255);
+            string file=StoredPath(Text(value,"source_path",path,240),kind),name=Name(value,path),layer=Text(value,"layer",path,255);
             Point2 position=Point(Required(value,"position",path),path+".position");
             double rotation=value.TryGetProperty("rotation",out var angle)?Rotation(Number(angle,path+".rotation")):0;
             if(operation=="insert_raster_image")return new InsertRasterImage385(file,name,position,layer,rotation,Number(Required(value,"width",path),path+".width",true),Number(Required(value,"height",path),path+".height",true));
@@ -88,11 +104,16 @@ public static class ExternalReferenceValidation385
             if(value.TryGetProperty("overlay",out var flag)){if(flag.ValueKind is not (JsonValueKind.True or JsonValueKind.False))throw Invalid(path+".overlay","Expected boolean.");overlay=flag.GetBoolean();}
             return new AttachXref385(file,name,position,layer,rotation,scale,overlay);
         }
-        Shape(value,path,operation=="set_reference_placement"?["operation","reference_kind","handle","reference_token","properties"]:["operation","reference_kind","handle","reference_token"]);
+        Shape(value,path,operation=="set_reference_placement"?["operation","reference_kind","handle","reference_token","properties"]:operation is "reload_xref" or "reload_reference"?["operation","reference_kind","handle","reference_token","source_path"]:["operation","reference_kind","handle","reference_token"]);
         string actualKind=Kind(value,path),handle=Validation.NormalizeHandle(Text(value,"handle",path,16)),token=Token(value,path);
         if(operation=="set_reference_placement")
         {
-            var properties=Required(value,"properties",path);Shape(properties,path+".properties",actualKind=="raster_image"?["position","rotation","width","height"]:["position","rotation","scale"]);
+            var properties=Required(value,"properties",path);Shape(properties,path+".properties",actualKind=="raster_image"?["position","rotation","width","height","calibration"]:["position","rotation","scale"]);
+            if(properties.TryGetProperty("calibration",out var calibration))
+            {
+                Shape(properties,path+".properties","calibration");
+                return new SetReferencePlacement385(actualKind,handle,token,new(null,null,null,null,null,RasterCalibration.Parse(calibration,path+".properties.calibration")));
+            }
             if(!properties.EnumerateObject().Any())throw Invalid(path+".properties","At least one placement property is required.");
             double? N(string name)=>properties.TryGetProperty(name,out var n)?Number(n,path+".properties."+name,name!="rotation"):null;
             double? r=N("rotation");
@@ -101,7 +122,8 @@ public static class ExternalReferenceValidation385
         if(operation is "reload_xref" or "detach_xref"){if(actualKind!="xref")throw Invalid(path+".reference_kind","Xref lifecycle requires an actual xref definition.");}
         else if(operation=="reload_reference"){if(actualKind=="xref")throw Invalid(path+".operation","Use reload_xref for an xref definition.");}
         else if(operation!="delete_reference")throw Invalid(path+".operation","Unknown external-reference operation.");
-        return new ReferenceLifecycle385(operation,actualKind,handle,token);
+        return new ReferenceLifecycle385(operation,actualKind,handle,token,
+            value.TryGetProperty("source_path",out _) ? StoredPath(Text(value,"source_path",path,240),actualKind) : null);
     }
     public static void Batch(IEnumerable<StructureEdit> edits)
     {

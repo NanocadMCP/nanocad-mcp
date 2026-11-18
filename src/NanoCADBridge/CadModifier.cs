@@ -275,7 +275,7 @@ internal static class CadModifier
                         throw new DomainException("INVALID_OPERATION_ORDER", "Explicit label placement cannot share its target with other dimension edits in the same batch.");
                     CadDimensionTextPositionEditor.CheckSource(entity);
                 }
-                else CadDimensionTextEditor.CheckSource(entity);
+                else CadDimensionTextEditor.CheckSource(entity, allowCreatedLength: sourceOperations.All(op => op is ReplaceDimensionTextSpec));
                 if (args.Operations.Any(op => op is SetDimensionLineSpec && op.Handles.Contains(handle))) CadDimensionLineEditor.CheckSource(entity);
             }
             else if (planeTransformFrame != null) CadPlaneCurveTransforms394.Check(entity, planeTransformFrame, cancel);
@@ -621,6 +621,7 @@ internal static class CadModifier
         var booleanChanges = new List<SolidBooleanChange>();
         var stockChanges = new List<SolidStockChange353>(); var toleranceChanges = new List<ToleranceFrameChange356>();
         var topologyChanges = new List<TableTopologyChange354>();
+        var cellChanges = new List<TableCellChange>();
         var regionChanges = new List<RegionBooleanChange>();
         var mtextChanges = new List<MTextFormatChange>();
         var modifiedSet = new HashSet<string>(StringComparer.Ordinal);
@@ -878,7 +879,8 @@ internal static class CadModifier
                     }
                     else if (operation is TableFormulaEditingSpec343 tableFormula)
                     {
-                        var tableWarnings = CadTableFormulaEditor343.Apply((Table)entity, tableFormula, entity.Database, tr, job.CheckCancellation);
+                        var tableWarnings = CadTableFormulaEditor343.Apply((Table)entity, tableFormula, entity.Database, tr, job.CheckCancellation, i, Ref(handle), out var cellChange);
+                        if (cellChange.cells.Length != 0) cellChanges.Add(cellChange);
                         nativeFormatWarnings?.AddRange(tableWarnings);
                     }
                     else if (operation is TableContentsEditing364 contentsEdit)
@@ -888,7 +890,8 @@ internal static class CadModifier
                     }
                     else if (operation is TableValueEditingSpec tableValues)
                     {
-                        var tableWarnings = CadTableValueEditor336.Apply((Table)entity, tableValues, entity.Database, tr, job.CheckCancellation);
+                        var tableWarnings = CadTableValueEditor336.Apply((Table)entity, tableValues, entity.Database, tr, job.CheckCancellation, i, Ref(handle), out var cellChange);
+                        if (cellChange.cells.Length != 0) cellChanges.Add(cellChange);
                         nativeFormatWarnings?.AddRange(tableWarnings);
                     }
                     else if (operation is TableEditingSpec tableTopology && TableTopologyValidation354.Handles(tableTopology.Operation))
@@ -925,7 +928,8 @@ internal static class CadModifier
                 .Concat(separations.SelectMany(c => c.parts.Skip(1).Select(p => (Index: c.operation_index, Reference: p))))
                 .Concat(slices.Select(c => (Index: c.operation_index, Reference: c.negative)))
                 .Concat(contourResults.SelectMany(change => change.generated.Select(reference => (Index: change.operation_index, Reference: reference))))
-                .OrderBy(created => created.Index).Select(created => created.Reference).ToArray(), copies.ToArray(), "single_command", contourResults.Count == 0 ? null : contourResults.ToArray(), solid_slice_results: slices.Count == 0 ? null : slices.ToArray(), solid_separation_results: separations.Count == 0 ? null : separations.ToArray(), solid_boolean_results: booleanChanges.Count == 0 ? null : booleanChanges.ToArray(), region_boolean_changes: regionChanges.Count == 0 ? null : regionChanges.ToArray(), mtext_format_changes: mtextChanges.Count == 0 ? null : mtextChanges.ToArray(), solid_stock_changes: stockChanges.Count == 0 ? null : stockChanges.ToArray(), table_topology_changes: topologyChanges.Count == 0 ? null : topologyChanges.ToArray(), tolerance_changes: toleranceChanges.Count == 0 ? null : toleranceChanges.ToArray(), repetition_results: repetitions.Length == 0 ? null : repetitions);
+                .OrderBy(created => created.Index).Select(created => created.Reference).ToArray(), copies.ToArray(), "single_command", contourResults.Count == 0 ? null : contourResults.ToArray(), solid_slice_results: slices.Count == 0 ? null : slices.ToArray(), solid_separation_results: separations.Count == 0 ? null : separations.ToArray(), solid_boolean_results: booleanChanges.Count == 0 ? null : booleanChanges.ToArray(), region_boolean_changes: regionChanges.Count == 0 ? null : regionChanges.ToArray(), mtext_format_changes: mtextChanges.Count == 0 ? null : mtextChanges.ToArray(), solid_stock_changes: stockChanges.Count == 0 ? null : stockChanges.ToArray(), table_topology_changes: topologyChanges.Count == 0 ? null : topologyChanges.ToArray(), tolerance_changes: toleranceChanges.Count == 0 ? null : toleranceChanges.ToArray(), repetition_results: repetitions.Length == 0 ? null : repetitions)
+            { table_cell_changes = cellChanges.Count == 0 ? null : cellChanges.ToArray() };
     }
     private static void CheckOperationGeometry(Entity entity, EditSpec operation, Action cancel)
     {

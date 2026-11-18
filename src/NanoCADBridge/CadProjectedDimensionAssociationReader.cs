@@ -38,7 +38,7 @@ internal static class CadProjectedDimensionAssociationReader
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static object? ReadLoaded(Db.Dimension source, EntitySummary summary, Action cancel)
+    internal static object? ReadLoaded(Db.Dimension source, EntitySummary summary, Action cancel)
     {
         bool recognized = false;
         bool storedAvailable = false;
@@ -46,6 +46,7 @@ internal static class CadProjectedDimensionAssociationReader
         string? classification = null;
         string? dimensionId = null, ownerId = null, drawingViewId = null;
         int? dimensionType = null, nativeViewSnapIndicator = null;
+        object? measurement = null;
         var anchors = new List<object>();
         var links = new List<object>();
         object Observation(bool complete, string? reason) => new
@@ -62,12 +63,13 @@ internal static class CadProjectedDimensionAssociationReader
             drawing_view_mc_id = drawingViewId,
             native_view_snap_indicator = nativeViewSnapIndicator,
             dimension_type = dimensionType,
+            measurement,
             anchors = anchors.ToArray(),
             links = links.ToArray(),
             unavailable_reason = reason,
             stored_anchor_parameters_available = storedAvailable,
             stored_anchor_parameters_unavailable_reason = storedAvailable ? null : reason,
-            scope = "Actual public McDimensionData stored anchors and local view/source ownership. Active reports native getAssociative independently of stored-anchor classification; it does not establish regeneration. No inferred 3D source-edge identity."
+            scope = "Stored McDimensionData anchors and local view ownership. Each marker source uses a direct native source and reversible edge key. Visible uniqueness and regeneration require separate observations."
         };
         try
         {
@@ -218,6 +220,28 @@ internal static class CadProjectedDimensionAssociationReader
                 Need(sourceRefs.Count != 0, "The referenced view has no current local solid source.");
                 double scale = view.DbEntity.Scale, drawingScale = view.DbEntity.DScale;
                 Need(double.IsFinite(scale) && double.IsFinite(drawingScale), "The referenced view has unavailable scale metadata.");
+                if (sourceCounts.Count == 1)
+                {
+                    // Only a fully identified local view supplies a scale/frame.
+                    // An unreadable measurement must not hide its proven stored links.
+                    try
+                    {
+                        var (sheet, reason) = DimensionMeasurementReader.MeasureProjectedSheet(source, cancel);
+                        bool angular = source is Db.LineAngularDimension2 or Db.Point3AngularDimension;
+                        double? expected = scale == 1 && drawingScale > 0 && sheet is { } s
+                            ? (angular ? s : s * drawingScale) : null;
+                        if (expected.HasValue && !double.IsFinite(expected.Value)) expected = null;
+                        double nominal = dimension.Value, factor = dimension.DimensionScale;
+                        measurement = new { sheet_geometry = sheet, sheet_unit = angular ? "radians" : "drawing_units",
+                            physical_length_from_projection = angular ? null : expected,
+                            view_scale_denominator = drawingScale, native_measurement_factor = double.IsFinite(factor) ? (double?)factor : null,
+                            native_nominal_length = !angular && double.IsFinite(nominal) && nominal != McDimension.UnknownValue ? (double?)nominal : null,
+                            unavailable_reason = reason, text_mode = DimensionTextContent.DisplayMode(source.DimensionText, source.HasFields) };
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception error) when (error is DomainException or Teigha.Runtime.Exception)
+                    { measurement = new { unavailable_reason = Reason(error) }; }
+                }
                 var link = new
                 {
                     view_ref = Ref(rawView.ObjectId),
@@ -226,6 +250,7 @@ internal static class CadProjectedDimensionAssociationReader
                     native_anchor_count = pair.Value,
                     source_refs = sourceRefs.ToArray(),
                     source_mc_ids = nativeSources.Select(id => id.ToString()).ToArray(),
+                    marker_sources = DrawingViewsReader.ReadStoredMarkerSources(view, nativeSources, sourceRefs.ToArray(), sourceMarkers[pair.Key], cancel),
                     view_status = view.Status.ToString(),
                     is_suppressed = view.IsSuppressed,
                     auto_update_enabled = view.EnableAutoUpdate,

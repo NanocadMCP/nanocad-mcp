@@ -54,7 +54,7 @@ internal static class CadTargetedRead407
         unavailable = false;
         if (filter == null) return true;
         var bounds = ReadBounds(entity, cancel);
-        unavailable = bounds == null;
+        unavailable = bounds is not { } value || !value.AvailableFor(filter);
         return bounds?.Matches(filter) == true;
     }
     internal static QueryEnvelope? ReadBounds(Entity entity, Action cancel)
@@ -85,7 +85,7 @@ internal static class CadTargetedRead407
         space = args.ReadSpace,
         spatial = args.QueryBounds == null ? null : new
         {
-            coordinate_system = "WCS_XY",
+            coordinate_system = args.QueryBounds.Min.Length == 3 ? "WCS_XYZ" : "WCS_XY",
             predicate = "candidate_envelope_" + args.QueryBounds.Mode,
             exact_geometry_intersection = false,
             unavailable_bounds_policy = "excluded",

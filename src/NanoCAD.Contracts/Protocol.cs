@@ -70,6 +70,7 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
 {
     public string[]? ModelFeatureDeletionIds { get; init; }
     public bool IncludeGeometrySources { get; init; }
+    public int? GeometrySourceMarker { get; init; }
     public string[]? SketchConstraintParameterIds { get; init; }
     public QueryBounds407? QueryBounds { get; init; }
     public bool SummaryOnly { get; init; }
@@ -77,7 +78,9 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     public QueryBlock407? QueryBlock { get; init; }
     public string[]? DetailSections { get; init; }
     public bool EraseAssessment { get; init; }
-    public string FilterKey(string operation) => JsonSerializer.Serialize(new { operation, Types, Layers, Section, ReadSpace, QueryBounds, QueryText, QueryBlock }, Wire.Json);
+    public string? StructureRecordHandle { get; init; }
+    public string[]? OccurrencePath { get; init; }
+    public string FilterKey(string operation) => JsonSerializer.Serialize(new { operation, Types, Layers, Section, ReadSpace, QueryBounds, QueryText, QueryBlock, SummaryOnly }, Wire.Json);
 }
 
 public static class Validation
@@ -157,11 +160,8 @@ public static class Validation
             if (summary.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
                 throw new DomainException("INVALID_ARGUMENT", "summary_only must be a boolean.", false, new { path = "$.summary_only" });
             summaryOnly = summary.GetBoolean();
-            foreach (var field in new[] { "page_size", "cursor" })
-                if (summaryOnly && input.TryGetProperty(field, out _))
-                    throw new DomainException("INVALID_ARGUMENT", $"{field} cannot be used with summary_only.", false, new { path = "$." + field });
         }
-        int pageSize = 100;
+        int pageSize = summaryOnly ? int.MaxValue : 100;
         if (input.TryGetProperty("page_size", out var page) && (page.ValueKind != JsonValueKind.Number || !page.TryGetInt32(out pageSize) || pageSize < 1))
             throw InputError.Create("$.page_size", "Expected a positive integer.", new { minimum = 1, maximum = int.MaxValue });
         var space = ReadString("space", 10);

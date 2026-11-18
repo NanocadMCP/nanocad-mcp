@@ -2,7 +2,20 @@ using System.Text.Json;
 
 namespace NanoCAD.Contracts;
 
-public sealed record DrilledSolidCopySpec(string SourceHandle,Point3 Start,Point3 Direction,double Radius,double Depth,string LayerName):EntitySpec("Solid3d",LayerName);
+public sealed record DrilledSolidCopySpec(string SourceHandle,Point3 Start,Point3 Direction,double Radius,double Depth,string LayerName):EntitySpec("Solid3d",LayerName)
+{
+    public static void VerifyRemoval(double before,double after,Func<(double Material,double Removed)> measureLocally)
+    {
+        double removed=before-after;
+        if(double.IsFinite(removed)&&removed>Math.Max(1e-7,Math.Abs(before)*1e-9))return;
+        var local=measureLocally();
+        if(local.Material==0)throw new DomainException("NO_MATERIAL_REMOVED","The drilling cylinder contains no stock material.");
+        if(!double.IsFinite(local.Material)||!double.IsFinite(local.Removed)||local.Material<0||local.Removed<=0||
+            Math.Abs(local.Material-local.Removed)>local.Material*1e-8)
+            throw new DomainException("DRILL_EFFECT_UNVERIFIED","The volume removed inside the drilling cylinder does not match its original material.",false,
+                new{original_local_volume=double.IsFinite(local.Material)?(double?)local.Material:null,removed_local_volume=double.IsFinite(local.Removed)?(double?)local.Removed:null});
+    }
+}
 public sealed record SolidDrillEditSpec(string[] Targets,Point3 Start,Point3 Direction,double Radius,double Depth):EditSpec("drill_solid",Targets)
 {
     public DrilledSolidCopySpec AsCopySpec(string layer)=>new(Targets.Single(),Start,Direction,Radius,Depth,layer);

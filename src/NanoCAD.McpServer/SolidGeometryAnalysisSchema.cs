@@ -7,7 +7,7 @@ internal static class SolidGeometryAnalysisSchema
     internal static void Extend(JsonObject schema)
     {
         var modes = (JsonArray)schema["properties"]!["mode"]!["enum"]!;
-        modes.Add("solid_containment"); modes.Add("solid_interference");
+        foreach (string mode in NanoCAD.Contracts.SolidGeometryAnalysisValidation.Modes) modes.Add(mode);
         schema["properties"]!["mode"]!["description"] = "solid_containment checks one WCS point against one top-level native Solid3d. Native bounds can prove the point is outside. Points within those bounds require whole-body B-rep classification, which can be unavailable on the host. solid_interference checks two top-level native Solid3d shapes using detached copies. It does not measure clearance or classify touching. These solid modes do not accept workplane.";
         var conditions = (JsonArray)schema["allOf"]!;
         conditions.Add(JsonNode.Parse("""

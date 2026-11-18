@@ -11,7 +11,11 @@ public sealed record ModelSketchConstraintParameterRead379(string constraint_id,
 public sealed record ModelSketchConstraintParameterChange379(int operation_index,EntityRef source,EntityRef body_ref,
     string body_mc_id,string sketch_id,string constraint_id,string variable_id,string member_id,string kind,
     double previous_value,double value,string value_unit,string previous_expression,double expression_numeric_value,
-    double? previous_radius,double? radius,string[] profile_ids,string[] consumer_feature_ids,bool source_representation_replaced,string storage_preservation,JsonElement? storage_diagnostics);
+    double? previous_radius,double? radius,string[] profile_ids,string[] consumer_feature_ids,bool source_representation_replaced,string storage_preservation,JsonElement? storage_diagnostics)
+{
+    public JsonElement? control_observation { get; init; }
+    public JsonElement? control_availability { get; init; }
+}
 public sealed record ModelSketchConstraintParameterOutput379(string operation_id,string status,bool replayed,
     EntityRef[] modified,EntityRef[] erased,EntityRef[] created,CopyMapping[] copies,string undo_history,
     ModelSketchConstraintParameterChange379[] sketch_constraint_parameter_changes);

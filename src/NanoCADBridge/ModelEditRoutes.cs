@@ -7,12 +7,14 @@ namespace NanoCADBridge;
 // preflight will accept every consumer/topology in this body.
 internal static class ModelEditRoutes
 {
-    internal static object Describe(IEnumerable<object> nodes)
+    internal static object Describe(IEnumerable<object> nodes,string bodyId,bool complete,ISet<string> visibilitySketches)
     {
         var routes=new List<object>();bool views=false,retained=false;
-        foreach(var value in nodes)
+        var observed=nodes.Select(value=>Wire.Element(value)).ToArray();
+        bool oneRevolution=complete&&observed.Count(node=>node.GetProperty("runtime_type").GetString()?.EndsWith(".RevolveFeature",StringComparison.Ordinal)==true)==1;
+        foreach(var node in observed)
         {
-            var node=Wire.Element(value);string type=node.GetProperty("runtime_type").GetString()!;
+            string type=node.GetProperty("runtime_type").GetString()!;
             views|=type.EndsWith(".DrawingView",StringComparison.Ordinal);
             if(!node.TryGetProperty("parameters",out var p)||p.ValueKind!=JsonValueKind.Object||!p.TryGetProperty("kind",out var k))continue;
             string? kind=k.GetString();retained|=kind=="projection";
@@ -34,7 +36,19 @@ internal static class ModelEditRoutes
                 "rectangular_pattern"=>new[]{"set_model_rectangular_pattern","set_model_pattern_element"},
                 _=>Array.Empty<string>()
             };
-            if(operations.Length>0)routes.Add(new{feature_id=node.GetProperty("mc_id").GetString(),kind,candidate_operations=operations});
+            string featureId=node.GetProperty("mc_id").GetString()!;
+            if(kind=="sketch"&&visibilitySketches.Contains(featureId))operations=operations.Append("set_model_sketch_visibility").ToArray();
+            double? expectedDegrees=null;
+            if(kind=="revolution"&&oneRevolution&&node.GetProperty("suppressed").ValueKind==JsonValueKind.False&&
+                string.Equals(node.GetProperty("host_solid_id").GetString(),bodyId,StringComparison.OrdinalIgnoreCase)&&
+                p.GetProperty("extent").GetString()=="Angle"&&p.GetProperty("direction").GetString()=="Positive"&&
+                p.GetProperty("angle_variable_id").ValueKind==JsonValueKind.String&&p.GetProperty("angle2").ValueKind==JsonValueKind.Number&&
+                DrawingProfileGeometry.Near(p.GetProperty("angle2").GetDouble(),0)&&p.GetProperty("angle").ValueKind==JsonValueKind.Number)
+            {
+                operations=operations.Prepend("set_model_revolution").ToArray();
+                expectedDegrees=p.GetProperty("angle").GetDouble()*180/Math.PI;
+            }
+            if(operations.Length>0)routes.Add(new{feature_id=featureId,kind,candidate_operations=operations,expected_angle_degrees=expectedDegrees});
         }
         return new{scope="route_guidance_not_preflight_or_full_capability_inventory",features=routes,
             retained_sources_present=retained,

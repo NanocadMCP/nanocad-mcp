@@ -21,7 +21,7 @@ internal static class DrawingViewsReader
         Teigha.Geometry.Point3d Midpoint, double Sweep, bool FullCircle, double StartParameter, double EndParameter);
     private sealed record SourceEdge(McObjectId Id, string RefKey);
     private sealed record ProjectionSource(string status, string? unavailable_reason, string? view_marker,
-        EntityRef? source_ref, string? native_edge_id, string? native_ref_key)
+        EntityRef? source_ref, string? native_edge_id, string? native_ref_key, string? creating_feature_id = null)
     {
         internal static ProjectionSource Unavailable(string reason) => new("unavailable", reason, null, null, null, null);
     }
@@ -38,10 +38,31 @@ internal static class DrawingViewsReader
         internal LineEnds Canonical() => Start.CompareTo(End) <= 0 ? this : new(End, Start);
     }
 
-    private sealed record LineIndex(Dictionary<int, LineEnds?> Markers, Dictionary<LineEnds, int> Occurrences)
+    private sealed record ProjectionIndex(Dictionary<int, LineEnds?> Markers, Dictionary<LineEnds, int> Occurrences,
+        Dictionary<int,CircularArcShape?> CircularMarkers, List<CircularArcShape> CircularShapes)
     {
         internal bool ContainsUnique(int marker, LineEnds line) =>
             Markers.TryGetValue(marker, out var ends) && ends == line && Occurrences.GetValueOrDefault(line) == 1;
+
+        internal bool ContainsUnique(int marker, CircularArcShape arc, Action cancel)
+        {
+            if (!CircularMarkers.TryGetValue(marker,out var found) || found == null || !found.Matches(arc)) return false;
+            int matches = 0;
+            // Shapes are sorted once per inventory. Only nearby centers can coincide.
+            int low = 0, high = CircularShapes.Count;
+            double lowerX = arc.Center.X - 1e-7, upperX = arc.Center.X + 1e-7;
+            while (low < high)
+            {
+                int middle = low + (high - low) / 2;
+                if (CircularShapes[middle].Center.X < lowerX) low = middle + 1; else high = middle;
+            }
+            for (int i = low; i < CircularShapes.Count && CircularShapes[i].Center.X <= upperX; i++)
+            {
+                cancel();
+                if (arc.Matches(CircularShapes[i]) && ++matches > 1) return false;
+            }
+            return matches == 1;
+        }
     }
 
     private static T? NativeProjection<T>(Func<T?> read) where T : class
@@ -50,9 +71,9 @@ internal static class DrawingViewsReader
         catch (Exception e) when (e is NotSupportedException or NotImplementedException or Teigha.Runtime.Exception) { return null; }
     }
 
-    private static LineIndex IndexLines(IEnumerable<G.EntityGeometry> geometry, Action cancel)
+    private static ProjectionIndex IndexLines(IEnumerable<G.EntityGeometry> geometry, Action cancel, bool includeCircular = false)
     {
-        var index = new LineIndex(new(), new());
+        var index = new ProjectionIndex(new(), new(), new(), []);
         foreach (var item in geometry)
         {
             cancel();
@@ -66,41 +87,108 @@ internal static class DrawingViewsReader
                 ends = canonical;
             }
             if (item.GSMarker >= 0 && !index.Markers.TryAdd(item.GSMarker, ends)) index.Markers[item.GSMarker] = null;
+            if (includeCircular)
+            {
+                var arc = CircularArcShape.Read(item);
+                if (arc != null) index.CircularShapes.Add(arc);
+                if (item.GSMarker >= 0 && !index.CircularMarkers.TryAdd(item.GSMarker,arc)) index.CircularMarkers[item.GSMarker] = null;
+            }
         }
+        index.CircularShapes.Sort((left, right) => left.Center.X.CompareTo(right.Center.X));
         return index;
     }
 
-    private static LineIndex? ReadVisibleMarkers(Multicad.Mc3D.DrawingView view, McObjectId source, Action cancel)
+    private sealed record LocalVisibility(ProjectionIndex Whole, ProjectionIndex Visible, double PaperDenominator)
     {
-        // The managed SDK copies these native projection items and applies the requested WCS transform.
-        var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source, true, true));
-        if (visible == null) return null;
+        internal bool Matches(int marker, bool line, Action cancel)
+        {
+            if (line)
+            {
+                if (!Whole.Markers.TryGetValue(marker, out var ends) || ends is not { } sheet ||
+                    !Visible.Markers.TryGetValue(marker, out var other) || other is not { } model ||
+                    !Whole.ContainsUnique(marker, sheet) || !Visible.ContainsUnique(marker, model)) return false;
+                bool Near((double X,double Y,double Z) a, (double X,double Y,double Z) b) =>
+                    new Teigha.Geometry.Point3d(a.X,a.Y,a.Z).DistanceTo(new(b.X/PaperDenominator,b.Y/PaperDenominator,b.Z/PaperDenominator)) <= 1e-7;
+                return Near(sheet.Start,model.Start) && Near(sheet.End,model.End);
+            }
+            return Whole.CircularMarkers.TryGetValue(marker, out var found) && found is { } arc &&
+                Visible.CircularMarkers.TryGetValue(marker, out var otherArc) && otherArc != null &&
+                Whole.ContainsUnique(marker, arc, cancel) && Visible.ContainsUnique(marker, otherArc, cancel) &&
+                arc.Matches(otherArc.ToSheet(PaperDenominator));
+        }
+        internal object Evidence(int marker, bool line)
+        {
+            static double[] P(Teigha.Geometry.Point3d p) => [p.X,p.Y,p.Z];
+            object? Locus(ProjectionIndex i)
+            {
+                if (line)
+                {
+                    if (!i.Markers.TryGetValue(marker, out var ends) || ends == null) return null;
+                    var (a,b) = ends.Value;
+                    return new { start = new[]{a.X,a.Y,a.Z}, end = new[]{b.X,b.Y,b.Z} };
+                }
+                if (!i.CircularMarkers.TryGetValue(marker, out var arc) || arc == null) return null;
+                return new {center=P(arc.Center), radius=arc.Radius, start=P(arc.Start), end=P(arc.End), sweep=arc.Sweep};
+            }
+            return new {marker,coordinate_system="view_lcs",whole_view=Locus(Whole),source_visible=Locus(Visible),
+                whole_view_units="sheet_drawing_units", source_visible_units="unscaled_view_units", sheet_scale_denominator=PaperDenominator,
+                whole_marker_count=Whole.Markers.Count,visible_marker_count=Visible.Markers.Count};
+        }
+    }
+
+    private static LocalVisibility? ReadLocalVisibility(Multicad.Mc3D.DrawingView view, McObjectId source,
+        Action cancel, bool includeCircular)
+    {
+        // The two APIs share view axes. On a Paper 1:2 view the whole-view
+        // output contains R5, while the source-only output reports the same marker at R10.
+        double denominator = view.DbEntity.Scale == 1 ? view.DbEntity.DScale : 1;
+        if (!double.IsFinite(denominator) || denominator <= 0) return null;
+        var whole = NativeProjection(() => view.GetViewGeometry(false, 0));
+        if (whole == null) return null;
         try
         {
-            return IndexLines(visible, cancel);
+            var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source, false, true));
+            if (visible == null) return null;
+            try { return new(IndexLines(whole, cancel, includeCircular), IndexLines(visible, cancel, includeCircular),denominator); }
+            finally
+            {
+                foreach (var item in visible.Distinct(ReferenceEqualityComparer.Instance))
+                    if (item is IDisposable owned) owned.Dispose();
+            }
         }
         finally
         {
-            foreach (var item in visible.Distinct(ReferenceEqualityComparer.Instance))
+            foreach (var item in whole.Distinct(ReferenceEqualityComparer.Instance))
                 if (item is IDisposable owned) owned.Dispose();
         }
+    }
+
+    private static void RequireLocalVisibility(Multicad.Mc3D.DrawingView view, McObjectId source, int marker,
+        bool line, Action cancel)
+    {
+        var local = ReadLocalVisibility(view, source, cancel, !line);
+        if (local == null || !local.Matches(marker, line, cancel))
+            throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE",
+                "The selected native marker is not a unique visible primitive of this source in the view's local coordinates.",
+                false, local?.Evidence(marker,line));
     }
 
     private const string SourceMismatch = "native_marker_source_not_exact_local_solid";
     private const string NonUniqueLine = "no_unique_matching_visible_projection_marker";
 
-    private static (SourceEdge? Edge, string? Reason) ReadProjectionSource(Multicad.Mc3D.DrawingView view, LocalSource source, int marker)
+    private static (SourceEdge? Edge, string? Reason) ReadProjectionSource(Multicad.Mc3D.DrawingView view, LocalSource source, int marker, bool requireSourceObject = false)
     {
         using var projected = NativeProjection(() => view.GetProjectedObjectByGsm(marker));
         bool hasProjectedId = projected != null && !projected.IsNull;
+        if (requireSourceObject && !hasProjectedId) return (null, "native_marker_source_object_unavailable");
         if (hasProjectedId && (projected!.IsXref || projected.Objects is not { Count: 1 } path ||
             path[0] != source.Id || projected.LeafId != source.Id))
             return (null, SourceMismatch);
         bool needsEdgeIdentity = hasProjectedId && (projected!.TopId != source.Id || projected.TargetId != source.Id);
         (SourceEdge?, string) UnavailableEdge(string reason) => (null, needsEdgeIdentity ? SourceMismatch : reason);
 
-        // Source-specific visible geometry already established ownership of this marker.
-        // The native subentity key lookup is independent of the optional object lookup.
+        // Pages establish visibility separately. A direct lookup requires the native
+        // source object as well as the reversible subentity key.
         using var key = NativeProjection(() => view.GetProjectedFevRefKeyByGsm(marker));
         if (key == null || key.IsNull) return UnavailableEdge("native_projection_edge_key_unavailable");
         McObjectId edge;
@@ -115,6 +203,43 @@ internal static class DrawingViewsReader
         if (resolvedKey == null || resolvedKey.IsNull || !resolvedKey.Equals(key))
             return UnavailableEdge("native_projection_edge_key_does_not_round_trip");
         return (new(edge, key.ToString()), null);
+    }
+
+    private static ProjectionSource ObserveEdge(Multicad.Mc3D.DrawingView view, LocalSource source, int marker,
+        Lazy<HashSet<McObjectId>?> members, bool requireSourceObject = false)
+    {
+        var binding = ReadProjectionSource(view, source, marker, requireSourceObject);
+        if (binding.Edge is not { } edge) return ProjectionSource.Unavailable(binding.Reason!);
+        string? creator = null;
+        try
+        {
+            var feature = Multicad.Mc3D.Service.GetFeatureObjectIdForFEV(edge.Id);
+            if (!feature.IsNull && members.Value?.Contains(feature) == true) creator = feature.ToString();
+        }
+        catch (Exception error) when (error is NotImplementedException or NotSupportedException or Teigha.Runtime.Exception) { }
+        return new("observed", null, marker.ToString(CultureInfo.InvariantCulture), source.Ref, edge.Id.ToString(), edge.RefKey, creator);
+    }
+
+    private static Lazy<HashSet<McObjectId>?> Members(LocalSource? source) => new(() =>
+    {
+        var body = source?.Id.GetObjectOfType<Multicad.Mc3D.Mc3dSolid>();
+        return body != null && body.ID == source!.Id ? body.GetPartContents(false)?.ToHashSet() : null;
+    });
+
+    internal static object[] ReadStoredMarkerSources(Multicad.Mc3D.DrawingView view, ICollection<McObjectId> sourceIds,
+        EntityRef[] sourceRefs, IEnumerable<int> markers, Action cancel)
+    {
+        var source = NativeProjection(() => OrdinarySource(view, sourceIds, sourceRefs, view.Attached2dBreaks is { Length: 0 }));
+        var members = Members(source);
+        return markers.OrderBy(value => value).Select(marker =>
+        {
+            cancel();
+            var observation = source == null ? ProjectionSource.Unavailable("requires_healthy_ordinary_projection_of_one_local_solid")
+                : marker < 0 ? ProjectionSource.Unavailable("stored_anchor_has_no_marker")
+                : NativeProjection(() => ObserveEdge(view, source, marker, members, true))
+                    ?? ProjectionSource.Unavailable("native_marker_lookup_unavailable");
+            return (object)new { marker, projection_source = observation };
+        }).ToArray();
     }
 
     private static LocalSource? OrdinarySource(Multicad.Mc3D.DrawingView view, ICollection<McObjectId>? nativeSources,
@@ -165,9 +290,9 @@ internal static class DrawingViewsReader
             var ends = LineEnds.Read(line);
             var canonical = ends.Canonical();
             int marker = item.GSMarker;
-            if (marker < 0 || !IndexLines(geometry, cancel).ContainsUnique(marker, canonical) ||
-                ReadVisibleMarkers(view, source.Id, cancel)?.ContainsUnique(marker, canonical) != true)
+            if (marker < 0 || !IndexLines(geometry, cancel).ContainsUnique(marker, canonical))
                 throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected line has no unique visible native projection marker.");
+            RequireLocalVisibility(view, source.Id, marker, true, cancel);
             var binding = ReadProjectionSource(view, source, marker);
             if (binding.Reason == SourceMismatch)
                 throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The native projection marker reports a conflicting source identity.");
@@ -236,21 +361,9 @@ internal static class DrawingViewsReader
                 CircleShape.Read(item) is not { } circle)
                 throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected projection index is not a full native circle in the sheet plane.");
             int marker = item.GSMarker;
-            if (marker < 0 || !ContainsCircle(geometry, marker, circle, false, cancel))
+            if (marker < 0 || !ContainsCircle(geometry, marker, circle, true, cancel))
                 throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circle has no unique native projection marker.");
-            var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source.Id, true, true));
-            if (visible == null)
-                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The native visible projection is unavailable.");
-            try
-            {
-                if (!ContainsCircle(visible, marker, circle, true, cancel))
-                    throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circle is not unique in the visible projection of this source.");
-            }
-            finally
-            {
-                foreach (var element in visible.Distinct(ReferenceEqualityComparer.Instance))
-                    if (element is IDisposable owned) owned.Dispose();
-            }
+            RequireLocalVisibility(view, source.Id, marker, false, cancel);
             if (ReadProjectionSource(view, source, marker).Reason == SourceMismatch)
                 throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The native projection marker reports a conflicting source identity.");
             return new(viewId, marker, circle.Center, circle.Radius);
@@ -266,6 +379,12 @@ internal static class DrawingViewsReader
         Teigha.Geometry.Point3d Start, Teigha.Geometry.Point3d End, Teigha.Geometry.Point3d Midpoint,
         double Sweep, bool FullCircle)
     {
+        internal CircularArcShape ToSheet(double denominator)
+        {
+            if (denominator == 1) return this;
+            Teigha.Geometry.Point3d Scale(Teigha.Geometry.Point3d p) => new(p.X/denominator,p.Y/denominator,p.Z/denominator);
+            return new(Scale(Center),Radius/denominator,Scale(Start),Scale(End),Scale(Midpoint),Sweep,FullCircle);
+        }
         internal bool Matches(CircularArcShape other) => Center.DistanceTo(other.Center) <= 1e-7 &&
             Math.Abs(Radius - other.Radius) <= 1e-7 && FullCircle == other.FullCircle &&
             (FullCircle || Math.Abs(Sweep - other.Sweep) <= 1e-8 &&
@@ -328,21 +447,9 @@ internal static class DrawingViewsReader
                 }
                 return found;
             }
-            if (marker < 0 || !Contains(geometry, false))
+            if (marker < 0 || !Contains(geometry, true))
                 throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circular arc has no unique native projection marker.");
-            var visible = NativeProjection(() => view.GetProjectedGeometryForObject(source.Id, true, true));
-            if (visible == null)
-                throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The native visible projection is unavailable.");
-            try
-            {
-                if (!Contains(visible, true))
-                    throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected circular arc is not unique in the visible projection of this source.");
-            }
-            finally
-            {
-                foreach (var value in visible.Distinct(ReferenceEqualityComparer.Instance))
-                    if (value is IDisposable owned) owned.Dispose();
-            }
+            RequireLocalVisibility(view, source.Id, marker, false, cancel);
             if (ReadProjectionSource(view, source, marker).Reason == SourceMismatch)
                 throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The native projection marker reports a conflicting source identity.");
             double startParameter = 0, endParameter = 0;
@@ -378,12 +485,14 @@ internal static class DrawingViewsReader
             if (start > geometry.Count) throw new DomainException("INVALID_ARGUMENT", "geometry_start_index exceeds the selected projection inventory; refresh the current view/revision.");
             var items = new List<object>(); bool complete = true; long bytes = 2048;
             int end = start + Math.Min(pageSize, geometry.Count - start);
-            LineIndex? allLines = null;
-            LineIndex? visible = null;
+            ProjectionIndex? allLines = null;
+            LocalVisibility? visible = null;
+            var members = Members(source);
             if (includeSources && source != null && start < end)
             {
-                visible = ReadVisibleMarkers(view, source.Id, budget);
-                if (visible != null) allLines = IndexLines(geometry, budget);
+                bool circles = geometry.Skip(start).Take(end-start).Any(item => item?.GeometryType == G.EntityGeomType.kCircArc);
+                visible = ReadLocalVisibility(view, source.Id, budget, circles);
+                if (visible != null) allLines = IndexLines(geometry, budget, circles);
             }
             for (int index = start; index < end; index++)
             {
@@ -396,6 +505,7 @@ internal static class DrawingViewsReader
                 object entry = new
                 {
                     index,
+                    view_marker = item is { GSMarker: >= 0 } ? item.GSMarker.ToString(CultureInfo.InvariantCulture) : null,
                     native_geometry_type = item?.GeometryType.ToString(),
                     status = detail == null ? "unsupported_geometry" : "read",
                     geometry = detail,
@@ -406,20 +516,23 @@ internal static class DrawingViewsReader
                     ProjectionSource observation;
                     int marker = item?.GSMarker ?? -1;
                     if (source == null) observation = ProjectionSource.Unavailable("requires_healthy_ordinary_projection_of_one_local_solid");
-                    else if (lineEnds == null) observation = ProjectionSource.Unavailable("only_visible_native_line_is_supported");
                     else if (visible == null) observation = ProjectionSource.Unavailable("native_visible_projection_unavailable");
-                    else if (marker < 0 || !allLines!.ContainsUnique(marker, lineEnds.Value.Canonical()) ||
-                        !visible.ContainsUnique(marker, lineEnds.Value.Canonical()))
-                        observation = ProjectionSource.Unavailable(NonUniqueLine);
                     else
                     {
-                        var binding = ReadProjectionSource(view, source, marker);
-                        observation = binding.Edge is { } edge
-                            ? new("observed", null, marker.ToString(CultureInfo.InvariantCulture), source.Ref, edge.Id.ToString(), edge.RefKey)
-                            : ProjectionSource.Unavailable(binding.Reason!);
+                        var arc = item == null || lineEnds != null ? null : CircularArcShape.Read(item);
+                        bool unique = lineEnds is { } ends ? allLines!.ContainsUnique(marker, ends.Canonical()) && visible.Matches(marker, true, budget) :
+                            arc != null && allLines!.ContainsUnique(marker, arc, budget) && visible.Matches(marker, false, budget);
+                        observation = marker >= 0 && unique ? ObserveEdge(view, source, marker, members) :
+                            ProjectionSource.Unavailable(lineEnds == null && arc == null ? "unsupported_projected_curve" : NonUniqueLine);
                     }
                     var row = JsonSerializer.SerializeToNode(entry, Wire.Json)!.AsObject();
                     row["projection_source"] = JsonSerializer.SerializeToNode(observation, Wire.Json);
+                    if (pageSize == 1 && visible != null && marker >= 0)
+                        row["projection_visibility"] = JsonSerializer.SerializeToNode(visible.Evidence(marker,lineEnds.HasValue), Wire.Json);
+                    if (pageSize == 1 && lineEnds is { } selectedLine && marker >= 0 && source != null)
+                        row["dimension_edge_binding"] = JsonSerializer.SerializeToNode(CadProjectedLineSubentity.Observe(state, entity, marker,
+                            new(selectedLine.Start.X, selectedLine.Start.Y, selectedLine.Start.Z),
+                            new(selectedLine.End.X, selectedLine.End.Y, selectedLine.End.Z)), Wire.Json);
                     entry = row;
                 }
                 int size = JsonSerializer.SerializeToUtf8Bytes(entry, Wire.Json).Length + 1;
@@ -514,7 +627,7 @@ internal static class DrawingViewsReader
             var sourceRefs = CadDrawingViewLifecycleState345.SourceRefs(nativeSources, state.Document.Database, tx, instance, state.Id, Budget);
             var attached = view.Attached2dBreaks;
             if (attached == null) throw new DomainException("MODEL_STATE_UNAVAILABLE", "Native break inventory is unavailable.");
-            if (args.IncludeGeometrySources && Validation.NormalizeHandle(entity.Handle.ToString()) == args.GeometryViewHandle)
+            if ((args.IncludeGeometrySources || args.GeometrySourceMarker.HasValue) && Validation.NormalizeHandle(entity.Handle.ToString()) == args.GeometryViewHandle)
                 selectedSource = OrdinarySource(view, nativeSources, sourceRefs.Refs, attached.Length == 0);
 
             var breakData = DrawingViewBreakReader.Read(attached, id, layoutHandles, instance, state.Id, Budget);
@@ -573,11 +686,19 @@ internal static class DrawingViewsReader
             });
         }
         object? selectedGeometry = null;
+        object? selectedMarker = null;
         if (args.GeometryViewHandle != null)
         {
             var selected = found.SingleOrDefault(x => Validation.NormalizeHandle(x.Entity.Handle.ToString()) == args.GeometryViewHandle);
             if (selected.View == null) throw new DomainException("OUT_OF_SCOPE", "geometry_view_handle is not a native drawing view in the requested layout.");
-            selectedGeometry = ReadGeometry(selected.View, selected.Entity, state, instance, state.Id, args.GeometryStartIndex, args.GeometryPageSize,
+            if (args.GeometrySourceMarker is int marker)
+            {
+                var binding = selectedSource == null ? ProjectionSource.Unavailable("requires_healthy_ordinary_projection_of_one_local_solid")
+                    : ObserveEdge(selected.View, selectedSource, marker, Members(selectedSource), true);
+                selectedMarker = new { view_handle = args.GeometryViewHandle, marker, scope = "native_marker_source_object_and_edge_key",
+                    visible_uniqueness_evaluated = false, projection_source = binding };
+            }
+            else selectedGeometry = ReadGeometry(selected.View, selected.Entity, state, instance, state.Id, args.GeometryStartIndex, args.GeometryPageSize,
                 args.IncludeGeometrySources, selectedSource, Budget);
         }
         Budget();
@@ -591,6 +712,7 @@ internal static class DrawingViewsReader
             coordinate_system = "native_view_planes",
             geometry_state = selectedGeometry == null ? "stored_metadata_not_regenerated" : "selected_native_projection_without_regeneration",
             selected_geometry = selectedGeometry,
+            selected_marker_source = selectedMarker,
             scanned_entities = scanned,
             complete = true,
             items

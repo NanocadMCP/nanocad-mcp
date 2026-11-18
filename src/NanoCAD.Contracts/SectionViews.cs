@@ -2,12 +2,12 @@ using System.Text.Json;
 
 namespace NanoCAD.Contracts;
 
-public sealed record CreateSectionViewEdit(string[] SourceHandles,string Name,Point3[] SectionLine,Point2 Origin,double Scale,Point3 ViewingDirection,Point3 VerticalDirection):StructureEdit("create_section_view");
+public sealed record CreateSectionViewEdit(string[] SourceHandles,string Name,Point3[] SectionLine,Point2 Origin,double Scale,Point3 ViewingDirection,Point3 VerticalDirection, [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? LayoutHandle=null):StructureEdit("create_section_view");
 public static class SectionViewValidation
 {
     public static CreateSectionViewEdit Parse(JsonElement item,string path)
     {
-        StructureWriteValidation.Shape(item,path,"operation","source_handles","name","section_line","origin","scale","viewing_direction","vertical_direction");
+        StructureWriteValidation.Shape(item,path,"operation","source_handles","name","section_line","origin","scale","viewing_direction","vertical_direction","layout_handle");
         var name=StructureWriteValidation.Text(item,"name",path,64);
         if(name!=name.Trim() || name.Contains("%<",StringComparison.Ordinal))throw StructureWriteValidation.Invalid(path,"Use a trimmed literal view name.");
         var input=StructureWriteValidation.Required(item,"source_handles",path);
@@ -41,7 +41,7 @@ public static class SectionViewValidation
             throw StructureWriteValidation.Invalid(path,"Section line must follow vertical_direction cross viewing_direction for at least0.001 mm.","INVALID_GEOMETRY");
         var origin=StructureWriteValidation.Required(item,"origin",path);
         if(origin.ValueKind!=JsonValueKind.Array || origin.GetArrayLength()!=2)throw StructureWriteValidation.Invalid(path,"Expected WCS XY origin [x,y].");
-        return new(handles.OrderBy(h=>h,StringComparer.Ordinal).ToArray(),name,points,new(Number(origin[0]),Number(origin[1])),Number(StructureWriteValidation.Required(item,"scale",path),0.001,1000),viewing,vertical);
+        return new(handles.OrderBy(h=>h,StringComparer.Ordinal).ToArray(),name,points,new(Number(origin[0]),Number(origin[1])),Number(StructureWriteValidation.Required(item,"scale",path),0.001,1000),viewing,vertical,item.TryGetProperty("layout_handle",out _)?Validation.NormalizeHandle(StructureWriteValidation.Text(item,"layout_handle",path,16)):null);
     }
     public static void ValidateBatch(IReadOnlyList<StructureEdit> edits)
     {

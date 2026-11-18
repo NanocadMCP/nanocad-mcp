@@ -143,7 +143,9 @@ internal static class ModelDependencyGraph410
                 }
                 // Diameter limits are evaluated from the rebuilt cylindrical
                 // source. Pitch, handedness, length and references stay stored.
-                if(kind=="thread"){p.Remove("minimum_diameter");p.Remove("maximum_diameter");}
+                if(kind=="thread" && !(controls.TryGetValue(id,out var directControls) &&
+                    directControls.Any(control=>control.Role=="thread_pitch") && p["internal"]?.GetValue<bool>()==false))
+                {p.Remove("minimum_diameter");p.Remove("maximum_diameter");}
             }
             if(controls.TryGetValue(id,out var selected))foreach(var control in selected)
             {

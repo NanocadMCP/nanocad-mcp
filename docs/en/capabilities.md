@@ -6,7 +6,7 @@ nanoCAD MCP connects an AI assistant to a running nanoCAD session. You describe 
 
 See [installation](installation.md) for requirements and connection instructions, and the [user guide](user-guide.md) for the working process.
 
-This page describes the scope of interim build 453. Earlier published
+This page describes the scope of build 456. Earlier published
 packages retain the limits recorded in their release notes.
 
 ## Drawings
@@ -30,7 +30,7 @@ an actual association. Native projected radius, circular-arc length and arc-angl
 dimensions can follow selected visible circular sources in ordinary auto-updating
 1:1 Paper views of one local body. Arc length and angle require a finite circular
 arc; radius can use a full circle or a finite arc. The existing projected aligned and diameter
-routes keep their own supported contexts. Native stored view-anchor reads are
+routes keep their own supported contexts. The projected diameter on a 1:2 view retained its physical value and followed a model diameter edit. Angular dimensions can use two converging visible segments. A marker identifies the solid edge only when nanoCAD supplies a verifiable source reference. Native stored view-anchor reads are
 available for all five assessed dimension cases; ordinary measurement data can
 still be explicitly unavailable for a particular association.
 
@@ -40,6 +40,8 @@ flip changes updated the actual geometry and survived DWG reopening. Values
 retain their native units and coordinate frame. Point2d, Point3d, Int32 and
 wider lookup, attribute-effect and dependency combinations remain unassessed;
 the hidden Origin property's meaning is not inferred.
+
+Table reads expose cell types, units, formulas and evaluated values after row edits. Spatial search can filter objects by X, Y and Z in world coordinates. Nested block inspection can follow one placement path and report its accumulated transform.
 
 ## Reuse DWG components
 
@@ -79,7 +81,11 @@ it does not transplant an arbitrary parametric feature history.
 
 A physical thread can be constructed from a real section, helical path and supported sweep/cut operations. A thread feature or annotation alone does not establish physical helical geometry or compliance with a thread standard.
 
+Thread edits can inspect retained pitch and length drivers. For a chamfer, the selected edges are checked against their face. Loft inspection returns the available native section sources.
+
 ## Editable DWG documentation
+
+Place projected views using first-angle or third-angle projection and select the alignment of a child view. For local references, inspect the saved path and resolved file after repointing. Raster calibration can use an independent third point to report the placement error in millimetres.
 
 Native view preview can be read and explicitly switched between its bounding
 frame and full view graphics. Selected ordinary views can be refreshed while

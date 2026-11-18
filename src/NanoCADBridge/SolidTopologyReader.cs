@@ -41,7 +41,8 @@ internal static class SolidTopologyReader
         if (edges) merged["native_model_edges"] = JsonSerializer.SerializeToNode(ModelEdgeReader.Capture(id, state, instance, cancellation), Wire.Json);
         return merged;
     }
-    internal static object Capture(Solid3d solid, EntityRef source, CancellationToken cancellation, Action? checkCancel = null, bool identifySurfaces = false)
+    internal static object Capture(Solid3d solid, EntityRef source, CancellationToken cancellation, Action? checkCancel = null, bool identifySurfaces = false,
+        string? selectedFace = null, ISet<string>? selectedBoundaryEdges = null)
     {
         void Budget() { checkCancel?.Invoke(); cancellation.ThrowIfCancellationRequested(); }
         Budget();
@@ -103,7 +104,8 @@ internal static class SolidTopologyReader
                     bool planar = surface is Plane || surface is ExternalBoundedSurface external && external.IsPlane;
                     var boundary = new List<FaceBounds>();
                     var boundaryBudget = new ModelInventoryBudget(Budget);
-                    if (planar) foreach (Teigha.BoundaryRepresentation.BoundaryLoop loop in face.Loops)
+                    bool collectBoundary = key == selectedFace && selectedBoundaryEdges != null;
+                    if (planar || collectBoundary) foreach (Teigha.BoundaryRepresentation.BoundaryLoop loop in face.Loops)
                         using (loop)
                         {
                             Budget(); foreach (Edge edge in loop.Edges) using (edge)
@@ -111,7 +113,8 @@ internal static class SolidTopologyReader
                                 Budget();
                                 var edgeKey = Identity(edge, SubentityType.Edge).IndexPtr.ToInt64().ToString(CultureInfo.InvariantCulture);
                                 if (!edgeBounds.TryGetValue(edgeKey, out var box)) throw new DomainException("SUBENTITY_IDENTITY_UNAVAILABLE", "Face boundary edge does not belong to this B-rep.");
-                                boundaryBudget.Add(box); boundary.Add(box);
+                                if (collectBoundary) selectedBoundaryEdges!.Add(edgeKey);
+                                if (planar) { boundaryBudget.Add(box); boundary.Add(box); }
                             }
                         }
                     // Planar extrema lie on the complete boundary. For a curved face,

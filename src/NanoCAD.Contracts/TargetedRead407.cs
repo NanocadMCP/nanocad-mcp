@@ -41,13 +41,14 @@ public static class TargetedRead407
         Fields(value, "bounds", "min", "max", "mode");
         double[] Point(string name)
         {
-            if (!value.TryGetProperty(name, out var point) || point.ValueKind != JsonValueKind.Array || point.GetArrayLength() != 2)
-                throw Invalid("bounds." + name + " must be [x,y] in WCS drawing units.");
+            if (!value.TryGetProperty(name, out var point) || point.ValueKind != JsonValueKind.Array || point.GetArrayLength() is not (2 or 3))
+                throw Invalid("bounds." + name + " must be [x,y] or [x,y,z] in WCS drawing units.");
             return point.EnumerateArray().Select(n => n.ValueKind == JsonValueKind.Number && n.TryGetDouble(out var result) && double.IsFinite(result)
                 ? result : throw Invalid("bounds coordinates must be finite numbers.")).ToArray();
         }
         var min = Point("min"); var max = Point("max");
-        if (min[0] > max[0] || min[1] > max[1]) throw Invalid("bounds.min must not exceed bounds.max.");
+        if (min.Length != max.Length) throw Invalid("Both bounds must have the same coordinate count.");
+        if (min.Where((coordinate, axis) => coordinate > max[axis]).Any()) throw Invalid("bounds.min must not exceed bounds.max.");
         var mode = Text(value, "mode") ?? "intersects";
         if (mode is not ("intersects" or "within")) throw Invalid("bounds.mode must be intersects or within.");
         return new(min, max, mode);

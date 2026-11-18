@@ -107,15 +107,33 @@ internal static class SolidCreator
         var axis=Vector3d.ZAxis.CrossProduct(direction);double angle=Vector3d.ZAxis.GetAngleTo(direction);
         if(angle>1e-12)cutter.TransformBy(Matrix3d.Rotation(angle,axis.Length>1e-12?axis.GetNormal():Vector3d.XAxis,Point3d.Origin));
         cutter.TransformBy(Matrix3d.Displacement(start+direction*(spec.Depth/2)-cutter.MassProperties.Centroid));
-            target.BooleanOperation(BooleanOperationType.BoolSubtract,cutter);
-            RequireVolume(target);
-            double removed=before-target.MassProperties.Volume;
-            double tolerance=Math.Max(1e-7,Math.Abs(before)*1e-9);
-            if(!double.IsFinite(removed) || removed<=tolerance)
-                throw new DomainException("NO_MATERIAL_REMOVED","Cylindrical cut removed no measurable volume; nothing appended.");
-            // Cutter volume is diagnostic only: the kernel may report a
-            // different integral for a valid B-rep. The required cut effect
-            // above is checked on the actual detached body.
+        // Native subtraction may consume its operand. Keep the tool for a
+        // local volumetric comparison when subtraction is small relative to stock.
+        using var operand=(Solid3d)cutter.Clone();
+        using var original=(Solid3d)target.Clone();
+        target.BooleanOperation(BooleanOperationType.BoolSubtract,operand);
+        RequireVolume(target);
+        DrilledSolidCopySpec.VerifyRemoval(before,target.MassProperties.Volume,()=>
+        {
+            try
+            {
+                if(!original.CheckInterference(cutter))return (0d,0d);
+                using var zone=(Solid3d)cutter.Clone();
+                zone.BooleanOperation(BooleanOperationType.BoolIntersect,original);
+                double material=zone.IsNull?0:zone.MassProperties.Volume;
+                if(material==0)return (0d,0d);
+                // A hole wall coincides with the tool. CheckInterference can
+                // report that boundary as contact. Measure material volume in
+                // the local solid instead; partial tool entry remains valid.
+                using var afterCopy=(Solid3d)target.Clone();
+                zone.BooleanOperation(BooleanOperationType.BoolSubtract,afterCopy);
+                return (material,zone.IsNull?0:zone.MassProperties.Volume);
+            }
+            catch(Teigha.Runtime.Exception ex)
+            {
+                throw new DomainException("DRILL_EFFECT_UNVERIFIED","The whole-body volume difference is inconclusive and the kernel could not measure the local cut volume.",false,new{native_status=ex.ErrorStatus.ToString()});
+            }
+        });
     }
     public static Solid3d Create(SolidSpec spec)
     {

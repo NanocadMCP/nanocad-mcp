@@ -78,8 +78,9 @@ public static partial class ModifyValidation
             double diameter = Num("diameter", .001);
             bool through = Flag("through");
             double depth = Num("depth", through ? 0 : .001);
-            Flag("flat_bottom");
-            Num("bottom_angle_degrees", .001, 179.999);
+            bool flatBottom = Flag("flat_bottom");
+            if ((!flatBottom && !through) || (d.TryGetProperty("bottom_angle_degrees", out var dormantAngle) && dormantAngle.ValueKind != JsonValueKind.Null))
+                Num("bottom_angle_degrees", .001, flatBottom || through ? 180 : 179.999);
             string seat = Text(d, "seat", at, 16);
             if (seat is not ("none" or "counterbore" or "countersink")) throw Invalid(at, "Unknown hole seat.");
             if (seat != "none")
@@ -103,7 +104,8 @@ public static partial class ModifyValidation
         {
             string[] fields = ["pitch", "right_handed", "internal", "full_length", "length"];
             Shape(d, at, add ? fields.Concat(new[] { "face_token", "face_id", "edge_token", "front_edge_id" }).ToArray() : fields);
-            Num("pitch", .001); Flag("right_handed"); Flag("internal"); bool full = Flag("full_length"); Num("length", full ? 0 : .001);
+            Num("pitch", .001); Flag("right_handed"); Flag("internal"); bool full = Flag("full_length");
+            if (!full || d.TryGetProperty("length", out _)) Num("length", full ? 0 : .001);
             if (add) { Token("face_token"); Token("edge_token"); Id(d, "face_id"); Id(d, "front_edge_id"); }
         }
         else if (kind.EndsWith("_circular_pattern", StringComparison.Ordinal))

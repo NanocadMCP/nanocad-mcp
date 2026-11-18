@@ -23,6 +23,27 @@ internal static class ModelManufacturingTests
         }
         ModifyArguments Parse(JsonObject e) => ModifyValidation.Parse(Wire.Element(new { bridge_instance_id = id, document_id = id, expected_revision = "1", operation_id = id, units = "Millimeters", operations = new[] { e } }));
         void Reject(JsonObject e) { try { Parse(e); } catch (DomainException) { return; } throw new Exception("Invalid manufacturing input accepted."); }
+        await test("manufacturing holes and threads accept only applicable required dimensions", () =>
+        {
+            foreach(bool add in new[]{true,false})
+            {
+                var hole=Edit("hole",add);var d=hole["definition"]!.AsObject();
+                d["through"]=false;d["flat_bottom"]=true;d.Remove("bottom_angle_degrees");Parse(hole);
+                d["bottom_angle_degrees"]=null;Parse(hole);
+                d["bottom_angle_degrees"]=180;Parse(hole);
+                d["bottom_angle_degrees"]=118;Parse(hole);
+                d["flat_bottom"]=false;d["bottom_angle_degrees"]=180;Reject(hole);
+                d.Remove("bottom_angle_degrees");Reject(hole);
+                d["bottom_angle_degrees"]=118;Parse(hole);
+                d["through"]=true;d.Remove("bottom_angle_degrees");Parse(hole);
+                var thread=Edit("thread",add);var t=thread["definition"]!.AsObject();
+                t["full_length"]=true;t.Remove("length");Parse(thread);
+                t["length"]=900000;Parse(thread);
+                t["full_length"]=false;t.Remove("length");Reject(thread);
+                t["length"]=0;Reject(thread);t["length"]=18;Parse(thread);
+            }
+            return Task.CompletedTask;
+        });
         await test("manufacturing block publishes and parses all eight feature branches", () =>
         {
             var topo = SolidTopologyValidation.Parse(Wire.Element(new { bridge_instance_id = id, document_id = id, expected_revision = "1", handle = "AB", include_native_model_faces = true, include_native_model_edges = true }));
@@ -83,7 +104,7 @@ internal static class ModelManufacturingTests
             {
                 var definition = branch.GetProperty("properties").GetProperty("definition");
                 if (definition.GetProperty("required").EnumerateArray().Any(field => field.GetString()!.StartsWith("seat_", StringComparison.Ordinal)) ||
-                    definition.GetProperty("allOf").GetArrayLength() != 2)
+                    definition.GetProperty("allOf").EnumerateArray().Count(rule=>rule.GetProperty("if").GetProperty("properties").TryGetProperty("seat",out _)) != 2)
                     throw new Exception("Published hole branch requires unused seat fields or lacks seat conditions.");
             }
             return Task.CompletedTask;

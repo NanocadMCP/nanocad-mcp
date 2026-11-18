@@ -6,7 +6,8 @@ namespace NanoCAD.Contracts;
 public sealed record DrawingViewLifecycleTarget345(DrawingViewTarget Target,string ViewToken);
 public sealed record SetDrawingViewSources345(DrawingViewLifecycleTarget345[] Targets,string[] SourceHandles):StructureEdit("set_drawing_view_sources");
 public sealed record RenameDrawingView345(DrawingViewLifecycleTarget345 Target,string Name):StructureEdit("rename_drawing_view");
-public sealed record AddDrawingViewChild345(DrawingViewLifecycleTarget345 Parent,string Name,string Direction,Point2 Origin,double ModelScale):StructureEdit("add_drawing_view_child");
+public sealed record AddDrawingViewChild345(DrawingViewLifecycleTarget345 Parent,string Name,string Direction,Point2 Origin,double ModelScale,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool AlignOnParent=false):StructureEdit("add_drawing_view_child");
 public sealed record DrawingViewLifecycleChange345(int operation_index,EntityRef view_ref,string view_token,
     EntityRef[] source_refs,string[] top_source_ids,string? parent_view_id,string? root_view_id,string[] child_view_ids);
 
@@ -60,14 +61,20 @@ public static class DrawingViewLifecycleValidation345
         }
         if(operation=="add_drawing_view_child")
         {
-            Shape(item,path,"operation","layout_handle","handle","expected_name","view_token","name","direction","origin","model_scale");
+            Shape(item,path,"operation","layout_handle","handle","expected_name","view_token","name","direction","origin","model_scale","align_on_parent");
+            bool aligned = false;
+            if (item.TryGetProperty("align_on_parent", out var alignment))
+            {
+                if (alignment.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Invalid(path+".align_on_parent","Expected a boolean.");
+                aligned = alignment.GetBoolean();
+            }
             string direction=Text(item,"direction",path,24);
             if(direction is not ("top" or "bottom" or "left" or "right" or "iso_top_left" or "iso_top_right" or "iso_bottom_left" or "iso_bottom_right"))
                 throw Invalid(path+".direction","Choose a supported native child direction.");
             var point=Required(item,"origin",path);
             if(point.ValueKind!=JsonValueKind.Array||point.GetArrayLength()!=2)throw Invalid(path+".origin","Expected WCS [x,y] in the parent's owning space.");
             return new AddDrawingViewChild345(Target(item,path),Text(item,"name",path,4096),direction,
-                new(Number(point[0],path+".origin[0]"),Number(point[1],path+".origin[1]")),Number(Required(item,"model_scale",path),path+".model_scale",true));
+                new(Number(point[0],path+".origin[0]"),Number(point[1],path+".origin[1]")),Number(Required(item,"model_scale",path),path+".model_scale",true),aligned);
         }
         throw Invalid(path+".operation","Unknown native view lifecycle operation.");
     }

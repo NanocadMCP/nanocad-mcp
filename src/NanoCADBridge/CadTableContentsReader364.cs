@@ -172,7 +172,7 @@ internal static class CadTableContentsReader364
                 if(!block.IsNull)attributes=Attributes(table,row,column,index,block,tr,cancel);
                 var type=table.GetDataType(row,column,index);bool formula=kind!=CellContentTypes.Block&&native.HasFormula;string expression=kind==CellContentTypes.Block?"":table.GetFormula(row,column,index);
                 Need(formula? !string.IsNullOrWhiteSpace(expression):string.IsNullOrEmpty(expression),"Native formula flag and stored expression disagree.","OBJECT_READ_FAILED");
-                object? raw=null;string? unavailable=null;var cache=field.IsNull?null:CadTableFieldCache365.Read(table,field,tr,cancel);
+                object? raw=null;string? unavailable=null;var cache=field.IsNull?null:CadTableFieldCache365.Read(table,field,tr,cancel,formula?expression:null);
                 if(kind==CellContentTypes.Block)unavailable="Block content has retained actual binding and attribute values; no scalar value is substituted.";
                 else
                 {
@@ -188,7 +188,7 @@ internal static class CadTableContentsReader364
                 var observed=raw is string or int or bool||raw is double finite&&double.IsFinite(finite)?raw:NativeOwnedMetadata.Value(raw);
                 var slot=new Slot(index,kind.ToString(),cache==null?table.GetTextString(row,column,index):cache.Text,type.DataType.ToString(),type.UnitType.ToString(),Wire.Element(observed!),
                     raw is double scalar?BitConverter.DoubleToInt64Bits(scalar).ToString("X16"):null,table.GetDataFormat(row,column,index),Number(native.Rotation),Number(native.Scale),native.IsAutoScale,0,
-                    Number(table.GetTextHeight(row,column,index)),Handle(table.GetTextStyleId(row,column,index)),Color(color),formula,expression,Reference(field),Reference(block),definition,attributes,unavailable,cache==null?null:CadTableFieldCache365.Source,cache?.TextReason);
+                    Number(table.GetTextHeight(row,column,index)),Handle(table.GetTextStyleId(row,column,index)),Color(color),formula,expression,Reference(field),Reference(block),definition,attributes,unavailable,cache?.ValueSource,cache?.TextReason);
                 budget.Add(slot);slots.Add(slot);
             }
             FormatValue? format=null;

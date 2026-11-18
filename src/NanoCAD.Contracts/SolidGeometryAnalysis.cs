@@ -4,7 +4,8 @@ namespace NanoCAD.Contracts;
 
 public static class SolidGeometryAnalysisValidation
 {
-    public static bool Handles(string? mode)=>mode is "solid_containment" or "solid_interference";
+    public static IReadOnlyList<string> Modes { get; } = Array.AsReadOnly<string>(["solid_containment", "solid_interference"]);
+    public static bool Handles(string? mode) => Modes.Contains(mode);
 
     public static GeometryAnalysisArguments Parse(Arguments read,string mode,JsonElement input)
     {

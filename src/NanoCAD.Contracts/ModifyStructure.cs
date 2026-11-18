@@ -29,7 +29,8 @@ public sealed record StructureWriteArguments(string BridgeId, string DocumentId,
 }
 public sealed record StructureChild(EntityRef @ref, string kind, int source_index, string? tag);
 public sealed record StructureChange(int operation_index, string operation, EntityRef @ref, string kind, string name, bool created,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] StructureChild[]? children = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] StructureChild[]? children = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RasterCalibrationResult? raster_calibration = null);
 public sealed record ModifiedStructure(string operation_id, string status, bool replayed, StructureChange[] changes, string undo_history,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ViewportLifecycleChange[]? viewport_lifecycle_results = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TableStyleChange337[]? table_style_changes = null,
@@ -200,7 +201,7 @@ public static class StructureWriteValidation
                 case var lifecycleKind when StructureLifecycleValidation.Handles(lifecycleKind): edits.Add(StructureLifecycleValidation.Parse(item, path)); break;
                 case var lifecycleKind when DrawingViewLifecycleValidation345.Handles(lifecycleKind): edits.Add(DrawingViewLifecycleValidation345.Parse(item, path)); break;
                 case var drawingViewKind when DrawingViewEditValidation.Handles(drawingViewKind): edits.Add(DrawingViewEditValidation.Parse(item, path)); break;
-                default: throw Invalid(path + ".operation", "Supported: set_text_style_font, set_text_style_properties, set_dimension_style_properties, create_layer, set_layer_properties, set_current_layer, rename_layer, rename_block_definition, set_block_definition_geometry, create_block_from_objects, import_block_dwg, redefine_block_from_dwg, set_block_definition_text, set_block_definition_members, set_attribute_text, define_block, insert_block, insert_block_array, set_block_array_properties, create_text_style, create_dimension_style, create_linetype, set_viewport_clipping, set_viewport_view, create_layout, rename_layout, set_layout_properties, create_viewport, create_drawing_views, create_section_view, set_section_view_cut, native current style and safe record lifecycle operations.");
+                default: throw Invalid(path + ".operation", "Unknown structure operation. Read get_guidance(topic=schema, operation=modify_structure) for the current operation names and schemas.");
             }
         }
         if (edits.Any(e => e is SetTextStyleFontEdit) && edits.Count != 1) throw Invalid("operations", "Change one text style font in a separate request before creating or editing annotations.");
@@ -243,6 +244,8 @@ public static class StructureWriteValidation
         DrawingViewCreateValidation.ValidateBatch(edits);
         DrawingViewCreateValidation.ValidateTargetSpace(edits, targetSpace ?? "model");
         SectionViewValidation.ValidateBatch(edits);
+        if (edits.OfType<CreateSectionViewEdit>().Any(section => (section.LayoutHandle != null) != (targetSpace == "paper")))
+            throw Invalid("$.target_space","Paper section views require target_space paper and the exact active layout_handle.");
         SectionCutValidation351.Batch(edits);
         ViewportCreateValidation.ValidateBatch(edits);
         return new(bridge, document, number.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray(), targetSpace);

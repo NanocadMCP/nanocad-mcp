@@ -83,6 +83,8 @@ public sealed record ModifiedEntities(string operation_id, string status, bool r
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public DynamicBlockPropertyChange[]? dynamic_block_changes { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public TableCellChange[]? table_cell_changes { get; init; }
 }
 
 public static partial class ModifyValidation

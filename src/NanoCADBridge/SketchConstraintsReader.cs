@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using NanoCAD.Contracts;
 using Teigha.DatabaseServices;
+using ConstraintType=Multicad.DatabaseServices.Constraints.ConstraintType;
 
 namespace NanoCADBridge;
 
@@ -64,9 +65,15 @@ internal static class SketchConstraintsReader
             Budget();using var info=manager.GetConstraintInfo(id);
             if(info==null)throw new DomainException("CONSTRAINTS_UNAVAILABLE","Constraint details are unavailable.");
             double parameter=info.Param;
+            string unit=info.Type switch
+            {
+                ConstraintType.DimAngular=>"radians",
+                ConstraintType.DimRadial or ConstraintType.DimDiametrical or ConstraintType.DimAligned or ConstraintType.DimHorizontal or ConstraintType.DimVertical=>"drawing_units",
+                _=>info.IsDimensional?"native_constraint_units":"not_applicable"
+            };
             constraints.Add(new {mc_id=id.ToString(),type=info.Type.ToString(),is_geometrical=info.IsGeometrical,is_dimensional=info.IsDimensional,
                 first=Reference(info.FirstObject),second=Reference(info.SecondObject),third=Reference(info.ThirdObject),
-                parameter_value=double.IsFinite(parameter)?(double?)parameter:null,parameter_value_unit="native_constraint_units",
+                parameter_value=info.IsDimensional&&double.IsFinite(parameter)?(double?)parameter:null,parameter_value_unit=unit,
                 variable_id=Id(info.VarId),variable_name=Text(info.VarName),variable_expression=Text(info.VarExpression),dimension_id=Id(info.DimId)});
         }
         Budget();

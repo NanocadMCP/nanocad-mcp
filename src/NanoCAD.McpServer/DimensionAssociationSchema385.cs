@@ -49,8 +49,18 @@ internal static class DimensionAssociationSchema385
         var point=Object(("role",Text()),("source_handle",Handle()),("osnap_type",Choice(new[]{"ModeStartpoint","ModeEnd","ModeMid","ModeCenter","ModeQuad"})),("point",Point()),("evaluated_point",Point()),("near_point_parameter",new JsonObject{["type"]="number"}));
         var noAssociation=Object(("association_handle",new JsonObject{["type"]="null"}));
         var native=Object(("association_handle",Handle()),("owner_handle",Nullable(Handle())),("dimension_handle",Handle()),("flags",Integer()),("trans_spatial",Bool()),("rotated_type",Text()),("points",Array(point)));
+        var slot=Object(("role",Text()),("enabled",Bool()),("stored",Nullable(Bool())));
+        var props=slot["properties"]!.AsObject();
+        props["source_path"]=Array(Nullable(Handle()));props["subentity_type"]=Text();props["osnap_type"]=Text();
+        props["evaluated_point"]=Nullable(Point());props["evaluation_unavailable_reason"]=Nullable(Text());props["unavailable_reason"]=Text();
+        var partial=Object(("owner_handle",Nullable(Handle())),("dimension_handle",Handle()),("flags",Integer()),("slots",Array(slot)));
         var read=Object(("association_token",Nullable(Token())),("association_handle",Nullable(Handle())),("active",Nullable(Bool())),
-            ("points",Nullable(new JsonObject{["oneOf"]=new JsonArray(noAssociation,native)})),("source_handles",Nullable(Array(Handle()))),("editing_unavailable_reason",Nullable(Text())),("scope",Text()));
+            ("points",Nullable(new JsonObject{["oneOf"]=new JsonArray(noAssociation,native,partial)})),("source_handles",Nullable(Array(Handle()))),("editing_unavailable_reason",Nullable(Text())),("scope",Text()));
+        read["properties"]!["binding_state"]=Choice(new[]{"no_native_dimassoc","active_native_dimassoc","inactive_native_dimassoc","partial_native_dimassoc","unavailable"});
+        read["properties"]!["notification_links"]=Nullable(Object(("association_handle",Handle()),("dimension_handle",Handle()),
+            ("owner_handle",Nullable(Handle())),("owned_by_dimension",Bool()),("dimension_reverse_count",Integer()),
+            ("source_reverse_links",Array(Object(("source_handle",Handle()),("count",Integer()))))));
+        read["properties"]!["notification_unavailable_reason"]=Nullable(Text());
         read["description"]="Stored native DimAssoc flags/whole source paths and Osnap picks, plus current native evaluated points; read performs no dimension update/regeneration. A fresh token admits the supported local association scope. Resident native AssocManager anchors and their readable owned records are observed by actual identity/ownership; the SDK exposes no complete private manager inventory. Inactive native storage is distinct from an active binding; null token/reason does not hide the independently readable stored dimension geometry.";return read;
     }
     internal static JsonObject Change(JsonNode reference)=>Object(("operation_index",Integer()),("dimension_ref",reference),("association_token",Token()),("association_handle",Nullable(Handle())),("source_handles",Array(Handle())),("warnings",Array(Text())));

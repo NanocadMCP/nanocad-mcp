@@ -41,6 +41,7 @@ internal static class DimensionGeometryReader
             elevation = Number(dimension.Elevation),
             dimension_style = new EntityRef(summary.@ref.bridge_instance_id, summary.@ref.document_id, Validation.NormalizeHandle(style.Handle.ToString())),
             dimension_text = text,
+            dimension_text_mode = DimensionTextContent.DisplayMode(text, dimension.HasFields),
             text_position = Point(dimension.TextPosition),
             text_rotation = Number(dimension.TextRotation),
             format,

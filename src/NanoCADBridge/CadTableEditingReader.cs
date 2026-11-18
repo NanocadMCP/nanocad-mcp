@@ -37,6 +37,34 @@ internal static class CadTableEditingReader
         string? native_value_source=null,string? text_unavailable_reason=null);
     internal sealed record ReadContentLayout(double rotation,double scale,bool auto_scale);
     internal sealed record ReadValue(string table_token,string table_style_handle,ReadCell[] cells,ReadAppearance[] appearance_formats,TableFormulaWorkflowRead350? formula_workflows=null,TableTopologyWorkflow354? topology_workflows=null,object? layout_workflow=null);
+    internal static TableCellChange ObservedChanges(int operationIndex, EntityRef target, Snapshot before, Snapshot after,
+        IEnumerable<(int Row, int Column)> selected, Action cancel)
+    {
+        var targets = selected.ToHashSet();
+        var cells = new List<ObservedTableCell>();
+        var budget = new ModelInventoryBudget(cancel);
+        foreach (var cell in after.Cells)
+        {
+            cancel();
+            int index = checked(cell.row * after.Columns + cell.column);
+            var value = after.Values[index];
+            var previous = before.Values[index];
+            bool requested = targets.Contains((cell.row, cell.column));
+            if (!requested)
+            {
+                if (value?.formula is null) continue;
+                if (value.formula == previous?.formula && value.evaluation_unavailable_reason == previous?.evaluation_unavailable_reason &&
+                    previous != null && value.native_value.GetRawText() == previous.native_value.GetRawText() &&
+                    value.native_value_source == previous.native_value_source) continue;
+            }
+            var item = new ObservedTableCell(cell.row, cell.column, requested ? "requested_cell" : "observed_formula_change",
+                value?.formula, value?.data_type, value?.unit_type, value?.native_value,
+                value == null ? null : value.native_value_source ?? "native_table_get_value", value?.evaluation_unavailable_reason);
+            budget.Add(item); cells.Add(item);
+        }
+        return new TableCellChange(operationIndex, target, after.Token, cells.ToArray());
+    }
+
     private const int SnapshotByteBudget=8*1024*1024;
     internal static void Need(bool value,string message,string code="UNSUPPORTED_TABLE_CONTENT")
     {if(!value)throw new DomainException(code,message);}
@@ -46,8 +74,14 @@ internal static class CadTableEditingReader
     private static double[] Vector(Vector3d vector)=>new[]{Number(vector.X),Number(vector.Y),Number(vector.Z)};
     private static ColorValue Color(Teigha.Colors.Color color)=>new(color.IsByLayer?"by_layer":color.IsByBlock?"by_block":color.IsByAci?"aci":color.IsByColor?"true_color":color.ColorMethod.ToString(),
         color.IsByAci?(int?)color.ColorIndex:null,color.IsByColor?new[]{(int)color.Red,color.Green,color.Blue}:null);
-    private static string Handle(ObjectId id)
-    {Need(!id.IsNull&&id.IsValid&&!id.IsErased&&!id.IsEffectivelyErased,"Table style/text style identity is unavailable.");return Validation.NormalizeHandle(id.Handle.ToString());}
+    private static string Handle(ObjectId id,Table table,string getter,int? row=null,int? column=null,int? contentIndex=null,string? component=null)
+    {
+        if(id.IsNull||!id.IsValid||id.IsErased||id.IsEffectivelyErased)
+            throw new DomainException("UNSUPPORTED_TABLE_CONTENT","A native Table snapshot reference is unavailable at "+getter+".",false,
+                new{table_handle=table.ObjectId.IsNull?null:table.Handle.ToString(),getter,row,column,content_index=contentIndex,component,
+                    is_null=id.IsNull,is_valid=!id.IsNull&&id.IsValid,observed_handle=id.IsNull||!id.IsValid?null:id.Handle.ToString()});
+        return Validation.NormalizeHandle(id.Handle.ToString());
+    }
     private static string Literal(string text)
     {
         Need(text.Length<=4096&&!text.Any(char.IsControl)&&text.IndexOfAny(new[]{'\\','{','}'})<0&&!text.Contains("%<")&&!text.Contains("%%"),"Lifecycle editing supports plain literal text without formatting/field codes.");return text;
@@ -64,7 +98,7 @@ internal static class CadTableEditingReader
                 grids.Add(new{line=line.ToString(),color=Color(gridColor),lineweight=(int)table.GridLineWeight(line,type),visible=table.GridVisibility(line,type)});
             }
             rows.Add(new{row_type=type.ToString(),content_color=Color(color),background_none=table.IsBackgroundColorNone(type),background_color=Color(background),
-                alignment=table.Alignment(type).ToString(),text_style_handle=table.TextStyle(type).IsNull?null:Handle(table.TextStyle(type)),text_height=Number(table.TextHeight(type)),
+                alignment=table.Alignment(type).ToString(),text_style_handle=table.TextStyle(type).IsNull?null:Handle(table.TextStyle(type),table,"TextStyle(RowType)",component:type.ToString()),text_height=Number(table.TextHeight(type)),
                 // Actual350 receipts prove these legacy row-role type getters return unstable non-enum outputs.
                 // Installed native void binding supplies no availability status. Do not invent inherited values.
                 data_type=(string?)null,unit_type=(string?)null,type_observation="legacy_row_role_type_getters_unavailable; actual_per_cell_GetDataType_remains_observed",grids=grids.ToArray()});
@@ -133,19 +167,19 @@ internal static class CadTableEditingReader
                 var type=table.GetDataType(row,column,0);
                 bool literal=type.DataType==DataType.String&&type.UnitType==UnitType.Unitless;
                 Need(hasFormula||literal||allowNumeric&&(type.DataType is DataType.Long or DataType.Double)&&TableValueEditingValidation336.UnitTypes.Contains(type.UnitType.ToString(),StringComparer.Ordinal),"Numeric or unsupported unit-bearing cell content is outside this table adapter.");
-                cancel();object? raw=null;string? evaluationReason=null;var cache=fieldId.IsNull?null:formulaFields.Cache(fieldId);
+                cancel();object? raw=null;string? evaluationReason=null;var cache=fieldId.IsNull?null:formulaFields.Cache(fieldId,storedFormula);
                 try
                 {
                     raw=cache==null?table.GetValue(row,column,0):cache.Value;evaluationReason=cache?.ValueReason;
                     bool scalar=type.DataType==DataType.String&&raw is string||type.DataType==DataType.Long&&raw is int||type.DataType==DataType.Double&&raw is double number&&double.IsFinite(number);
-                    if(!scalar&&hasFormula){raw=null;evaluationReason="Native formula has no finite scalar value matching its observed datatype.";}
+                    if(!scalar&&hasFormula){raw=null;evaluationReason??="Native formula has no finite scalar value matching its observed datatype.";}
                     else Need(scalar,"Native scalar value has an unavailable or inconsistent storage type.","OBJECT_READ_FAILED");
                 }
                 catch(OperationCanceledException){throw;}
                 catch(System.Exception error) when(hasFormula&&error is not DomainException)
                 {raw=null;evaluationReason="Native formula value getter unavailable: "+error.GetType().Name;}
                 value=new(type.DataType.ToString(),type.UnitType.ToString(),JsonSerializer.SerializeToElement(raw,Wire.Json),raw is double real?BitConverter.DoubleToInt64Bits(real).ToString("X16"):null,
-                    0,Number(content.Rotation),Number(content.Scale),content.IsAutoScale,hasFormula?storedFormula:null,evaluationReason,contentType.ToString(),nativeField,cache==null?null:CadTableFieldCache365.Source);
+                    0,Number(content.Rotation),Number(content.Scale),content.IsAutoScale,hasFormula?storedFormula:null,evaluationReason,contentType.ToString(),nativeField,cache?.ValueSource);
                 var stored=cache==null?table.GetTextString(row,column,0):cache.Text;textReason=cache?.TextReason;
                 // Native appearance setters do not replace text. Retain its
                 // exact stored string, including existing CAD format codes;
@@ -164,9 +198,9 @@ internal static class CadTableEditingReader
                 {
                     cancel();using var color=table.GetGridColor(row,column,line);var linetype=table.GetGridLinetype(row,column,line);
                     grids.Add(new(line.ToString(),table.GetGridVisibility(row,column,line).ToString(),(int)table.GetGridLineWeight(row,column,line),
-                        linetype.IsNull?null:Handle(linetype),table.GetGridLineStyle(row,column,line).ToString(),Number(table.GetGridDoubleLineSpacing(row,column,line)),(int)table.GetOverrides(row,column,line),Color(color)));
+                        linetype.IsNull?null:Handle(linetype,table,"GetGridLinetype",row,column,component:line.ToString()),table.GetGridLineStyle(row,column,line).ToString(),Number(table.GetGridDoubleLineSpacing(row,column,line)),(int)table.GetOverrides(row,column,line),Color(color)));
                 }
-                format=new(table.GetCellStyle(row,column),count==0?table.GetDataFormat(row,column):table.GetDataFormat(row,column,0),table.Alignment(row,column).ToString(),Number(count==0?table.TextHeight(row,column):table.GetTextHeight(row,column,0)),Handle(count==0?table.TextStyle(row,column):table.GetTextStyleId(row,column,0)),
+                format=new(table.GetCellStyle(row,column),count==0?table.GetDataFormat(row,column):table.GetDataFormat(row,column,0),table.Alignment(row,column).ToString(),Number(count==0?table.TextHeight(row,column):table.GetTextHeight(row,column,0)),Handle(count==0?table.TextStyle(row,column):table.GetTextStyleId(row,column,0),table,count==0?"TextStyle(row,column)":"GetTextStyleId",row,column,count==0?null:0),
                     Color(contentColor),table.IsBackgroundColorNone(row,column),Color(background),
                     new[]{CellMargins.Top,CellMargins.Left,CellMargins.Bottom,CellMargins.Right}.Select(m=>Number(table.GetMargin(row,column,m))).ToArray(),grids.ToArray());
             }
@@ -188,7 +222,7 @@ internal static class CadTableEditingReader
         // Installed getter IL is native-backed despite CS0618; retain these
         // exact suppression flags (basic-337-table-style.md compatibility note).
 #pragma warning disable CS0618
-        var common=Wire.Element(new{table_style_handle=Handle(table.TableStyle),position=Point(position),direction=Vector(direction),normal=Vector(normal),
+        var common=Wire.Element(new{table_style_handle=Handle(table.TableStyle,table,"TableStyle"),position=Point(position),direction=Vector(direction),normal=Vector(normal),
             properties=rootProperties,table_overrides=table.TableStyleOverrides().Select(item=>(int)item).OrderBy(item=>item).ToArray(),
             IsTitleSuppressed=titleSuppressed,IsHeaderSuppressed=headerSuppressed,flow_direction=flowDirection,horizontal_margin=horizontalMargin,vertical_margin=verticalMargin,row_defaults=rowDefaults});
 #pragma warning restore CS0618

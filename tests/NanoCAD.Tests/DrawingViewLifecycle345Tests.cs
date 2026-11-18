@@ -14,6 +14,15 @@ internal static class DrawingViewLifecycle345Tests
         JsonElement Payload(params object[] operations)=>Wire.Element(new{bridge_instance_id="11111111-1111-1111-1111-111111111111",
             document_id="22222222-2222-2222-2222-222222222222",expected_revision="1",operation_id="33333333-3333-3333-3333-333333333333",
             units="Millimeters",target_space="paper",operations});
+        await test("drawing preparation retains optional native child alignment",()=>
+        {
+            var entry=new Dictionary<string,object>{["operation"]="add_drawing_view_child",["handle"]="A1",["layout_handle"]="B1",["expected_name"]="Parent",["view_token"]=token,["name"]="Right",["direction"]="right",["origin"]=new[]{50,0},["model_scale"]=1};
+            var free=(AddDrawingViewChild345)StructureWriteValidation.Parse(Payload(entry)).Operations.Single();
+            entry["align_on_parent"]=true;
+            var aligned=(AddDrawingViewChild345)StructureWriteValidation.Parse(Payload(entry)).Operations.Single();
+            Need(!free.AlignOnParent&&aligned.AlignOnParent,"Explicit and default alignment were conflated.");
+            return Task.CompletedTask;
+        });
         await test("block345 view lifecycle binds current layout/token and explicit complete source group without body count ceilings",()=>
         {
             var sourceHandles=Enumerable.Range(1,129).Select(i=>i.ToString("X")).ToArray();

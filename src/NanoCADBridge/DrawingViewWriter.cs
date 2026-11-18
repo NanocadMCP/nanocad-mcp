@@ -116,6 +116,12 @@ internal static class DrawingViewWriter
         :new(Point3d.Origin,Vector3d.XAxis);
     private static JsonElement Capture(DocumentState state,Action cancel)
         => Observe(state.Document,cancel);
+    internal static object ViewSummary(string handle, DrawingView view)
+    {
+        var sources=view.GetTop3dEntitiesInView();var children=view.ChildViews;
+        Need(sources!=null,"MODEL_STATE_UNAVAILABLE","View associations unavailable.");
+        return new{handle,mc_id=view.ID.ToString(),name=view.Name,direction=view.DirectionType.ToString(),root=view.RootViewID.ToString(),parent=view.ParentViewID.ToString(),children=children?.Select(x=>x.ToString()).OrderBy(x=>x,StringComparer.Ordinal).ToArray()??Array.Empty<string>(),sources=sources!.Select(x=>x.ToString()).OrderBy(x=>x,StringComparer.Ordinal).ToArray(),status=view.Status.ToString(),suppressed=view.IsSuppressed,auto_update=view.EnableAutoUpdate,hidden_lines=view.ShowHiddenLines,hatches=view.ShowHatches,tangent_edges=view.ShowTangentEdges,view_plane=Plane(view.ViewPlane),projection_plane=Plane(view.ProjPlane),scale=Finite(view.DbEntity.DScale),design_scale=Finite(view.DbEntity.Scale),origin=new[]{Finite(view.ViewPlane.Origin.X),Finite(view.ViewPlane.Origin.Y),Finite(view.ViewPlane.Origin.Z)}};
+    }
     internal static JsonElement Observe(HostMgd.ApplicationServices.Document doc,Action cancel,bool allowPaperViews=false)
     {
         var nativeSections=new List<object>();
@@ -157,9 +163,7 @@ internal static class DrawingViewWriter
             if(view!=null)
             {
                 Need(view.ID==mcId,"ANALYSIS_LIMIT_EXCEEDED","View identity is invalid.");
-                var sources=view.GetTop3dEntitiesInView();var children=view.ChildViews;
-                Need(sources!=null,"MODEL_STATE_UNAVAILABLE","View associations unavailable.");
-                views.Add(new{handle=id.Handle.ToString(),mc_id=mcId.ToString(),name=view.Name,direction=view.DirectionType.ToString(),root=view.RootViewID.ToString(),parent=view.ParentViewID.ToString(),children=children?.Select(x=>x.ToString()).OrderBy(x=>x,StringComparer.Ordinal).ToArray()??Array.Empty<string>(),sources=sources!.Select(x=>x.ToString()).OrderBy(x=>x,StringComparer.Ordinal).ToArray(),status=view.Status.ToString(),suppressed=view.IsSuppressed,auto_update=view.EnableAutoUpdate,hidden_lines=view.ShowHiddenLines,hatches=view.ShowHatches,tangent_edges=view.ShowTangentEdges,view_plane=Plane(view.ViewPlane),projection_plane=Plane(view.ProjPlane),scale=Finite(view.DbEntity.DScale),design_scale=Finite(view.DbEntity.Scale),origin=new[]{Finite(view.ViewPlane.Origin.X),Finite(view.ViewPlane.Origin.Y),Finite(view.ViewPlane.Origin.Z)}});
+                views.Add(ViewSummary(id.Handle.ToString(),view));
                 measured?.Add(views[^1]);
             }
             if(entity is Db.Solid3d solid)

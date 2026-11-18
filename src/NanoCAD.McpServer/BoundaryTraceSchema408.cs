@@ -14,7 +14,7 @@ internal static class BoundaryTraceSchema408
             ["bridge_instance_id"]=new JsonObject{["type"]="string",["format"]="uuid"},
             ["document_id"]=new JsonObject{["type"]="string",["format"]="uuid"},
             ["expected_revision"]=new JsonObject{["type"]="string",["pattern"]="^[0-9]{1,20}$"},
-            ["mode"]=new JsonObject{["const"]="trace_boundary"},
+            ["mode"]=new JsonObject{["const"]=NanoCAD.Contracts.GeometryAnalysisValidation.TraceBoundaryMode},
             ["point"]=new JsonObject{["type"]="array",["minItems"]=3,["maxItems"]=3,["items"]=new JsonObject{["type"]="number",["minimum"]=-1e12,["maximum"]=1e12},["description"]="Interior seed in WCS drawing units; the bridge maps it to the current native editor UCS."},
             ["detect_islands"]=new JsonObject{["type"]="boolean",["default"]=true},
             ["space"]=new JsonObject{["enum"]=new JsonArray("model","paper"),["default"]="model",["description"]="Must match the active editing space. No automatic context switch."}

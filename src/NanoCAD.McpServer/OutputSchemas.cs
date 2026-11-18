@@ -220,6 +220,10 @@ internal static class OutputSchemas
         data["properties"]!["solid_imprint_changes"] = Array(SolidImprintSchema393.Change(Ref("ref")));
         data["properties"]!["solid_stock_changes"] = Array(SolidStockSchema353.Change(Ref("ref")));
         data["properties"]!["tolerance_changes"] = Array(ExtendedAnnotationSchema356.Change(Ref("ref")));
+        data["properties"]!["table_cell_changes"] = Array(Object(("operation_index", Integer()), ("source", Ref("ref")),
+            ("table_token", Text()), ("cells", Array(Object(("row", Integer()), ("column", Integer()), ("origin", Text()),
+                ("formula", Nullable(Text())), ("data_type", Nullable(Text())), ("unit_type", Nullable(Text())),
+                ("native_value", new JsonObject()), ("value_source", Nullable(Text())), ("evaluation_unavailable_reason", Nullable(Text())))))));
         data["properties"]!["table_topology_changes"] = Array(TableTopologySchema354.Change(Ref("ref")));
         data["properties"]!["region_boolean_changes"] = Array(RegionBooleanSchema.Change());
         return data;
@@ -276,10 +280,11 @@ internal static class OutputSchemas
             ("geometry_details_complete", Bool()), ("element_identity", Text()),
             ("items", Array(Object(("index", Integer()), ("native_geometry_type", Nullable(Text())),
                 ("status", Text()), ("geometry", Nullable(AnyObject())), ("unavailable_reason", Nullable(Text()))))));
-        var projectedSource = Object(("status", Text()), ("unavailable_reason", Nullable(Text())),
-            ("view_marker", Nullable(Text())), ("source_ref", Nullable(Ref("ref"))),
-            ("native_edge_id", Nullable(Text())), ("native_ref_key", Nullable(Text())));
-        AddOptional(projected["properties"]!["items"]!["items"]!.AsObject(), "projection_source", projectedSource);
+        var projectedSource = ProjectionSource();
+        AddOptional(projected["properties"]!["items"]!["items"]!.AsObject(), "view_marker", Nullable(Text()));
+        AddOptional(projected["properties"]!["items"]!["items"]!.AsObject(), "dimension_edge_binding", AnyObject());
+        AddOptional(projected["properties"]!["items"]!["items"]!.AsObject(), "projection_visibility", AnyObject());
+        AddOptional(projected["properties"]!["items"]!["items"]!.AsObject(), "projection_source", projectedSource.DeepClone().AsObject());
         AddOptional(projected, "geometry_scope", Text()); AddOptional(projected, "total_elements", Integer()); AddOptional(projected, "start_index", Integer());
         AddOptional(projected, "next_index", Nullable(Integer())); AddOptional(projected, "complete", Bool());
         var result = Object(("layout_ref", Ref("ref")), ("layout_name", Text()), ("space", Text()), ("identity_scope", Text()),
@@ -293,6 +298,8 @@ internal static class OutputSchemas
         var item = result["properties"]!["items"]!["items"]!.AsObject();
         AddOptional(item, "native_owner_document_id", Nullable(Text()));
         AddOptional(result, "selected_source_identity", PaperDrawingViewsSchema356.SelectedSources(Ref("ref")));
+        AddOptional(result, "selected_marker_source", Nullable(Object(("view_handle", Text()), ("marker", Integer()),
+            ("scope", Text()), ("visible_uniqueness_evaluated", Bool()), ("projection_source", projectedSource))));
         AddOptional(item, "align_on_parent", Bool());
         AddOptional(item, "attached_local_cut_ids", Nullable(Array(Text())));
         AddOptional(item, "outer_cut_sketch_id", Nullable(Text()));
@@ -438,6 +445,7 @@ internal static class OutputSchemas
             ("measurement", Nullable(Number())), ("measurement_unavailable_reason", Nullable(Text())), ("measurement_unit", new JsonObject { ["type"] = "string", ["const"] = kind is "LineAngularDimension2" or "Point3AngularDimension" ? "radians" : "drawing_units" }),
             ("normal", Point()), ("elevation", Number()), ("dimension_style", Ref("ref")),
             ("dimension_text", Text()), ("text_position", Point()), ("text_rotation", Number()));
+            result["properties"]!["dimension_text_mode"] = Text();
             result["properties"]!["native_details"] = Nullable(ExtendedAnnotationSchema356.ArcDetails());
             result["properties"]!["native_binding"] = Object(("opened_runtime_type", Text()), ("definition_runtime_type", Text()), ("borrowed_wrapper", Bool()), ("scope", Text()));
             result["properties"]!["format"] = Nullable(DimensionFormatSchema.Read());
@@ -462,7 +470,18 @@ internal static class OutputSchemas
             Kind("OrdinateDimension", Object(("origin", Point()), ("defining_point", Point()), ("leader_end_point", Point()), ("using_x_axis", Bool()))))
         };
     }
-    private static JsonObject ProjectedDimensionViewAssociation() => Object(
+    private static JsonObject ProjectionSource()
+    {
+        var source = Object(("status", Text()), ("unavailable_reason", Nullable(Text())),
+            ("view_marker", Nullable(Text())), ("source_ref", Nullable(Ref("ref"))),
+            ("native_edge_id", Nullable(Text())), ("native_ref_key", Nullable(Text())));
+        source["properties"]!["creating_feature_id"] = Nullable(Text());
+        return source;
+    }
+
+    private static JsonObject ProjectedDimensionViewAssociation()
+    {
+        var association = Object(
         ("kind", new JsonObject { ["const"] = "mcs_dimension_view" }), ("active", Bool()),
         ("status", new JsonObject { ["enum"] = new JsonArray("observed", "unavailable") }),
         ("native_associative", Nullable(Bool())), ("native_view_classifier", Nullable(Bool())),
@@ -481,6 +500,11 @@ internal static class OutputSchemas
             ("source_gs_marker_unavailable_reason", Nullable(Text()))))),
         ("unavailable_reason", Nullable(Text())), ("stored_anchor_parameters_available", Bool()),
         ("stored_anchor_parameters_unavailable_reason", Nullable(Text())), ("scope", Text()));
+        association["properties"]!["measurement"] = Nullable(AnyObject());
+        association["properties"]!["links"]!["items"]!["properties"]!["marker_sources"] =
+            Array(Object(("marker", Integer()), ("projection_source", ProjectionSource())));
+        return association;
+    }
     public static JsonElement For(string operation)
     {
         if (operation == "get_operation_result") return OperationResultSchema432.Output();
@@ -606,6 +630,7 @@ internal static class OutputSchemas
         var children = Array(Object(("ref", Ref("ref")), ("kind", Text()), ("source_index", Integer()), ("tag", Nullable(Text()))));
         children["description"] = "Complete created native children. For define_block, entity/attribute_definition source_index identifies the requested array member. nested_attribute identifies a newly owned attribute of the BlockReference at that entities source_index; tag is its actual tag. inspect_block supplies the actual parent/occurrence path. For set_block_definition_members, added_member/added_nested_attribute source_index identifies add_entities; retired_member/retired_nested_attribute identifies remove_handles, including the actual owned attribute tag. block_reference children are actual retained consumers marked for redraw. Retired IDs are inactive and must not be reused for a later edit. No fixed child-count truncation.";
         structureChange["properties"]!["children"] = children;
+        structureChange["properties"]!["raster_calibration"] = Object(("mm_per_pixel",Number()),("check_error_mm",Nullable(Number())));
         JsonObject data = operation switch
         {
             "analyze_geometry" => GeometryAnalysis(),

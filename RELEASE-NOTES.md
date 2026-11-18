@@ -2,6 +2,17 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 456
+
+- Place first-angle or third-angle projected views, select child view alignment and inspect section ownership on the chosen sheet. Projected dimensions account for view scale. A diameter on a 1:2 view followed a model edit from 20 to 24 mm. An angular dimension can use two converging visible line segments.
+- Inspect table cell types, units, formula expressions and evaluated values after inserting or deleting rows. Restore measured dimension text after a long literal override, and snap to the selected vertex of an eligible polyline.
+- Check the material removed by a small bore and the ownership of chamfer edges. Inspect native Loft section sources and the available sketch and feature controls. Thread edits report the retained pitch and length drivers where applicable.
+- Find objects by a 3D world-coordinate region, inspect one structure entry by handle and follow a nested block path with its accumulated transform. Repoint an eligible external drawing reference and check raster calibration against an independent third point.
+
+A view dimension can retain a valid attachment even when nanoCAD cannot identify the original solid edge. The result reports the available native references. Table totals were checked with numeric, unitless results and source lengths in millimetres.
+
+The connection reports server 0.283.0 and bridge 0.241.0. Download the installer, runtime, source, documentation and matching checksums from [release 456](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/456).
+
 ## Build 455
 
 - Addresses the confirmed native tab accessibility crash observed when Codex
