@@ -282,6 +282,30 @@ NanoCAD_SetHoleExtent(const wchar_t* documentGuid, const wchar_t* bodyGuid,
 }
 
 extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ApplyMeasuredThroughDepth(const wchar_t* documentGuid, const wchar_t* bodyGuid,
+    const wchar_t* featureGuid, double depth)
+{
+    if (!std::isfinite(depth) || depth <= 0) return E_INVALIDARG;
+    try
+    {
+        IMcObjectPtr object;
+        HRESULT status = ReadObject(documentGuid, featureGuid, object);
+        if (FAILED(status)) return status;
+        mcsWorkID bodyId;
+        status = ParseId(bodyGuid, bodyId);
+        if (FAILED(status)) return status;
+        IMc3dHolePtr hole = object;
+        if (!hole || hole->getHostSolidID() != bodyId || hole->getExtent() != kHoleExtType_All || !hole->isFullDepth())
+            return E_INVALIDARG;
+        status = hole->setDepth(depth);
+        if (FAILED(status)) return status;
+        return hole->getExtent() == kHoleExtType_All && hole->isFullDepth() &&
+            std::abs(hole->getDepth() - depth) <= 1e-7 ? S_OK : E_FAIL;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+extern "C" __declspec(dllexport) HRESULT __cdecl
 NanoCAD_ReadHoleControlState(const wchar_t* documentGuid, const wchar_t* bodyGuid,
     const wchar_t* featureGuid, const wchar_t* variableGuid, std::uint32_t* category, int* extent)
 {
@@ -598,6 +622,26 @@ NanoCAD_ReadOwnedDrawingViewLocalCutData(const wchar_t* drawingWorkId,
             !final || snapshot != *final) return E_INVALIDARG;
         *phase = 6;
         return S_OK;
+    }
+    catch (...) { return E_UNEXPECTED; }
+}
+
+extern "C" __declspec(dllexport) HRESULT __cdecl
+NanoCAD_ReadOriginalProjectionMarker(const wchar_t* documentGuid, const wchar_t* viewGuid,
+    int marker, std::int64_t* sourceMarker)
+{
+    if (!sourceMarker || marker < 0) return E_INVALIDARG;
+    *sourceMarker = -1;
+    try
+    {
+        IMcObjectPtr object;
+        const HRESULT status = ReadObject(documentGuid, viewGuid, object);
+        if (FAILED(status)) return status;
+        IMcHlrEngine2Ptr projection = object;
+        if (!projection || !projection->getGeomByGsm_lcs(marker)) return S_FALSE;
+        // 3DCore.h IMcHlrEngine2::getSrcGsm identifies the original primitive.
+        *sourceMarker = projection->getSrcGsm(marker);
+        return *sourceMarker > 0 ? S_OK : S_FALSE;
     }
     catch (...) { return E_UNEXPECTED; }
 }

@@ -17,7 +17,7 @@ internal static class ProjectedDimensionWriter
         Point3d? Center = null, string Kind = "aligned", Point3d? Interior = null, double Sweep = 0,
         double[]? ObservedParameters = null);
     private sealed record Binding(Projection Projection, Point3d Placement, string LayerName,
-        McDocument Owner, Db.ObjectId Space, Db.ObjectId Layer, double ViewScaleDenominator, McGeomParam[] Anchors);
+        McDocument Owner, Db.ObjectId Space, Db.ObjectId Layer, double ViewScaleDenominator, McGeomParam[] Anchors, bool IsSection);
 
     private static bool IsProjectedDimension(EntitySpec item) =>
         item is ProjectedAlignedDimensionSpec or ProjectedDiametricDimensionSpec or ProjectedRadialDimensionSpec or
@@ -99,7 +99,8 @@ internal static class ProjectedDimensionWriter
             McGeomParam[]? cornerAnchors = null;
             if (spec is ProjectedAlignedDimensionSpec alignedSpec)
             {
-                var line = DrawingViewsReader.ResolveProjectedLine(entity, state, tx, args.BridgeId, alignedSpec.LineIndex, cancel);
+                var line = DrawingViewsReader.ResolveProjectedLine(entity, state, tx, args.BridgeId, alignedSpec.LineIndex, cancel,
+                    allowPlaneSection: paper);
                 var direction = line.End - line.Start;
                 Need(line.Start.Z == 0 && line.End.Z == 0 && direction.Length > 1e-7 &&
                     direction.CrossProduct(placement - line.Start).Length / direction.Length >= .001,
@@ -181,7 +182,8 @@ internal static class ProjectedDimensionWriter
             var layer = (Db.LayerTableRecord)tx.GetObject(layers[spec.Layer], Db.OpenMode.ForRead);
             Need(!layer.IsLocked && !layer.IsOff && !layer.IsFrozen && !layer.IsDependent,
                 "LAYER_UNAVAILABLE", "Use a local visible writable dimension layer.");
-            return new Binding(projection, placement, spec.Layer, owner, space, layer.ObjectId, view.DbEntity.DScale, cornerAnchors ?? Anchors(projection, owner));
+            return new Binding(projection, placement, spec.Layer, owner, space, layer.ObjectId, view.DbEntity.DScale,
+                cornerAnchors ?? Anchors(projection, owner), !view.SectionID.IsNull);
         }).ToArray();
     }
 
@@ -238,7 +240,7 @@ internal static class ProjectedDimensionWriter
             Need(angular.SetPosition(0, Native(projection.First)).IsSuccess() && angular.SetPosition(1, Native(projection.Second)).IsSuccess(),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native angle did not accept its arc endpoint rays.");
             angular.DimensionScale = 1; angular.LinePosition = Native(binding.Placement); angular.TextPosition = Native(binding.Placement);
-            if (binding.Anchors.Length == 3)
+            if (binding.IsSection || binding.Anchors.Length == 3)
                 Need(Same(angular.Center, angularCenter) && Same(angular.GetPosition(0), projection.First) &&
                     Same(angular.GetPosition(1), projection.Second) && Same(angular.LinePosition, binding.Placement),
                     "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached angular dimension did not retain the two projected rays, vertex and selected sector.");
@@ -379,16 +381,17 @@ internal static class ProjectedDimensionWriter
             {
                 var table = (Db.BlockTable)tx.GetObject(database.BlockTableId, Db.OpenMode.ForRead);
                 var summary = EntityAdapter.Summary(dimension, table[Db.BlockTableRecord.ModelSpace], args.BridgeId, args.DocumentId, true);
-                var observed = CadProjectedDimensionAssociationReader.ReadLoaded(dimension, summary, cancel);
-                Need(observed != null, "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The stored native angular dimension anchor inventory is unavailable.");
+                var observed = CadProjectedDimensionAssociationReader.ReadLoaded(dimension, summary, cancel, includeDesignSource: false);
+                Need(observed != null, "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The stored projected dimension anchor inventory is unavailable.");
                 var actual = Wire.Element(observed);
                 Need(actual.GetProperty("native_associative").ValueKind == System.Text.Json.JsonValueKind.True &&
                     actual.GetProperty("links_complete").GetBoolean() && actual.GetProperty("links").GetArrayLength() == 1 &&
                     actual.GetProperty("drawing_view_mc_id").GetString() == projection.ViewId.ToString(),
-                    "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident angular dimension did not retain its associative view identity.");
+                    "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The resident dimension did not retain its associative view identity.");
                 var anchors = actual.GetProperty("anchors");
-                var expectedPoints = new[] { projection.First, projection.Second, projection.Center!.Value };
-                Need(anchors.GetArrayLength() == 3, "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "Expected three stored angular anchors.");
+                Point3d[] expectedPoints = binding.IsSection ? [projection.First, projection.Second] : [projection.First, projection.Second, projection.Center!.Value];
+                Need(anchors.EnumerateArray().Count(row => !row.GetProperty("is_null").GetBoolean()) == expectedPoints.Length,
+                    "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", "The stored anchor count differs from the selected dimension.");
                 bool Matches(JsonElement row, McGeomParam expected, Point3d point)
                 {
                     var wcs = row.GetProperty("evaluated_point_wcs");
@@ -401,7 +404,7 @@ internal static class ProjectedDimensionWriter
                         SamePoint(new(wcs[0].GetDouble(), wcs[1].GetDouble(), wcs[2].GetDouble()), point);
                 }
                 // nanoCAD can reorder the two ray anchors to normalize its DWG
-                // angular sector. Each of the three actual parameter identities
+                // angular sector. Each actual parameter identity
                 // must still match exactly one distinct resident storage slot.
                 var usedSlots = new HashSet<int>();
                 for (int role = 0; role < expectedPoints.Length; role++)
@@ -409,7 +412,7 @@ internal static class ProjectedDimensionWriter
                     var matching = anchors.EnumerateArray().Where(row => Matches(row, binding.Anchors[role], expectedPoints[role]))
                         .Select(row => row.GetProperty("slot").GetInt32()).ToArray();
                     Need(matching.Length == 1 && matching[0] is >= 0 and < 3 && usedSlots.Add(matching[0]),
-                        "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", $"Angular anchor role {role} has no unique resident slot retaining its original view marker, point and parameter.");
+                        "NATIVE_DIMENSION_ASSOCIATION_MISMATCH", $"Anchor role {role} has no unique resident slot retaining its original view marker, point and parameter.");
                 }
             }
             result = id;

@@ -21,6 +21,7 @@ public static class ReadPreparationBindings433
             case "get_model_variables": adapter.Variables(data); break;
             case "inspect_model_history": adapter.History(data); break;
             case "inspect_solid_topology": adapter.Topology(data); break;
+            case "get_drawing_views": adapter.DrawingViews(data); break;
             case "inspect_sketch_constraints":
             case "inspect_constraints": adapter.Constraints(data, reader); break;
                 // get_document contributes only common read context in the caller.
@@ -46,8 +47,17 @@ public static class ReadPreparationBindings433
 
     private sealed class Adapter(JsonArray output, string operation, string? variant, JsonElement branch, ReadContext context)
     {
-        private readonly string prefix = operation == "modify_entities" ? "/operations/0" : "";
-        private bool Field(string name) => Get(branch, "properties", out var properties) && Get(properties, name, out _);
+        private readonly string prefix = operation switch { "modify_entities" or "modify_structure" => "/operations/0", "create_entities" => "/entities/0", _ => "" };
+        private bool Field(string name)
+        {
+            var schema = branch;
+            foreach (string part in name.Split('/'))
+            {
+                if (int.TryParse(part, out _)) { if (!Get(schema, "items", out schema)) return false; }
+                else if (!Get(schema, "properties", out var props) || !Get(props, part, out schema)) return false;
+            }
+            return true;
+        }
         private bool Variant(params string[] values) => operation == "modify_entities" && variant != null && values.Contains(variant, StringComparer.Ordinal);
         private static bool Present(JsonElement value) => value.ValueKind is not (JsonValueKind.Undefined or JsonValueKind.Null);
         private static JsonObject Candidate(string pointer, JsonObject target) => new()
@@ -225,6 +235,166 @@ public static class ReadPreparationBindings433
             "move" or "rotate" or "scale" or "mirror" or "copy" or "erase" or "set_properties" => type != null,
             _ => false
         };
+
+        internal void DrawingViews(JsonElement data)
+        {
+            if (!Get(data, "layout_ref", out var layout) || !Reference(layout)) return;
+            bool edits = operation == "modify_structure" && variant is "set_drawing_view_properties" or "rename_drawing_view" or
+                "add_drawing_view_child" or "set_drawing_view_sources" or "refresh_drawing_views" or "delete_drawing_views";
+            bool dimensions = operation == "create_entities" && variant is "projected_aligned" or "projected_diametric" or
+                "projected_radial" or "projected_arc_length" or "projected_angular";
+            if (!edits && !dimensions) return;
+            Get(data, "selected_geometry", out var page);
+            foreach (var (view, vp) in Array(data, "items", "/data"))
+            {
+                if (!Get(view, "ref", out var reference) || !Reference(reference)) continue;
+                JsonObject ViewCandidate(string pointer)
+                {
+                    var candidate = Candidate(pointer, Target(reference));
+                    foreach (string f in new[] { "name", "status", "direction", "mc_id", "section_id", "suppressed", "auto_update_enabled", "preview_mode", "parent_view_id", "align_on_parent" })
+                        Current(candidate, f, view, f, vp);
+                    Current(candidate, "model_scale", view, "model_scale", vp, "native_model_scale_denominator");
+                    return candidate;
+                }
+                if (edits)
+                {
+                    var candidate = ViewCandidate(vp);
+                    string nested = Field("targets") ? "targets/0/" : "";
+                    Bind(candidate, nested + "layout_handle", layout, "handle", "/data/layout_ref");
+                    Bind(candidate, nested + "handle", reference, "handle", vp + "/ref");
+                    Bind(candidate, nested + "expected_name", view, "name", vp);
+                    Bind(candidate, nested + "view_token", view, "view_token", vp);
+                    if (Get(view, "view_plane", out var plane)) Current(candidate, "origin_wcs", plane, "origin", vp + "/view_plane", "drawing_units");
+                    foreach (string f in new[] { "show_hidden_lines", "show_hatches", "show_tangent_edges", "source_refs", "child_view_ids", "view_token_unavailable_reason" })
+                        Current(candidate, f, view, f, vp);
+                    output.Add(candidate);
+                    continue;
+                }
+                if (!Get(page, "view_ref", out var selected) || !Reference(selected) ||
+                    Text(selected, "handle") != Text(reference, "handle") || Text(view, "status") != "Ok" ||
+                    Yes(view, "suppressed") || Yes(view, "preview_mode") || (variant != "projected_aligned" && Text(data, "space") != "paper")) continue;
+                bool section = Text(view, "section_id") != null || Yes(view, "is_based_on_section");
+                if (section && (variant != "projected_aligned" || Text(data, "space") != "paper" || !Yes(view, "is_root_section_view") ||
+                    Yes(view, "is_slice") || Yes(view, "depends_on_slice") || Yes(view, "show_hidden_lines") || !Yes(view, "auto_update_enabled"))) continue;
+                if (Get(view, "source_refs", out var refs) && (refs.ValueKind != JsonValueKind.Array || refs.GetArrayLength() != 1 || !Reference(refs[0]))) continue;
+                if (Text(view, "outer_cut_sketch_id") != null || Array(view, "attached_local_cut_ids", vp).Any() || Array(view, "attached_break_ids", vp).Any()) continue;
+
+                const string pp = "/data/selected_geometry";
+                JsonObject ForGeometry(string path)
+                {
+                    var c = Candidate(path, Target(reference));
+                    Bind(c, "view_handle", selected, "handle", pp + "/view_ref");
+                    Current(c, "model_scale", view, "model_scale", vp, "native_model_scale_denominator");
+                    Current(c, "element_identity", page, "element_identity", pp);
+                    return c;
+                }
+                var rays = new Dictionary<Point2, List<ProjectedRay>>();
+                foreach (var (row, rp) in Array(page, "items", pp))
+                {
+                    if (Text(row, "status") != "read" || Text(row, "view_marker") == null ||
+                        !Get(row, "index", out var index) || index.ValueKind != JsonValueKind.Number || !index.TryGetInt32(out int ordinal) || ordinal < 0 ||
+                        !Get(row, "geometry", out var geometry)) continue;
+                    bool line = Text(geometry, "kind") == "line";
+                    if (line && variant == "projected_angular")
+                    {
+                        Point2? XY(string key) => Get(geometry, key, out var vector) && vector.ValueKind == JsonValueKind.Array &&
+                            vector.GetArrayLength() == 3 && vector[2].GetDouble() == 0 ? new(vector[0].GetDouble(), vector[1].GetDouble()) : null;
+                        var a = XY("start"); var b = XY("end");
+                        if (a == null || b == null || AngularDimensionGeometry.Length(a, b) < .001) continue;
+                        void AddRay(Point2 tip, Point2 end)
+                        {
+                            if (!rays.TryGetValue(tip, out var group)) rays[tip] = group = [];
+                            group.Add(new(tip, end, row, rp, ordinal));
+                        }
+                        AddRay(a, b); AddRay(b, a);
+                        continue;
+                    }
+                    if (line != (variant == "projected_aligned")) continue;
+                    if (!line)
+                    {
+                        if (Text(geometry, "kind") != "circular_arc" || Text(geometry, "angle_unit") != "radians" ||
+                            !Get(geometry, "start_angle", out var first) || !Get(geometry, "end_angle", out var last)) continue;
+                        double sweep = Math.Abs(last.GetDouble() - first.GetDouble());
+                        bool full = Math.Abs(sweep - Math.Tau) <= 1e-8;
+                        if (sweep <= 1e-8 || sweep > Math.Tau + 1e-8 || variant == "projected_diametric" && !full ||
+                            (variant is "projected_arc_length" or "projected_angular") && full) continue;
+                    }
+                    var candidate = ForGeometry(rp);
+                    Bind(candidate, line ? "line_index" : "arc_index", row, "index", rp);
+                    Current(candidate, "view_marker", row, "view_marker", rp);
+                    Current(candidate, "projection_source", row, "projection_source", rp);
+                    Current(candidate, "geometry_wcs", row, "geometry", rp);
+                    output.Add(candidate);
+                }
+                AddCorners(rays, ForGeometry);
+            }
+        }
+
+        private sealed record ProjectedRay(Point2 Tip, Point2 End, JsonElement Row, string Path, int Index);
+
+        private void AddCorners(Dictionary<Point2, List<ProjectedRay>> rays, Func<string, JsonObject> candidate)
+        {
+            const double tolerance = ProjectedCornerGeometry.EndpointTolerance;
+            // Index native endpoints on this geometry page. Nearby coordinates select candidate
+            // pairs only. Bindings use the actual indices, with a direct read pointer for each.
+            static (double X, double Y) Cell(Point2 p) => (Math.Floor(p.X / tolerance), Math.Floor(p.Y / tolerance));
+            var cells = rays.Keys.ToLookup(Cell);
+            var seenPairs = new HashSet<(int, int)>();
+            var seenGroups = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var tip in rays.Keys)
+            {
+                var cell = Cell(tip);
+                var group = new List<ProjectedRay>();
+                var nearby = new HashSet<(double, double)>();
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -1; dy <= 1; dy++)
+                        if (nearby.Add((cell.X + dx, cell.Y + dy)))
+                            foreach (var p in cells[(cell.X + dx, cell.Y + dy)])
+                                if (AngularDimensionGeometry.Length(p, tip) <= tolerance) group.AddRange(rays[p]);
+                if (group.Count < 2) continue;
+                group.Sort((a, b) => a.Index.CompareTo(b.Index));
+                // At busier junctions a list of available rays preserves all choices in linear
+                // output. For two or three rays, enumerating the pairs costs at most one per ray.
+                if (group.Count > 3)
+                {
+                    if (!seenGroups.Add(string.Join(",", group.Select(r => r.Index)))) continue;
+                    var options = candidate(group[0].Path);
+                    options["ray_options"] = new JsonArray(group.Select(r => (JsonNode)new JsonObject
+                    {
+                        ["index"] = r.Index,
+                        ["source_pointer"] = r.Path + "/index",
+                        ["geometry_wcs"] = Node(r.Row.GetProperty("geometry")),
+                        ["geometry_source_pointer"] = r.Path + "/geometry"
+                    }).ToArray());
+                    Note(options, "mapping_note", "Choose two distinct, non-collinear original-view indices with one shared endpoint and the intended dimension sector.", group[0].Path);
+                    output.Add(options);
+                    continue;
+                }
+                for (int i = 0; i < group.Count; i++)
+                    for (int j = i + 1; j < group.Count; j++)
+                    {
+                        var a = group[i]; var b = group[j];
+                        if (Text(a.Row, "view_marker") == Text(b.Row, "view_marker") ||
+                            AngularDimensionGeometry.Length(a.Tip, b.Tip) > tolerance ||
+                            AngularDimensionGeometry.Length(a.End, b.End) <= tolerance) continue;
+                        double angle = AngularDimensionGeometry.Turn(AngularDimensionGeometry.Difference(a.End, a.Tip), AngularDimensionGeometry.Difference(b.End, a.Tip));
+                        if (!double.IsFinite(angle) || Math.Abs(Math.Sin(angle)) < AngularDimensionGeometry.MinimumAngle ||
+                            !seenPairs.Add((a.Index, b.Index))) continue;
+                        var c = candidate(a.Path);
+                        Bind(c, "line_indices/0", a.Row, "index", a.Path);
+                        Bind(c, "line_indices/1", b.Row, "index", b.Path);
+                        Current(c, "first_ray_wcs", a.Row, "geometry", a.Path);
+                        Current(c, "second_ray_wcs", b.Row, "geometry", b.Path);
+                        c["angle_between_rays"] = new JsonObject
+                        {
+                            ["smaller_sector_radians"] = Math.Min(angle, Math.Tau - angle),
+                            ["calculation"] = "angle between observed XY rays at their shared endpoint",
+                            ["source_pointers"] = new JsonArray(a.Path + "/geometry", b.Path + "/geometry")
+                        };
+                        output.Add(c);
+                    }
+            }
+        }
 
         internal void Variables(JsonElement data)
         {

@@ -4,7 +4,9 @@ using static NanoCAD.Contracts.StructureWriteValidation;
 
 namespace NanoCAD.Contracts;
 
-public sealed record CreateLayoutEdit(string Name, string BaseLayoutHandle) : StructureEdit("create_layout");
+public sealed record CreateLayoutEdit(string Name, string BaseLayoutHandle, string[]? DecorationHandles = null) : StructureEdit("create_layout");
+public sealed record LayoutDecorationAttribute(EntityRef source_ref, EntityRef copy_ref, string tag);
+public sealed record LayoutDecorationCopy(EntityRef source_ref, EntityRef copy_ref, LayoutDecorationAttribute[] attributes);
 
 public static class LayoutCreateValidation
 {
@@ -18,12 +20,22 @@ public static class LayoutCreateValidation
         catch (EncoderFallbackException) { throw Invalid("name", "Invalid Unicode."); }
         if (Validation.NormalizeHandle(operation.BaseLayoutHandle) != operation.BaseLayoutHandle)
             throw Invalid("base_layout_handle", "Expected a normalized nonzero layout handle.");
+        if (operation.DecorationHandles is { } handles &&
+            (handles.Any(handle => Validation.NormalizeHandle(handle) != handle) || handles.Distinct().Count() != handles.Length))
+            throw Invalid("decoration_handles", "Select unique normalized decoration handles from the base layout.");
     }
     public static CreateLayoutEdit Parse(JsonElement input, string path = "$")
     {
-        Shape(input, path, "operation", "name", "base_layout_handle");
+        Shape(input, path, "operation", "name", "base_layout_handle", "decoration_handles");
         if (Text(input, "operation", path, 32) != "create_layout") throw Invalid(path, "Expected create_layout.");
-        var result = new CreateLayoutEdit(Text(input, "name", path, 255), Validation.NormalizeHandle(Text(input, "base_layout_handle", path, 16)));
+        string[]? handles = null;
+        if (input.TryGetProperty("decoration_handles", out var selected))
+        {
+            if (selected.ValueKind != JsonValueKind.Array) throw Invalid(path + ".decoration_handles", "Expected an array of handles.");
+            handles = selected.EnumerateArray().Select(value => value.ValueKind == JsonValueKind.String
+                ? Validation.NormalizeHandle(value.GetString()!) : throw Invalid(path + ".decoration_handles", "Expected a handle.")).ToArray();
+        }
+        var result = new CreateLayoutEdit(Text(input, "name", path, 255), Validation.NormalizeHandle(Text(input, "base_layout_handle", path, 16)), handles);
         Validate(result); return result;
     }
     public static int ValidateBatch(IEnumerable<StructureEdit> operations)

@@ -10,9 +10,14 @@ namespace NanoCADBridge;
 // viewport/trans-spatial path or guessed Polyline subentity marker is used.
 internal static class CadDimensionAssociation385
 {
+    internal const string CircleDefinitionUpdate = "CIRCLE_DIAMETER_SYNCHRONIZED: The native dimension kept its previous endpoints after source notification. The bridge updated the same diameter from its retained Circle quadrant and antipode.";
     internal const string Warning = "NATIVE_DIMENSION_ASSOCIATION: Native source ObjectIds and object-snap references are retained, rather than replacing measured geometry with coordinates. Native updates can reflow generated dimension graphics/text. Resident native manager anchors and readable owned data are observed; private manager internals are not completely inventoried. Recovery/Undo is not guaranteed; refresh the association token and inspect the result. Pending/unknown never means success or rollback.";
     internal sealed record PointState(string Role, ObjectId Source, ObjectSnapModes Snap, Point3d Pick, Point3d Evaluated, double NearParameter);
-    internal sealed record Snapshot(string Token, ObjectId Association, int Flags, string Kind, PointState[] Points, JsonElement Dimension, JsonElement Sources, JsonElement AssociationData, JsonElement Metadata, string[] Containers);
+    internal sealed record Snapshot(string Token, ObjectId Association, int Flags, string Kind, PointState[] Points, JsonElement Dimension, JsonElement Sources, JsonElement AssociationData, JsonElement Metadata, string[] Containers)
+    {
+        internal bool CircleChordOnly => Kind == nameof(DiametricDimension) && Flags == 1;
+        internal bool Active => Flags == 3 || CircleChordOnly;
+    }
     internal static void Need([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool condition, string message, string code = "UNSUPPORTED_DIMENSION_ASSOCIATION")
     { if (!condition) throw new DomainException(code, message); }
     static void Match(bool condition, string path, object? expected, object? actual)
@@ -228,6 +233,11 @@ internal static class CadDimensionAssociation385
         Need(result != null, "The selected native association descriptor changed.");
         try { Ownership(result!.Value, dimension, db, tr, cancel); return result; } catch { result!.Dispose(); throw; }
     }
+    internal static ObjectId FindId(Dimension dimension, Database db, Transaction tr, Action cancel)
+    {
+        using var binding = Find(dimension, db, tr, cancel, ObjectId.Null);
+        return binding?.Value.ObjectId ?? ObjectId.Null;
+    }
     // Retain all unrelated ordinary owned records. Only the proved selected
     // DimAssoc record and its direct native reactor link are intentional edits.
     static JsonElement Metadata(DBObject root, ObjectId association, Database db, Transaction tr, Action cancel)
@@ -329,9 +339,14 @@ internal static class CadDimensionAssociation385
         {
             Need(!assoc.TransSpatial && !assoc.HasFields && assoc.ExtensionDictionary.IsNull, "Trans-spatial, Field-bearing or extended association storage needs its own adapter.");
             using (var data = assoc.XData) Need(data == null, "Custom association XData needs its own adapter."); flags = (int)assoc.AssocFlag;
-            if (flags is not (0 or 3)) throw new DomainException("UNSUPPORTED_DIMENSION_ASSOCIATION", $"Native DimAssoc {Id(association)} on dimension {Id(dimension.ObjectId)} reports flags {flags}. This two-point route requires both first/second flags (3) or inactive storage (0).", false,
-                new { association_handle = Id(association), dimension_handle = Id(dimension.ObjectId), actual_flags = flags }); var roles = Roles(dimension.GetType().Name);
-            foreach (string role in flags == 3 ? new[] { roles.First, roles.Second } : Array.Empty<string>())
+            // The host can close a same-circle diameter with its chord reference
+            // alone. Read only that stored slot; far_chord remains a defining point.
+            bool circleChordOnly = dimension.GetType() == typeof(DiametricDimension) && flags == 1;
+            if (!circleChordOnly && flags is not (0 or 3)) throw new DomainException("UNSUPPORTED_DIMENSION_ASSOCIATION", $"Native DimAssoc {Id(association)} on dimension {Id(dimension.ObjectId)} reports an unsupported active point-reference mask {flags}.", false,
+                new { association_handle = Id(association), dimension_handle = Id(dimension.ObjectId), actual_flags = flags });
+            var roles = Roles(dimension.GetType().Name);
+            string[] activeRoles = circleChordOnly ? [roles.First] : flags == 3 ? [roles.First, roles.Second] : [];
+            foreach (string role in activeRoles)
             {
                 cancel(); using var reference = assoc.PointRef(NativeRole(role)); Need(reference != null && reference.GetType() == typeof(OsnapPointRef), "The selected native point reference is unavailable or not an ordinary OsnapPointRef.");
                 var path = reference!.IdPath; var ids = path.GetObjectIds(); Need(ids.Length == 1 && path.SubentId.Type == SubentityType.Null && path.SubentId.IndexPtr == IntPtr.Zero,
@@ -343,9 +358,11 @@ internal static class CadDimensionAssociation385
                 Need(snap != ObjectSnapModes.ModeQuad || source is Circle, "Quadrant association is not on a Circle.");
                 var pick = reference.Point; var evaluated = reference.EvalPoint(); Point(pick); Point(evaluated); points.Add(new(role, ids[0], snap, pick, evaluated, reference.NearPointParam));
             }
-            if (flags == 3)
+            if (flags != 0)
             {
-                ValidateKind(dimension.GetType().Name, points.ToArray(), db, tr, cancel);
+                if (circleChordOnly)
+                    Need(points.Single().Snap == ObjectSnapModes.ModeQuad, "A single chord diameter requires a native quadrant of one whole local Circle.");
+                else ValidateKind(dimension.GetType().Name, points.ToArray(), db, tr, cancel);
                 using var geometryIds = new ObjectIdCollection(); assoc.GetDimAssocGeomIds(geometryIds);
                 Need(geometryIds.Cast<ObjectId>().Distinct().ToHashSet().SetEquals(points.Select(point => point.Source)), "Native association geometry inventory differs from its complete ordinary point paths.");
             }
@@ -392,10 +409,10 @@ internal static class CadDimensionAssociation385
                 { notificationReason = e is Teigha.Runtime.Exception native ? native.ErrorStatus.ToString() : e.Message; }
             return new
             {
-                binding_state = snapshot.Association.IsNull ? "no_native_dimassoc" : snapshot.Flags == 3 ? "active_native_dimassoc" : "inactive_native_dimassoc",
+                binding_state = snapshot.Association.IsNull ? "no_native_dimassoc" : snapshot.Active ? "active_native_dimassoc" : "inactive_native_dimassoc",
                 association_token = snapshot.Token,
                 association_handle = Id(snapshot.Association),
-                active = snapshot.Flags == 3,
+                active = snapshot.Active,
                 points = snapshot.AssociationData,
                 source_handles = snapshot.Points.Select(point => Id(point.Source)).Distinct().ToArray(),
                 notification_links = connections,
@@ -487,6 +504,46 @@ internal static class CadDimensionAssociation385
     }
     internal static void MatchPoints(Dimension dimension, PointState[] points)
     { foreach (var point in points) Match(Same(DefinitionPoint(dimension, point.Role), point.Evaluated), "/defining_points/" + point.Role, Point(point.Evaluated), Point(DefinitionPoint(dimension, point.Role))); }
+    static Point3d CircleOpposite(PointState chord, Transaction tr)
+    {
+        var circle = (Circle)tr.GetObject(chord.Source, OpenMode.ForRead);
+        Need(Math.Abs(circle.Radius - chord.Evaluated.DistanceTo(circle.Center)) <= 1e-7,
+            "The retained quadrant does not evaluate on its whole Circle.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+        return circle.Center - (chord.Evaluated - circle.Center);
+    }
+    internal static void CheckCircleDiameter(Dimension dimension, Snapshot snapshot, Transaction tr)
+    {
+        if (!snapshot.CircleChordOnly) return;
+        var diameter = (DiametricDimension)dimension;
+        var chord = snapshot.Points.Single();
+        Match(Same(diameter.ChordPoint, chord.Evaluated), "/circle_diameter/chord", Point(chord.Evaluated), Point(diameter.ChordPoint));
+        var opposite = CircleOpposite(chord, tr);
+        Match(Same(diameter.FarChordPoint, opposite), "/circle_diameter/opposite", Point(opposite), Point(diameter.FarChordPoint));
+    }
+
+    static void RequireCircleDiameterMovement(DiametricDimension diameter, ObjectId source)
+    {
+        if (!diameter.UsingDefaultTextPosition && diameter.Dimtmove != 2)
+            throw new DomainException("UNSUPPORTED_DIMENSION_CONTENT",
+                "The associated diameter has a manually placed label. Updating its definition requires automatic positioning or an existing effective DIMTMOVE of 2.",
+                false, new
+                {
+                    dimension_handle = Id(diameter.ObjectId),
+                    source_handle = Id(source),
+                    automatic_text_position = false,
+                    text_movement = diameter.Dimtmove,
+                    text_position = Point(diameter.TextPosition)
+                });
+    }
+
+    internal static void PreflightRefresh(Dimension dimension, Snapshot before, Transaction tr)
+    {
+        if (!before.CircleChordOnly) return;
+        var diameter = (DiametricDimension)dimension;
+        var chord = before.Points.Single();
+        if (!Same(diameter.ChordPoint, chord.Evaluated) || !Same(diameter.FarChordPoint, CircleOpposite(chord, tr)))
+            RequireCircleDiameterMovement(diameter, chord.Source);
+    }
     // OsnapPointRef stores both its pick and the native curve parameter. A default
     // zero parameter cannot identify the far endpoint of an ordinary source Line.
     // Use Curve.GetParameterAtPoint, never a guessed endpoint/subentity marker.
@@ -663,8 +720,47 @@ internal static class CadDimensionAssociation385
             if (!resident) { if (!postEntered) assoc.Dispose(); else GC.SuppressFinalize(assoc); }
         }
     }
-    internal static void Refresh(Dimension dimension, Snapshot before, Database db, Transaction tr, Action cancel)
-    { Need(before.Flags == 3, "The dimension has no current supported active association."); using var native = CadNativeDimAssocBinding434.TryBind(tr.GetObject(before.Association, OpenMode.ForWrite)); Need(native != null, "The selected native association descriptor changed."); var assoc = native!.Value; Ownership(assoc, dimension, db, tr, cancel); cancel(); assoc.UpdateDimension(true, false); cancel(); MatchPoints(dimension, before.Points); }
+    internal static bool Refresh(Dimension dimension, Snapshot before, Database db, Transaction tr, Action cancel)
+    {
+        Need(before.Active, "The dimension has no current supported active association.");
+        using var native = CadNativeDimAssocBinding434.TryBind(tr.GetObject(before.Association, OpenMode.ForWrite));
+        Need(native != null, "The selected native association descriptor changed.");
+        var association = native.Value;
+        Ownership(association, dimension, db, tr, cancel);
+        cancel(); association.UpdateDimension(true, false); cancel();
+        if (!before.CircleChordOnly) { MatchPoints(dimension, before.Points); return false; }
+
+        var observed = Capture(dimension, db, tr, cancel);
+        Need(observed.CircleChordOnly && observed.Association == before.Association &&
+            observed.Points.Single().Source == before.Points.Single().Source,
+            "The resident diameter or its native Circle reference changed during notification.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+        var diameter = (DiametricDimension)dimension;
+        var chord = observed.Points.Single();
+        var opposite = CircleOpposite(chord, tr);
+        if (Same(diameter.ChordPoint, chord.Evaluated) && Same(diameter.FarChordPoint, opposite)) return false;
+        VerifyConnections(Connections(diameter, observed.Association, observed.Points, tr, cancel), "before_diameter_definition_update");
+        using var reactors = diameter.GetPersistentReactorIds();
+        Need(reactors.Cast<ObjectId>().All(id => id == observed.Association || CadDrawingGroups431.OrganizationalReactor(diameter, id, tr, cancel)),
+            "Another persistent dependency controls this diameter.");
+        var automatic = diameter.UsingDefaultTextPosition;
+        int movement = diameter.Dimtmove;
+        RequireCircleDiameterMovement(diameter, chord.Source);
+        var anchor = diameter.TextPosition;
+        var rotation = diameter.TextRotation;
+        // The association manager can leave both DWG definition points stale
+        // although its native retained quadrant already evaluates on the edited Circle.
+        diameter.ChordPoint = chord.Evaluated;
+        diameter.FarChordPoint = opposite;
+        cancel(); diameter.RecomputeDimensionBlock(true); diameter.RecordGraphicsModified(true);
+        Need(diameter.UsingDefaultTextPosition == automatic && diameter.Dimtmove == movement && diameter.TextRotation == rotation &&
+            (automatic || Same(diameter.TextPosition, anchor)), "The diameter update changed the retained text placement.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+        var after = Capture(diameter, db, tr, cancel);
+        Need(after.CircleChordOnly && after.Association == observed.Association && after.Points.Single().Source == chord.Source &&
+            Same(after.Points.Single().Evaluated, chord.Evaluated), "The diameter definition update changed the native Circle binding.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
+        CheckCircleDiameter(diameter, after, tr);
+        VerifyConnections(Connections(diameter, after.Association, after.Points, tr, cancel), "after_diameter_definition_update");
+        return true;
+    }
     internal static void FinishNewAttachment(Dimension dimension, ObjectId posted, PointState[] points, Database db, Transaction tr, Action cancel)
     {
         // Finish the actual dimension's own notifications as well as those
@@ -676,6 +772,16 @@ internal static class CadDimensionAssociation385
         var assoc = native.Value; Ownership(assoc, dimension, db, tr, cancel);
         int flags = (int)assoc.AssocFlag;
         if (flags == 3) { CompleteNewSourceNotifications(assoc, dimension, points, tr, cancel); return; }
+        if (flags == 1 && dimension.GetType() == typeof(DiametricDimension))
+        {
+            var retained = Capture(dimension, db, tr, cancel);
+            Need(retained.Association == posted && retained.CircleChordOnly &&
+                points.All(p => p.Source == retained.Points[0].Source && p.Snap == ObjectSnapModes.ModeQuad),
+                "The resident diameter lost the requested whole-Circle source.");
+            MatchPoints(dimension, points); CheckCircleDiameter(dimension, retained, tr);
+            CompleteNewSourceNotifications(assoc, dimension, retained.Points, tr, cancel);
+            return;
+        }
         Need(flags is 0 or 1 or 2, "Additional native defining roles need their own association adapter.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
         foreach (var point in points)
         {
@@ -689,7 +795,7 @@ internal static class CadDimensionAssociation385
         CompleteNewSourceNotifications(assoc, dimension, points, tr, cancel);
     }
     internal static void Detach(Dimension dimension, Snapshot before, Database db, Transaction tr, Action cancel)
-    { Need(before.Flags == 3, "The dimension has no current supported active association."); using var native = CadNativeDimAssocBinding434.TryBind(tr.GetObject(before.Association, OpenMode.ForWrite)); Need(native != null, "The selected native association descriptor changed."); var assoc = native!.Value; Ownership(assoc, dimension, db, tr, cancel); cancel(); assoc.RemoveAssociativity(true); cancel(); }
+    { Need(before.Active, "The dimension has no current supported active association."); using var native = CadNativeDimAssocBinding434.TryBind(tr.GetObject(before.Association, OpenMode.ForWrite)); Need(native != null, "The selected native association descriptor changed."); var assoc = native!.Value; Ownership(assoc, dimension, db, tr, cancel); cancel(); assoc.RemoveAssociativity(true); cancel(); }
 
     internal static void Retained(JsonElement before, JsonElement after, ObjectId selected, Transaction tr, Database db, Action cancel, string[]? previousContainers = null)
     {
@@ -809,13 +915,23 @@ internal static class CadDimensionAssociation385
             Need(dimension != null && dimension.OwnerId == source.OwnerId && Local(dimension, db), "Native dimension dependency has a foreign source/space ownership path.");
             var snapshot = Capture(dimension!, db, tr, cancel); Need(snapshot.Association == id, "The source reactor does not identify this dimension's current supported native association.");
             if (snapshot.Flags == 0) continue;
-            Need(snapshot.Flags == 3 && snapshot.Points.Any(point => point.Source == source.ObjectId),
+            Need(snapshot.Active && snapshot.Points.Any(point => point.Source == source.ObjectId),
                 "The source reactor is not this dimension's complete current supported source binding."); result.TryAdd(dimension!.ObjectId, snapshot);
         }
         return result.Select(item => new Follower434(item.Key, item.Value)).ToArray();
     }
-    internal static void PreflightFollowers(Entity source, Database db, Transaction tr, Action cancel) => Followers(source, db, tr, cancel);
-    internal static bool RefreshFollowers(Entity source, Database db, Transaction tr, Action cancel)
+    internal static void PreflightFollowers(Entity source, Database db, Transaction tr, Action cancel, bool circleGeometryChanges = false)
+    {
+        var followers = Followers(source, db, tr, cancel);
+        if (!circleGeometryChanges) return;
+        foreach (var follower in followers.Where(follower => follower.Before.CircleChordOnly))
+        {
+            cancel();
+            var diameter = (DiametricDimension)tr.GetObject(follower.Dimension, OpenMode.ForRead);
+            RequireCircleDiameterMovement(diameter, source.ObjectId);
+        }
+    }
+    internal static bool RefreshFollowers(Entity source, Database db, Transaction tr, Action cancel, Action<string>? notice = null)
     {
         var followers = Followers(source, db, tr, cancel); if (followers.Length == 0) return false;
         Need(source.IsWriteEnabled, "A modified associative source must have its actual write-open state before native notification.");
@@ -829,7 +945,8 @@ internal static class CadDimensionAssociation385
             foreach (var follower in followers)
             {
                 cancel(); var dimension = (Dimension)tr.GetObject(follower.Dimension, OpenMode.ForWrite); var before = follower.Before;
-                Refresh(dimension, before, db, tr, cancel); var after = Capture(dimension, db, tr, cancel); MatchPoints(dimension, after.Points);
+                if (Refresh(dimension, before, db, tr, cancel)) notice?.Invoke(CircleDefinitionUpdate);
+                var after = Capture(dimension, db, tr, cancel); MatchPoints(dimension, after.Points);
                 Need(before.Association == after.Association && before.AssociationData.GetProperty("flags").GetRawText() == after.AssociationData.GetProperty("flags").GetRawText(),
                     "Native source update replaced the retained association identity/flags.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
                 foreach (var point in before.Points)

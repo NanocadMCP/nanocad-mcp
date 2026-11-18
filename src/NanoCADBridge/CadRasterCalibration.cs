@@ -6,6 +6,38 @@ namespace NanoCADBridge;
 
 internal static class CadRasterCalibration
 {
+    // SDK database.h::getPixelToModelTransform. Transform displacements as vectors so a large
+    // WCS insertion offset does not cancel a small pixel step. No clip or source-file read.
+    internal static object Observe(RasterImage image)
+    {
+        double[]? origin = null, column = null, row = null;
+        string? reason = null;
+        try
+        {
+            var map = image.PixelToModelTransform;
+            var o = Point3d.Origin.TransformBy(map);
+            var x = Vector3d.XAxis.TransformBy(map); var y = Vector3d.YAxis.TransformBy(map);
+            double[] values = [o.X, o.Y, o.Z, x.X, x.Y, x.Z, y.X, y.Y, y.Z];
+            if (values.All(double.IsFinite) && x.Length > 0 && y.Length > 0 && x.CrossProduct(y).Length > 0)
+            {
+                origin = [o.X, o.Y, o.Z]; column = [x.X, x.Y, x.Z]; row = [y.X, y.Y, y.Z];
+            }
+            else reason = "native_pixel_frame_degenerate_or_nonfinite";
+        }
+        catch (Exception e) when (e is Teigha.Runtime.Exception or InvalidOperationException or NotSupportedException)
+        { reason = "native_pixel_transform_unavailable"; }
+        return new
+        {
+            source = "native_pixel_to_model_transform",
+            coordinate_system = "WCS",
+            unit = "drawing_units",
+            origin_wcs = origin,
+            step_x_wcs = column,
+            step_y_wcs = row,
+            unavailable_reason = reason
+        };
+    }
+
     internal sealed record Plan(CoordinateSystem3d Frame, RasterCalibrationResult Result);
     internal static Plan Prepare(RasterImage image, RasterCalibration calibration)
     {

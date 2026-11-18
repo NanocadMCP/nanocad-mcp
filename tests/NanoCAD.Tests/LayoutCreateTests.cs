@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using NanoCAD.Contracts;
 
 internal static class LayoutCreateTests
@@ -8,9 +9,15 @@ internal static class LayoutCreateTests
     private static void Domain(string code, Action action)
     { try { action(); throw new Exception("Expected " + code); } catch (DomainException e) { Check(e.Error.code == code, e.Error.code); } }
     public static Dictionary<string, object?> Input() => new() { ["operation"] = "create_layout", ["name"] = "New A3", ["base_layout_handle"] = "001e" };
-    public static Dictionary<string, object?> ProtocolInput(string bridge, string document) => new() {
-        ["bridge_instance_id"] = bridge, ["document_id"] = document, ["expected_revision"] = "3", ["operation_id"] = Guid.NewGuid().ToString("D"),
-        ["units"] = "Millimeters", ["operations"] = new[] { Input() } };
+    public static Dictionary<string, object?> ProtocolInput(string bridge, string document) => new()
+    {
+        ["bridge_instance_id"] = bridge,
+        ["document_id"] = document,
+        ["expected_revision"] = "3",
+        ["operation_id"] = Guid.NewGuid().ToString("D"),
+        ["units"] = "Millimeters",
+        ["operations"] = new[] { Input() }
+    };
     public static ModifiedStructure ProtocolData(StructureWriteArguments args) => new(args.OperationId, "committed", false,
         new[] { new StructureChange(0, "create_layout", new(args.BridgeId, args.DocumentId, "90"), "layout", "New A3", true) }, "single_command");
     public static async Task Run(Func<string, Func<Task>, Task> test)
@@ -40,11 +47,23 @@ internal static class LayoutCreateTests
             Domain("INVALID_ARGUMENT", () => LayoutCreateValidation.Parse(duplicate.RootElement));
             return Task.CompletedTask;
         });
+        await test("layout decoration selects canonical roots and keeps the empty layout default", () =>
+        {
+            var empty = Input();
+            Check(LayoutCreateValidation.Parse(Wire.Element(empty)).DecorationHandles == null, "Default sheet should be empty.");
+            empty["decoration_handles"] = new JsonArray("000af", "20");
+            Check(LayoutCreateValidation.Parse(Wire.Element(empty)).DecorationHandles!.SequenceEqual(new[] { "AF", "20" }), "Native handle selection");
+            empty["decoration_handles"] = new JsonArray("AF", "0af");
+            Domain("INVALID_ARGUMENT", () => LayoutCreateValidation.Parse(Wire.Element(empty)));
+            empty["decoration_handles"] = true;
+            Domain("INVALID_ARGUMENT", () => LayoutCreateValidation.Parse(Wire.Element(empty)));
+            return Task.CompletedTask;
+        });
         await test("layout batches reject mixed writes duplicate names and excess work", () =>
         {
             var edit = new CreateLayoutEdit("Sheet", "1E"); var batch = Enumerable.Range(1, 8).Select(n => edit with { Name = "Sheet " + n }).ToArray();
             Check(LayoutCreateValidation.ValidateBatch(batch) == 32, "Count all native records");
-            Check(LayoutCreateValidation.ValidateBatch(batch.Append(edit))==36,"no arbitrary layout batch ceiling");
+            Check(LayoutCreateValidation.ValidateBatch(batch.Append(edit)) == 36, "no arbitrary layout batch ceiling");
             Domain("INVALID_OPERATION_ORDER", () => LayoutCreateValidation.ValidateBatch(new[] { edit, edit with { Name = "SHEET" } }));
             Domain("INVALID_OPERATION_ORDER", () => LayoutCreateValidation.ValidateBatch(new StructureEdit[] { edit, new SetLayerEdit("2F", new(null, null, null, null, null, false, null)) }));
             return Task.CompletedTask;
@@ -53,7 +72,7 @@ internal static class LayoutCreateTests
         {
             Check(LayoutCreateValidation.NextTabOrder(new[] { 0, 2, 20 }, 1, 2) == 22, "Append after maximum");
             Check(LayoutCreateValidation.NextTabOrder(Enumerable.Range(0, 248), 7, 8) == 255, "256 layout boundary");
-            Check(LayoutCreateValidation.NextTabOrder(Enumerable.Range(0,249),0,8)==249,"no invented layout count ceiling");
+            Check(LayoutCreateValidation.NextTabOrder(Enumerable.Range(0, 249), 0, 8) == 249, "no invented layout count ceiling");
             foreach (int order in new[] { -1, int.MaxValue }) Domain("UNSUPPORTED_LAYOUT", () => LayoutCreateValidation.NextTabOrder(new[] { order }, 0, 1));
             return Task.CompletedTask;
         });

@@ -29,7 +29,7 @@ internal sealed class CadWriter
             throw new DomainException(_documents.IsOpen(args.DocumentId) ? "DOCUMENT_NOT_ACTIVE" : "DOCUMENT_CLOSED", "Requested document is no longer the active open document.");
         if (state.Revision != args.ExpectedRevision) throw new DomainException("STALE_DOCUMENT", "Document changed since expected_revision.", true);
         if (doc.IsReadOnly) throw new DomainException("DOCUMENT_READ_ONLY", "The document is read-only.");
-        bool settingsOnly = args is ModifyArguments settings && settings.Operations.All(op => op is EraseSpec or PropertiesSpec or ModelSketchVisibilitySpec436)
+        bool settingsOnly = args is ModifyArguments settings && settings.Operations.All(op => op is EraseSpec or PropertiesSpec or ModelSketchVisibilitySpec436 or ModelBodyNameEdit)
             || args is StructureWriteArguments structureSettings && StructureWriteValidation.IsSettingsOnly(structureSettings.Operations);
         if (!settingsOnly && (int)doc.Database.Insunits != 4) throw new DomainException("UNSUPPORTED_UNITS", "Geometry and dimensional size writes require Millimeters; no implicit scaling is performed. Display/layer settings and erase do not convert coordinates.");
         using var tr = doc.Database.TransactionManager.StartTransaction();
@@ -85,6 +85,7 @@ internal sealed class CadWriter
             else if (ModelSketchWriter.Handles(modify)) ModelSketchWriter.Preflight(modify, state, tr, cancel);
             else if (SketchConstraintWriter.Handles(modify)) SketchConstraintWriter.Preflight(modify, state, tr, cancel);
             else if (ModelUserVariableWriter.Handles(modify)) ModelUserVariableWriter.Preflight(modify, state, tr, cancel);
+            else if (ModelBodyNameWriter.Handles(modify)) ModelBodyNameWriter.Preflight(modify, state, tr, cancel);
             else if (ModelParameterNameWriter.Handles(modify)) ModelParameterNameWriter.Preflight(modify, state, tr, cancel);
             else if (CadTableFormulaRange350.Handles(modify))
             {
@@ -475,6 +476,7 @@ internal sealed class CadWriter
             if (args is ModifyArguments circleArgs && DrawingCircleWriter.Handles(circleArgs)) return DrawingCircleWriter.Execute(circleArgs, state, job, context, _log);
             if (args is ModifyArguments profileArgs && DrawingProfileWriter.Handles(profileArgs)) return DrawingProfileWriter.Execute(profileArgs, state, job, context, _log);
             if (args is ModifyArguments userArgs && ModelUserVariableWriter.Handles(userArgs)) return ModelUserVariableWriter.Execute(userArgs, state, job, context, _log);
+            if (args is ModifyArguments bodyNameArgs && ModelBodyNameWriter.Handles(bodyNameArgs)) return ModelBodyNameWriter.Execute(bodyNameArgs, state, job, context);
             if (args is ModifyArguments nameArgs && ModelParameterNameWriter.Handles(nameArgs)) return ModelParameterNameWriter.Execute(nameArgs, state, job, context, _log);
             if (args is ModelParameterArguments parameter) return parameter.ScopeHandles != null ? ModelMultiExpressionWriter.Execute(parameter, state, job, context, _log) : parameter.UsesExpressionPlan
                 ? ModelExpressionWriter.Execute(parameter, state, job, context, _log) : ModelParameterWriter.Execute(parameter, state, job, context, _log);

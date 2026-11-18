@@ -10,6 +10,7 @@ You describe the result, dimensions and constraints. The assistant reads the dra
 
 - Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks; adjust supported properties of existing dynamic blocks.
 - Reuse eligible local DWG content as static blocks, and update shared definitions while retaining insertion placement and attribute values.
+- Name individual solids in the native model tree and find them again by name, geometry and current drawing handle.
 - Build solids with extrusion, revolution, sweep, loft, Boolean operations and finishing tools.
 - Use supported native sketches, constraints, parameters and dependent features to build editable individual parts.
 - Prepare editable DWG documentation with dimensions linked to supported drawing views, and work with local drawing and raster references.
@@ -28,16 +29,16 @@ The release includes the MCP server runtime. You do not need Python, a compiler 
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 456](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/456).
+Get the installer or ready-to-run ZIP from [release 457](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/457).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-456.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-456.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-457.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-457.zip` | Manual setup, or installation from an extracted folder |
 
-Use the matching `SHA256SUMS-456.txt` and source/documentation archives from the same release. See [what changes in 456](RELEASE-NOTES.md#build-456).
+Use the matching `SHA256SUMS-457.txt` and source/documentation archives from the same release. See [what changes in 457](RELEASE-NOTES.md#build-457).
 
-This release improves projected dimensions, formula tables, part feature inspection and the placement of drawing views and external references.
+Name individual parts in the native model tree, find their driving features, check internal material and verify how a design change affects sheet dimensions and view placement.
 
 ## Get started
 

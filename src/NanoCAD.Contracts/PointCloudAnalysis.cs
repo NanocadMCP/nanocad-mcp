@@ -6,11 +6,13 @@ namespace NanoCAD.Contracts;
 public sealed record PointCloudInspectArguments(Arguments Read, string Mode, int PageSize = 100, string? Cursor = null);
 public sealed record PointCloudSection(double[] Origin, double[] Normal, double[] XAxis, double Thickness);
 public sealed record PointCloudRegion(double[] Min, double[] Max);
+public sealed record CloudProfileComparison(string SolidHandle, double SegmentLength, double CaptureDistance, long StartSegment);
 public sealed record PointCloudMeasurement(string Kind, ulong? PointIndex = null, ulong? SecondPointIndex = null,
     double[]? PlaneOrigin = null, double[]? PlaneNormal = null, uint? FeatureId = null);
 public sealed record PointCloudAnalysisArguments(Arguments Read, string Mode, string Units,
     PointCloudSection? Section = null, PointCloudRegion? Region = null, int PageSize = 100, string? Cursor = null,
-    PointCloudMeasurement? Measurement = null, double[]? QueryPoint = null, bool IncludeAttributes = false);
+    PointCloudMeasurement? Measurement = null, double[]? QueryPoint = null, bool IncludeAttributes = false,
+    CloudProfileComparison? Comparison = null);
 
 public static class PointCloudInspectValidation
 {
@@ -31,10 +33,12 @@ public static class PointCloudAnalysisValidation
     public static PointCloudAnalysisArguments Parse(JsonElement input)
     {
         Shape(input, "request", "bridge_instance_id", "document_id", "expected_revision", "handle", "mode", "units",
-            "section", "region", "page_size", "cursor", "measurement", "query_point", "include_attributes");
+            "section", "region", "page_size", "cursor", "measurement", "query_point", "include_attributes", "comparison");
         var read = Read(input);
-        var mode = Choice(Required(input, "mode"), "mode", "points", "section", "statistics", "measure");
+        var mode = Choice(Required(input, "mode"), "mode", "points", "section", "statistics", "measure", "compare_section");
         var units = Choice(Required(input, "units"), "units", "drawing_units");
+        if (input.TryGetProperty("comparison", out _) && mode != "compare_section")
+            throw Invalid("comparison requires mode=compare_section.");
         if (mode == "measure")
         {
             foreach (var name in new[] { "section", "region", "page_size", "cursor", "query_point", "include_attributes" })
@@ -46,6 +50,27 @@ public static class PointCloudAnalysisValidation
         if (mode == "section" && section == null) throw Invalid("section mode requires an explicit section frame and thickness.");
         if (mode == "points" && section != null) throw Invalid("Use section mode to select an oriented slab.");
         var region = input.TryGetProperty("region", out var regionValue) ? Region(regionValue) : null;
+        if (mode == "compare_section")
+        {
+            if (section == null || region == null) throw Invalid("compare_section requires the section slab and WCS observation region.");
+            if (input.TryGetProperty("query_point", out _) || input.TryGetProperty("include_attributes", out _))
+                throw Invalid("compare_section accepts the comparison specification and scan paging.");
+            var spec = Required(input, "comparison");
+            Shape(spec, "comparison", "solid_handle", "segment_length", "capture_distance", "start_segment");
+            var handle = Required(spec, "solid_handle");
+            if (handle.ValueKind != JsonValueKind.String) throw Invalid("comparison.solid_handle must be an existing Model solid handle.");
+            string solid = Validation.NormalizeHandle(handle.GetString()!);
+            if (solid == read.Handles![0]) throw Invalid("Cloud insertion and solid handles must be distinct.");
+            double length = Number(Required(spec, "segment_length"), "comparison.segment_length");
+            double distance = Number(Required(spec, "capture_distance"), "comparison.capture_distance");
+            if (length <= 0 || distance <= 0) throw Invalid("Segment length and capture distance must be positive drawing units.");
+            long start = 0;
+            if (spec.TryGetProperty("start_segment", out var index) &&
+                (index.ValueKind != JsonValueKind.Number || !index.TryGetInt64(out start) || start < 0))
+                throw Invalid("comparison.start_segment must be the nonnegative offset from the preceding group.");
+            return new(read, mode, units, section, region, PageSize(input), Cursor(input),
+                Comparison: new(solid, length, distance, start));
+        }
         var query = input.TryGetProperty("query_point", out var point) ? Vector(point, "query_point") : null;
         if (query != null && mode != "statistics") throw Invalid("query_point is available only in statistics mode.");
         var attributes = false;

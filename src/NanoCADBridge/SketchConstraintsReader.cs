@@ -17,10 +17,10 @@ internal static class SketchConstraintsReader
         if (!state.Document.Database.TryGetObjectId(new Handle(handle), out var id) || id.IsNull || !id.IsValid) throw new DomainException("OBJECT_NOT_FOUND", "Body not found.");
         if (id.IsErased || id.IsEffectivelyErased) throw new DomainException("OBJECT_ERASED", "Body was erased.");
         if (tx.GetObject(id, OpenMode.ForRead) is not Entity entity || entity.OwnerId != modelId) throw new DomainException("OUT_OF_SCOPE", "A top-level Model Space body is required.");
-        return ReadMultiCad(args, state, handle, instance, cancellation);
+        return ReadMultiCad(args, state, tx, handle, instance, cancellation);
     }
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static object ReadMultiCad(Arguments args, DocumentState state, long handle, string instance, CancellationToken cancellation)
+    private static object ReadMultiCad(Arguments args, DocumentState state, Transaction tx, long handle, string instance, CancellationToken cancellation)
     {
 
         void Budget() => cancellation.ThrowIfCancellationRequested();
@@ -33,10 +33,17 @@ internal static class SketchConstraintsReader
         var contents = body.GetPartContents(false); Budget();
         if (contents == null) throw new DomainException("ANALYSIS_LIMIT_EXCEEDED", "Body history is unavailable.");
         var matches = contents.Where(x => x.ToString() == args.ModelObjectId).ToArray();
-        if (matches.Length != 1) throw new DomainException("OUT_OF_SCOPE", "Sketch is not in this body's current history.");
-        var sketchId = matches[0]; var sketch = sketchId.GetObjectOfType<Multicad.Mc3D.PlanarSketch>();
-        if (sketch == null || sketch.ID != sketchId) throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "History item is not a PlanarSketch.");
         var owner = body.DbEntity.Document;
+        Multicad.Mc3D.PlanarSketch? sketch;
+        if (matches.Length == 1) sketch = matches[0].GetObjectOfType<Multicad.Mc3D.PlanarSketch>();
+        else if (matches.Length == 0 && args.DocumentSketchScope)
+        {
+            sketch = ModelSketchLifecycleReader362.Resolve(args.ModelObjectId!, owner, Budget);
+            if (!sketch.HostSolidID.IsNull) throw new DomainException("OUT_OF_SCOPE", "Choose an independent construction sketch or a sketch from the selected body's current history.");
+        }
+        else throw new DomainException("OUT_OF_SCOPE", "Sketch is not in this body's current history.");
+        if (sketch == null || sketch.ID.ToString() != args.ModelObjectId) throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Selected item is not the requested PlanarSketch.");
+        var sketchId = sketch.ID;
         if (sketch.DbEntity.Document?.ID != owner.ID) throw new DomainException("CONSTRAINT_SCOPE_MISMATCH", "The exact sketch and body owner differ.");
         using var manager = NativeSketchMembers385.Manager(sketch);
         Budget();
@@ -71,10 +78,24 @@ internal static class SketchConstraintsReader
             };
         }
         var constraints = new List<object>();
+        var smooth = args.MeasureSmooth ? new List<object>() : null;
+        NativeSketchMembers385.Snapshot? geometry = null;
+        string? geometryError = null;
         foreach (var id in ids)
         {
             Budget(); using var info = manager.GetConstraintInfo(id);
             if (info == null) throw new DomainException("CONSTRAINTS_UNAVAILABLE", "Constraint details are unavailable.");
+            if (smooth != null && info.Type == ConstraintType.GeomSmooth)
+            {
+                if (geometry == null && geometryError == null)
+                {
+                    try { geometry = NativeSketchMembers385.Capture(sketch, state, tx, Budget, manager, ids); }
+                    catch (DomainException error) when (error.Error.code != "RESPONSE_LIMIT_EXCEEDED") { geometryError = error.Message; }
+                    catch (Teigha.Runtime.Exception error) { geometryError = error.Message; }
+                }
+                if (geometry == null) smooth.Add(new { constraint_id = id.ToString(), status = "unavailable", reason = geometryError });
+                else smooth.Add(MeasureSmooth(id.ToString(), geometry, info.FirstObject, info.SecondObject));
+            }
             double parameter = info.Param;
             string unit = info.Type switch
             {
@@ -104,6 +125,7 @@ internal static class SketchConstraintsReader
         {
             source_ref = new EntityRef(instance, state.Id, args.Handles![0]),
             sketch_id = sketchId.ToString(),
+            sketch_membership = matches.Length == 1 ? "body_history" : "same_document_construction",
             network = network.ToString(),
             manager_document_id = Id(manager.DocumentId),
             scope_id = Id(manager.ScopeId),
@@ -111,8 +133,49 @@ internal static class SketchConstraintsReader
             reference_coordinate_system = "native_constraint_reference",
             solver_status = "not_evaluated",
             constraints,
+            smooth_measurements = smooth,
             presentation = SketchVisibilityState436.Observe(body, sketch, Budget)
         };
+    }
+
+    private static object MeasureSmooth(string constraint, NativeSketchMembers385.Snapshot inputs,
+        Multicad.DatabaseServices.Constraints.IConstraintObjectInfo? first,
+        Multicad.DatabaseServices.Constraints.IConstraintObjectInfo? second)
+    {
+        (NativeSketchMembers385.Member Member, string Role, string LocalRole, double[] Point) Endpoint(Multicad.DatabaseServices.Constraints.IConstraintObjectInfo? reference)
+        {
+            if (reference == null || reference.ObjectId.IsNull) throw new DomainException("SMOOTH_ENDPOINT_UNAVAILABLE", "The native constraint has no operand reference.");
+            var matches = inputs.Members.Where(m => m.Id == reference.ObjectId || m.ObjectId == reference.ObjectId &&
+                (m.Segment == null || m.Segment == reference.PolylineSegmentIndex)).ToArray();
+            if (matches.Length != 1) throw new DomainException("SMOOTH_ENDPOINT_UNAVAILABLE", "The native operand does not identify one current sketch member.");
+            var member = matches[0];
+            var role = NativeSketchMembers385.PointRole(inputs, member, reference);
+            if (role is not ("start" or "end")) throw new DomainException("SMOOTH_ENDPOINT_UNAVAILABLE", "The native selector does not identify a unique current endpoint.");
+            var p = NativeSketchMembers385.Point(inputs, member, role);
+            return (member, role, NativeSketchMembers385.EndpointName(inputs, member, role)!, [p.X, p.Y, p.Z]);
+        }
+        try
+        {
+            var a = Endpoint(first); var b = Endpoint(second);
+            double gap = Math.Sqrt(a.Point.Zip(b.Point, (x, y) => (x - y) * (x - y)).Sum());
+            double? angle = null; string? reason = null;
+            try { angle = SplineConstraintGeometry445.ContinuationAngle(a.Member.Curve, a.LocalRole, b.Member.Curve, b.LocalRole); }
+            catch (DomainException e) { reason = e.Message; }
+            return new
+            {
+                constraint_id = constraint,
+                status = angle == null ? "partial" : "measured",
+                reason,
+                first = new { member_id = a.Member.Id.ToString(), role = a.Role, point_wcs = a.Point },
+                second = new { member_id = b.Member.Id.ToString(), role = b.Role, point_wcs = b.Point },
+                endpoint_gap = gap,
+                gap_unit = "drawing_units",
+                continuation_angle = angle,
+                angle_unit = "radians"
+            };
+        }
+        catch (DomainException e) { return new { constraint_id = constraint, status = "unavailable", reason = e.Message }; }
+        catch (Teigha.Runtime.Exception e) { return new { constraint_id = constraint, status = "unavailable", reason = e.ErrorStatus.ToString() }; }
     }
     private static string? Text(string? text) => text == null || text.Length <= 8192 ? text : throw new DomainException("ENTITY_TOO_LARGE", "Constraint text exceeds8192 characters.");
 }

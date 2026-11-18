@@ -50,6 +50,10 @@ Understand an existing block's definition, placement and attributes before reusi
 
 # analyze_geometry
 
+Use mode=solid_section with one Solid3d and a section workplane to inspect the finished part. Read the native area, perimeter and face loops in their reported plane. The optional local XY window clips the section and adds its cut edges to the returned contour. For a bore, shoulder or rib use mode=section_material_intervals with a finite segment in that same plane. Distances start at the first endpoint. Inspect material, void and boundary intervals and their WCS witnesses. A tangent or unclassified section cannot establish a wall thickness.
+
+Use mode=selected_contours with actual Line, Arc, Circle or lightweight Polyline handles before making a Region or Hatch from an existing selection. It reports each connected component, ordered handles with reverse flags, open ends, closest gaps in drawing units, junctions and boundary contacts. A hole has a confirmed enclosing loop. Two disjoint outer loops represent separate regions. Consult classification_complete and per-component issues when curves touch, cross or overlap. An optional workplane selects a tilted plane; the default is WCS XY at Z=0.
+
 For finite solid/face clearance, use analyze_geometry modes solid_distance or face_distance when the published planar straight-edged topology scope applies. wall_thickness measures one local normal material chord between two selected opposite parallel planar faces at a WCS point; it is not a global minimum or a bbox measurement. Read fresh topology for face IDs and use actual witness points, drawing units and scope. Curved geometry outside this measurement scope remains available for modeling.
 
 Answer a specific geometric question relevant to fit, size or construction. Do not calculate every available metric as a mandatory quality check.
@@ -69,6 +73,8 @@ Optional profile_element_ids reads actual Line/Arc/Circle element identities, so
 Read current native parameters and expressions when the planned edit needs them. A readable variable does not imply an unrestricted writable parameter.
 
 # inspect_sketch_constraints
+
+For a retained Smooth junction, set measure_smooth=true. Each measured relation reports the actual member IDs, endpoint roles, two WCS points, gap in drawing units and continuation angle in radians. A zero angle continues the path, while a limit of pi indicates a cusp. Inspect a standalone native sketch with sketch_scope=document, its current document sketch ID and a part in the same owner document. Missing endpoint roles or tangents are reported on the affected relation.
 
 The optional presentation observation reports native sketch/annotation visibility, in_edit_mode and visibility_token. Use set_model_sketch_visibility to show/hide the sketch or existing dimensional annotations. Missing current DimId means the native annotation is unavailable in that context, not a missing driving relation. No separate preview/editor-transition route is published for this purpose. Inspect actual rendered visibility, which can depend on layers and sketch context. The reader and display writer do not enter/leave an editor, generate graphics, create replacement annotations or solve constraints.
 

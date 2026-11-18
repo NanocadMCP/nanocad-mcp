@@ -16,6 +16,8 @@ internal static class NativeModelHistory421
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     internal delegate int SetHoleExtent(string document, string body, string feature, int through);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    internal delegate int ApplyMeasuredThroughDepth(string document, string body, string feature, double depth);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     internal delegate int ReadHoleControlState(string document, string body, string feature, string variable,
         out uint category, out int extent);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
@@ -38,6 +40,16 @@ internal static class NativeModelHistory421
         [MarshalAs(UnmanagedType.LPArray, SizeConst = 6)] double[] endpoints,
         [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] double[] parameters,
         [Out, MarshalAs(UnmanagedType.LPArray, SizeConst = 2)] long[] data);
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
+    private delegate int ReadOriginalMarker(string document, string view, int marker, out long sourceMarker);
+
+    internal static long? OriginalProjectionMarker(string document, string view, int marker)
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ReadOriginalProjectionMarker", out var address))
+            return null;
+        var read = Marshal.GetDelegateForFunctionPointer<ReadOriginalMarker>(address);
+        return read(document, view, marker, out long original) == 0 && original > 0 ? original : null;
+    }
     [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Unicode)]
     internal delegate int ReadProjectedCircularArcAnchors(string document, string view, int marker,
         [MarshalAs(UnmanagedType.LPArray, SizeConst = 9)] double[] endpointsAndInterior,
@@ -102,6 +114,12 @@ internal static class NativeModelHistory421
         if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_SetHoleExtent", out var address))
             throw Unavailable("The native model-history adapter does not expose the hole extent setter.");
         return Marshal.GetDelegateForFunctionPointer<SetHoleExtent>(address);
+    }
+    internal static ApplyMeasuredThroughDepth LoadMeasuredThroughDepth()
+    {
+        if (!NativeLibrary.TryGetExport(Load().Library, "NanoCAD_ApplyMeasuredThroughDepth", out var address))
+            throw Unavailable("The native model-history adapter does not expose the measured through-hole depth setter.");
+        return Marshal.GetDelegateForFunctionPointer<ApplyMeasuredThroughDepth>(address);
     }
     internal static ReadProjectedDimensionAnchors LoadProjectedDimensionAnchors()
     {

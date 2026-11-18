@@ -30,6 +30,7 @@ internal static class SolidTopologyReader
         if (tx.GetObject(id, OpenMode.ForRead) is not Solid3d solid || solid.GetType() != typeof(Solid3d) || solid.OwnerId != model)
             throw new DomainException("OUT_OF_SCOPE", "Topology requires a top-level native Model Space Solid3d.");
         if (solid.IsNull) throw new DomainException("DEGENERATE_GEOMETRY", "Solid is empty.");
+        if (args.FaceQuery != null || args.EdgeQuery != null) return new { source_ref = new EntityRef(instance, state.Id, solid.Handle.ToString()) };
         return Capture(solid, new EntityRef(instance, state.Id, solid.Handle.ToString()), cancellation, identifySurfaces: true);
     }
     internal static object AttachNativeFaces(object topology, ObjectId id, DocumentState state, string instance, CancellationToken cancellation, bool faces, bool edges)

@@ -14,7 +14,7 @@ $anchors=@{
 }
 $coreKeep=@('m3dIPPDef','IMc3dHistoryItem','IMc3dSolid','IMc3dAlienSolid','IMc3dAlienSolidData','IMcFeatureEntity','IMc3dHole','IMc3dThicknessFeature','IMcsDocVariablesManager',
     'IMc3dArrFeatureType','IMc3dCircPatFeature','IMc3dRectPatFeature','McDrawingViewLocalCutData','IMcSketch','IMcPlanarSketch',
-    'IMc3dCoordSysObject','IMc3dWorkPlane','IMc3dDrawingView')
+    'IMc3dCoordSysObject','IMc3dWorkPlane','IMc3dDrawingView','IMcHlrEngine2')
 $required=@{
     'IMcObjects.h'=@('IMcPropertySource','IMcDbObject','IMcDbEntity','IMcEntity','IMc3dConstraintCompatible','IMcObjectsManager','mcsComplexWorkID','McGeometryParam')
     '3DCore.h'=$coreKeep

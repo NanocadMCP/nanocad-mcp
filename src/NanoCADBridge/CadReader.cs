@@ -146,13 +146,18 @@ internal sealed class CadReader
                 cancellationToken.ThrowIfCancellationRequested();
                 pointScope.Accept();
             }
-            if (request.operation == "inspect_solid_topology" && (args.IncludeNativeModelFaces || args.IncludeNativeModelEdges))
+            if (request.operation == "inspect_solid_topology" && (args.FaceQuery != null || args.EdgeQuery != null || args.IncludeNativeModelFaces || args.IncludeNativeModelEdges))
             {
                 long bits = unchecked((long)ulong.Parse(args.Handles![0], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                 if (!document.Database.TryGetObjectId(new Handle(bits), out var sourceId) || sourceId.IsNull || !sourceId.IsValid || sourceId.IsErased)
                     throw new DomainException("OBJECT_NOT_FOUND", "Model body changed before native face inspection.");
                 using var nativeTrace = new NativeTopologyReadTrace362(state);
-                var data = SolidTopologyReader.AttachNativeFaces(result.data!, sourceId, state, _instance, cancellationToken, args.IncludeNativeModelFaces, args.IncludeNativeModelEdges);
+                var data = args switch
+                {
+                    { FaceQuery: { } query } => ModelFaceReader.Capture(sourceId, state, _instance, cancellationToken, query: query),
+                    { EdgeQuery: { } query } => ModelEdgeReader.BoundaryPage(sourceId, state, _instance, cancellationToken, query),
+                    _ => SolidTopologyReader.AttachNativeFaces(result.data!, sourceId, state, _instance, cancellationToken, args.IncludeNativeModelFaces, args.IncludeNativeModelEdges)
+                };
                 cancellationToken.ThrowIfCancellationRequested();
                 if (state.Revision != context.revision)
                     throw new DomainException("STALE_DOCUMENT", "Document changed during native face inspection.", true, nativeTrace.Snapshot());
@@ -215,6 +220,8 @@ internal sealed class CadReader
         var selectionRevision = selection ? state.SelectionRevision : null;
         var watch = Stopwatch.StartNew();
         int unavailableBounds = 0;
+        int unavailableBodyNames = 0;
+        var bodyNames = new CadModelBodyNames();
         (Entity entity, EntitySummary summary)? ReadMatch(ulong handle)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -228,6 +235,9 @@ internal sealed class CadReader
             if (args.Layers != null && !args.Layers.Contains(summary.layer!.name, StringComparer.OrdinalIgnoreCase)) return null;
             if (!CadTargetedRead407.MatchBlock(entity, args.QueryBlock, transaction, cancellationToken.ThrowIfCancellationRequested)) return null;
             if (!CadTargetedRead407.MatchText(entity, args.QueryText, cancellationToken.ThrowIfCancellationRequested)) return null;
+            if (!args.SummaryOnly || args.BodyName != null) summary = bodyNames.Observe(entity, summary);
+            if (args.BodyName != null && entity is Solid3d && entity.OwnerId == modelId && summary.body_name == null) unavailableBodyNames++;
+            if (args.BodyName != null && !string.Equals(summary.body_name, args.BodyName, StringComparison.OrdinalIgnoreCase)) return null;
             return (entity, summary);
         }
         EntitySummary? Read(ulong handle)
@@ -239,7 +249,7 @@ internal sealed class CadReader
         }
         object Convert(HandlePages<EntitySummary>.Page page)
         {
-            if (args.QueryBounds == null && args.QueryText == null && args.QueryBlock == null)
+            if (args.QueryBounds == null && args.QueryText == null && args.QueryBlock == null && args.BodyName == null)
                 return new Page(page.items, page.total_count, page.returned_count, page.complete, page.next_cursor, page.selection_revision);
             return new
             {
@@ -249,7 +259,7 @@ internal sealed class CadReader
                 page.complete,
                 page.next_cursor,
                 page.selection_revision,
-                match_semantics = CadTargetedRead407.Semantics(args, unavailableBounds)
+                match_semantics = CadTargetedRead407.Semantics(args, unavailableBounds, unavailableBodyNames)
             };
         }
         // Yield a continuation, including an empty filtered page, rather than reject
@@ -285,7 +295,7 @@ internal sealed class CadReader
                 : _summaryPages.Next(args.Cursor, state.Id, state.Revision, null, key, args.PageSize, ReadSummary, Yield);
             var summary = new QuerySummary();
             foreach (var item in page.items) summary.Add(item.Type, item.Layer, item.Bounds, args.QueryBounds);
-            return summary.Result(args.ReadSpace, page.next_cursor, args.Cursor != null);
+            return summary.Result(args.ReadSpace, page.next_cursor, args.Cursor != null, args.BodyName == null ? null : unavailableBodyNames);
         }
         if (args.Cursor != null) return Convert(_snapshots.Next(args.Cursor, state.Id, state.Revision, selectionRevision, args.FilterKey(operation), args.PageSize, Read, Yield));
         return Convert(_snapshots.First(state.Id, state.Revision, selectionRevision, args.FilterKey(operation), Identities(), args.PageSize, Read, Yield));
@@ -293,6 +303,7 @@ internal sealed class CadReader
     private object Inspect(Arguments args, DocumentState state, Transaction transaction, ObjectId modelId, CancellationToken cancellationToken)
     {
         var items = new List<object>();
+        var bodyNames = new CadModelBodyNames();
         int failed = 0;
         int bytes = 4096;
         foreach (var handle in args.Handles!)
@@ -308,6 +319,7 @@ internal sealed class CadReader
                     throw new DomainException("OUT_OF_SCOPE", "The handle does not identify an entity.");
                 bool paper = entity.OwnerId != modelId && transaction.GetObject(entity.OwnerId, OpenMode.ForRead) is BlockTableRecord owner && owner.IsLayout;
                 var summary = EntityAdapter.Summary(entity, modelId, _instance, state.Id, paper);
+                summary = bodyNames.Observe(entity, summary);
                 if (entity.OwnerId != modelId && !paper) throw new DomainException("OUT_OF_SCOPE", "Only top-level Model or paper-layout entities can be inspected; nested block content uses inspect_block.", false, new { summary });
                 bool needsGeometry = args.DetailSections == null || args.DetailSections.Contains("geometry", StringComparer.Ordinal) || args.DetailSections.Contains("editing", StringComparer.Ordinal);
                 if (summary.type == "Unknown" && needsGeometry) throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Geometry for this type is not supported; sections:[] can still read its identity and owner.", false, new { summary });

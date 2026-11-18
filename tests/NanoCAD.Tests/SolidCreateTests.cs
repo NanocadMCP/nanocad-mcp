@@ -11,6 +11,20 @@ internal static class SolidCreateTests
         object Box(double z = 3) => new { type = "Solid3d", kind = "box", center = new[] { 1d, 2, z }, size = new[] { 10, 20, 30 } };
         void Reject(object[] entities)
         { try { CreateValidation.Parse(Wire.Element(Request(entities))); } catch (DomainException) { return; } throw new Exception("Invalid solid accepted."); }
+        await test("flat stock uses one base frame or the existing mass-center placement", () =>
+        {
+            var frame = new { origin = new[] { 1, 2, 3 }, x_axis = new[] { 0, 1, 0 }, y_axis = new[] { 0, 0, 1 } };
+            var size = new[] { 10, 20, 30 };
+            var wedge = new { type = "Solid3d", kind = "wedge", size, base_frame = frame };
+            var a = CreateValidation.Parse(Wire.Element(Request(new object[] { wedge })));
+            if (a.Entities[0] is not SolidSpec { BaseFrame.Origin.Z: 3 }) throw new Exception("Base origin lost.");
+            var legacy = CreateValidation.Parse(Wire.Element(Request(new object[] { Box() })));
+            if (legacy.Entities[0] is not SolidSpec { BaseFrame: null } || a.Fingerprint() == legacy.Fingerprint())
+                throw new Exception("Stock placements failed to retain their distinct operation intents.");
+            Reject(new object[] { new { type = "Solid3d", kind = "wedge", size, center = frame.origin, base_frame = frame } });
+            Reject(new object[] { new { type = "Solid3d", kind = "sphere", radius = 5, base_frame = frame } });
+            return Task.CompletedTask;
+        });
         await test("solid create validates 3D primitives and retains XYZ in operation identity", () =>
         {
             var entities = new object[] { Box(), new { type = "Solid3d", kind = "sphere", center = new[] { 20, 0, 0 }, radius = 5 }, new { type = "Solid3d", kind = "cylinder", center = new[] { 40, 0, 10 }, radius = 3, height = 8 } };

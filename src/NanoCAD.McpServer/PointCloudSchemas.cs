@@ -6,7 +6,7 @@ namespace NanoCAD.McpServer;
 internal static class PointCloudSchemas
 {
     internal const string InspectDescription = "Read one top-level Model point-cloud insertion. mode=metadata (default) discloses loaded state, available source metadata, drawing units and insertion bounds; unavailable observations remain null. The observed native counter is not a verified raw-point total. mode=features requires an already-loaded source and pages existing native feature identities and observed geometry, without fitting or changing features. Keep the same explicit bridge/document/revision/handle and request on cursor continuation. No loading, import, display, clipping or storage mutation.";
-    internal const string AnalysisDescription = "Read actual raw point-cloud data in drawing_units. points pages native point indices and the insertion iterator's actual Vertex coordinates in WCS; do not apply the reported CloudInfo matrices again. Mapping for moved or rotated insertions has not been independently confirmed. section selects an arbitrary oriented slab and also returns its local coordinates. statistics scans the requested subset and can find the nearest actual point to query_point; it is final only when complete=true. measure reads actual native indices for point_distance or point_plane_distance, or an existing Cylinder/Sphere feature for feature_diameter. No fitting, source projection, CAD geometry creation, import or cloud mutation. A time-limited page may contain no points and still have complete=false; continue its query/revision-bound cursor.";
+    internal const string AnalysisDescription = "Read raw point-cloud data in drawing_units. points pages actual insertion iterator Vertex coordinates and native indices. section reads an oriented slab. compare_section compares slab points in a WCS region with an actual Model solid section and reports signed residuals, witness indices and gaps by arclength segment. statistics can find the nearest point to query_point. measure reads native point_distance, point_plane_distance or a stored feature_diameter. Continue each query/revision-bound scan cursor until complete, including empty incomplete pages. CloudInfo matrices are diagnostic. The operation leaves cloud data and CAD entities intact.";
 
     static JsonObject Object(params (string Name, JsonNode Schema)[] fields) => new()
     {
@@ -56,7 +56,13 @@ internal static class PointCloudSchemas
     {
         var root = Context(); var properties = root["properties"]!.AsObject(); var required = root["required"]!.AsArray();
         required.Add("mode"); required.Add("units");
-        properties["mode"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("points", "section", "statistics", "measure") };
+        properties["mode"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("points", "section", "statistics", "measure", "compare_section") };
+        var comparison = Object(("solid_handle", new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-Fa-f]{1,16}$" }),
+            ("segment_length", new JsonObject { ["type"] = "number", ["exclusiveMinimum"] = 0 }),
+            ("capture_distance", new JsonObject { ["type"] = "number", ["exclusiveMinimum"] = 0 }));
+        comparison["properties"]!["start_segment"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 };
+        comparison["description"] = "Compare the cloud slab inside the WCS region to a section through this Model Solid3d. segment_length is the maximum arclength per coverage bin, capture_distance is the largest accepted point-to-profile distance. Both are drawing units. Continue scan.next_cursor for this segment group, then comparison.next_start_segment for remaining groups.";
+        properties["comparison"] = comparison;
         properties["units"] = new JsonObject { ["type"] = "string", ["const"] = "drawing_units", ["description"] = "Coordinates, slab thickness and linear results use actual drawing units. No millimeter or import-source unit assumption or conversion is made." };
         var section = Object(("origin", Point()), ("normal", Point()), ("x_axis", Point()),
             ("thickness", new JsonObject { ["type"] = "number", ["exclusiveMinimum"] = 0 }));
@@ -87,6 +93,7 @@ internal static class PointCloudSchemas
                 ["else"] = Forbidden("measurement")
             },
             new JsonObject { ["if"] = IsMode("section"), ["then"] = new JsonObject { ["required"] = new JsonArray("section") } },
+            new JsonObject { ["if"] = IsMode("compare_section"), ["then"] = new JsonObject { ["required"] = new JsonArray("section", "region", "comparison") }, ["else"] = Forbidden("comparison") },
             new JsonObject { ["if"] = IsMode("points"), ["then"] = Forbidden("section") },
             new JsonObject { ["if"] = new JsonObject { ["required"] = new JsonArray("query_point") }, ["then"] = IsMode("statistics") },
             new JsonObject
@@ -119,7 +126,7 @@ internal static class PointCloudSchemas
     }
     static JsonObject PointRecord() => Object(
         ("point_index", Index()),
-        ("point_wcs", Described(Point(), "Actual insertion-scoped native iterator Vertex, used directly for WCS filtering and measurements. No additional CloudInfo transform is applied; moved/rotated insertion mapping has not been independently confirmed.")),
+        ("point_wcs", Described(Point(), "Actual insertion-scoped native iterator Vertex in WCS. Native samples followed translation and rotation of a loaded insertion. Use the coordinate directly for filtering and measurement.")),
         ("base_point", Described(Point(), "Native BaseVertex observation. Do not infer its WCS mapping from the reported CloudInfo matrices.")),
         ("section_coordinates", Nullable(Pair())), ("signed_section_distance", Nullable(Number())),
         ("attributes", Nullable(Object(
@@ -159,8 +166,23 @@ internal static class PointCloudSchemas
         ("features", Nullable(Array(Feature()))), ("features_geometry_scope", Text()),
         ("complete", Nullable(Boolean())), ("next_cursor", Nullable(Text())));
 
+    static JsonObject ProfileComparison(JsonNode reference)
+    {
+        var segment = Object(("segment", Integer()), ("curve_type", Text()), ("edge_first_segment", Integer()),
+            ("station_from", Number()), ("station_to", Number()), ("from_uv", Pair()), ("to_uv", Pair()), ("midpoint_uv", Pair()),
+            ("coverage", new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("observed", "unobserved_in_subset", "scan_incomplete") }),
+            ("observed_points", DecimalCount()), ("signed_points", DecimalCount()), ("first_point_index", Nullable(Index())),
+            ("largest_absolute_residual_point_index", Nullable(Index())),
+            ("signed_residual", Nullable(Object(("min", Number()), ("max", Number()), ("mean", Number())))));
+        return Object(("solid_ref", reference.DeepClone()), ("section_status", Text()),
+            ("section", Object(("origin", Point()), ("normal", Point()), ("x_axis", Point()), ("thickness", Number()))),
+            ("observation_region_wcs", Bounds()), ("segment_length", Number()), ("capture_distance", Number()),
+            ("start_segment", Integer()), ("total_segments", Integer()), ("next_start_segment", Nullable(Integer())),
+            ("outside_capture_distance", DecimalCount()), ("ambiguous_points", DecimalCount()), ("method", Text()), ("segments", Array(segment)));
+    }
+
     internal static JsonObject AnalysisData(JsonNode reference) => Object(
-        ("mode", new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("points", "section", "statistics", "measure") }),
+        ("mode", new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("points", "section", "statistics", "measure", "compare_section") }),
         ("source_ref", reference.DeepClone()), ("definition_ref", reference.DeepClone()),
         ("units", new JsonObject { ["type"] = "string", ["const"] = "drawing_units" }),
         ("drawing_unit", DrawingUnit()), ("source_units_known", new JsonObject { ["type"] = "boolean", ["const"] = false }),
@@ -173,6 +195,7 @@ internal static class PointCloudSchemas
         ("frame_observation", Described(Object(("checked_point_count", DecimalCount()),
             ("vertex_matches_transformed_base", Described(Nullable(Boolean()), "Cumulative diagnostic comparison of native Vertex with CloudInfo-transformed BaseVertex. false is an observed mismatch; null means the comparison is unavailable. Neither rejects returned native points.")),
             ("back_transform_matches_base", Described(Nullable(Boolean()), "Cumulative diagnostic comparison of CloudInfo-back-transformed Vertex with native BaseVertex. false or null does not invalidate the returned native Vertex.")),
-            ("status", Text())), "Coordinates use actual insertion-scoped native Vertex. CloudInfo/BaseVertex agreement is diagnostic and may be false or unavailable; moved/rotated insertion mapping has not been independently confirmed.")),
-        ("statistics", Nullable(Statistics())), ("measurement", Nullable(Measurement())));
+            ("status", Text())), "Coordinates use actual insertion-scoped native Vertex. CloudInfo/BaseVertex agreement is diagnostic and may be false or unavailable. Sampled WCS vertices followed rigid placement on the assessed loaded insertion.")),
+        ("statistics", Nullable(Statistics())), ("measurement", Nullable(Measurement())),
+        ("comparison", Nullable(ProfileComparison(reference))));
 }

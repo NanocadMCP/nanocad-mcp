@@ -22,7 +22,10 @@ internal static class ModelParameterGraphWriter410
     private sealed record Binding(ModelParameterBody[] Bodies, ModelParameterBody Primary, ModelExpressionPlan Plan,
         Dictionary<string, McObjectId> Variables, Dictionary<string, Bound> Controls,
         Dictionary<string, HashSet<string>> Affected, HashSet<Db.ObjectId> Inventory, HashSet<Db.ObjectId> OriginalBodies, Dictionary<string, string> Layers)
-    { internal string[] SketchWarnings { get; set; } = []; }
+    {
+        internal string[] SketchWarnings { get; set; } = [];
+        internal Dictionary<string, ModelThroughHole.Support> ThroughHoles { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
     private sealed record Observed(string Handle, JsonElement State);
     private static void Need(bool ok, string code, string message) { if (!ok) throw new DomainException(code, message); }
     private static object FailureObservation(ModelParameterArguments args, Binding? binding)
@@ -169,7 +172,21 @@ internal static class ModelParameterGraphWriter410
         }
         var layers = bodies.ToDictionary(b => b.Handle, b => ((Db.Entity)tx.GetObject(CadStructureWriter.Find(state.Document.Database, b.Handle), Db.OpenMode.ForRead)).Layer, StringComparer.OrdinalIgnoreCase);
         var originalBodies = bodies.Select(b => CadStructureWriter.Find(state.Document.Database, b.Handle)).ToHashSet();
-        return new(bodies, primary, plan, ids, controls, affected, Inventory(state, tx, cancel), originalBodies, layers);
+        return new Binding(bodies, primary, plan, ids, controls, affected, Inventory(state, tx, cancel), originalBodies, layers);
+    }
+
+    private static void ObserveThroughHoles(Binding binding, DocumentState state, Action cancel)
+    {
+        foreach (var body in binding.Bodies)
+        {
+            var stockControls = binding.Plan.AffectedIds.Where(id => binding.Controls.TryGetValue(id, out var bound) && bound.Body == body &&
+                bound.Feature?.Role is "extrusion_distance" or "extrusion_distance2").ToArray();
+            if (stockControls.Length != 1) continue;
+            string driver = stockControls[0];
+            double travel = binding.Plan.ExpectedValues[driver] - ModelParameterSnapshot.Variable(body.Before, driver).GetProperty("value").GetDouble();
+            if (ModelThroughHole.Observe(body, state, travel, cancel) is { } through)
+                binding.ThroughHoles.Add(body.Handle, through);
+        }
     }
     private static Dictionary<string, Observed> Verify(ModelParameterArguments args, DocumentState state, Binding b,
         IReadOnlyCollection<NativeSketchEditorSolve445.Transition> transitions, Action cancel)
@@ -198,6 +215,13 @@ internal static class ModelParameterGraphWriter410
             // identity slots. Original geometry, values and metadata remain
             // the baseline for the existing dependency/preservation checks.
             var expectedBody = NativeSketchSolveExpected445.Body(body, transitions, cancel);
+            if (b.ThroughHoles.TryGetValue(body.Handle, out var originalHole))
+            {
+                var verified = ModelThroughHole.RetainedSupport(body, originalHole);
+                Need(ModelThroughHole.PhysicalDepth(body.Body, verified.Feature.GetObjectOfType<HoleFeature>()!, state, cancel) == null,
+                    "HOLE_EXTENT_UNVERIFIED", "The previously open through hole contains material after the parent edit.");
+                expectedBody = ModelThroughHole.Expected(expectedBody, originalHole, verified);
+            }
             edited = edited.Select(control => control.Role == ModelHoleNativeControl.Role
                 ? ModelHoleNativeControl.Witness(control, expectedBody, after, b.Plan.ExpectedValues[control.Variable.ToString()], cancel) : control).ToArray();
             foreach (var witnessed in edited.Where(control => control.Role == ModelHoleNativeControl.Role))
@@ -285,6 +309,7 @@ internal static class ModelParameterGraphWriter410
         try
         {
             using (var tx = state.Document.Database.TransactionManager.StartTransaction()) binding = Resolve(args, state, tx, job.CheckCancellation, numeric);
+            ObserveThroughHoles(binding, state, job.CheckCancellation);
             foreach (var body in binding.Bodies) ModelViewFollowers.CheckStandalone(body.Body, body.Views, job.CheckCancellation);
             tracker = new McUndoPoint(false); tracker.Start(); job.CheckCancellation(); started = true; stage = "expression";
             using (var manager = binding.Primary.Body.DbEntity.Document.GetDocumentVariablesManager(Constraint2dNetType.MCS)) Need(manager != null && manager.SetVariableExpression(binding.Variables[args.VariableId], args.Expression), "MODEL_UPDATE_FAILED", "Native expression update was rejected.");
@@ -301,6 +326,15 @@ internal static class ModelParameterGraphWriter410
                 pendingSolves.AddRange(ModelSketchParameterGraph411.Solve(body, binding.Affected[body.Handle], state, original, job.CheckCancellation));
             }
             McObjectManager.UpdateAll();
+            foreach (var body in binding.Bodies)
+            {
+                if (!binding.ThroughHoles.TryGetValue(body.Handle, out var original)) continue;
+                stage = "refresh_dependent_through_hole";
+                Need(body.Body.RebuildPart(), "MODEL_UPDATE_FAILED", "The upstream extrusion did not rebuild before the through-hole check.");
+                McObjectManager.UpdateAll();
+                var retained = ModelThroughHole.RetainedSupport(body, original);
+                ModelThroughHole.EnsureClear(body.Body, retained.Feature.GetObjectOfType<HoleFeature>()!, state, job.CheckCancellation);
+            }
             foreach (var body in binding.Bodies) ModelViewFollowers.PrepareStandaloneRefresh(body.Body, body.Views, job.CheckCancellation);
             stage = "preserve_native_body_transparency";
             foreach (var pending in pendingSolves) NativeSketchEditorSolve445.PreserveTransparency(pending, state, job.CheckCancellation);

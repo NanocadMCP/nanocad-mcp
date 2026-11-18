@@ -23,6 +23,25 @@ internal static class ModelManufacturingTests
         }
         ModifyArguments Parse(JsonObject e) => ModifyValidation.Parse(Wire.Element(new { bridge_instance_id = id, document_id = id, expected_revision = "1", operation_id = id, units = "Millimeters", operations = new[] { e } }));
         void Reject(JsonObject e) { try { Parse(e); } catch (DomainException) { return; } throw new Exception("Invalid manufacturing input accepted."); }
+        await test("concentric hole creation requires one current circular source and its planar face", () =>
+        {
+            var hole = Edit("hole", true);
+            var d = hole["definition"]!.AsObject();
+            d.Remove("center");
+            d["concentric_edge_id"] = b;
+            Reject(hole);
+            d["edge_token"] = token;
+            Parse(hole);
+            d["center"] = new JsonArray(0, 0, 0);
+            Reject(hole);
+            d.Remove("center");
+            d["offset1"] = 0;
+            Reject(hole);
+            d.Remove("offset1");
+            d.Remove("face_id");
+            Reject(hole);
+            return Task.CompletedTask;
+        });
         await test("manufacturing holes and threads accept only applicable required dimensions", () =>
         {
             foreach (bool add in new[] { true, false })

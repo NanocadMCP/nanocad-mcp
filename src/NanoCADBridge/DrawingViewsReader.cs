@@ -19,9 +19,12 @@ internal static class DrawingViewsReader
     internal sealed record ProjectedCircularArc(McObjectId ViewId, int Marker, Teigha.Geometry.Point3d Center,
         double Radius, Teigha.Geometry.Point3d Start, Teigha.Geometry.Point3d End,
         Teigha.Geometry.Point3d Midpoint, double Sweep, bool FullCircle, double StartParameter, double EndParameter);
-    private sealed record SourceEdge(McObjectId Id, string RefKey);
+    private sealed record SourceTopology(McObjectId Id, string RefKey);
+    private sealed record OriginalMarkerTopology(string original_marker, string native_subelement_id, string native_subelement_kind,
+        string native_ref_key, string? creating_feature_id, ProjectedFeatureSource.Feature? subelement_creator);
     private sealed record ProjectionSource(string status, string? unavailable_reason, string? view_marker,
-        EntityRef? source_ref, string? native_edge_id, string? native_ref_key, string? creating_feature_id = null)
+        EntityRef? source_ref, string? native_edge_id, string? native_ref_key, string? creating_feature_id = null,
+        string? native_subelement_id = null, string? native_subelement_kind = null)
     {
         internal static ProjectionSource Unavailable(string reason) => new("unavailable", reason, null, null, null, null);
     }
@@ -185,7 +188,7 @@ internal static class DrawingViewsReader
     private const string SourceMismatch = "native_marker_source_not_exact_local_solid";
     private const string NonUniqueLine = "no_unique_matching_visible_projection_marker";
 
-    private static (SourceEdge? Edge, string? Reason) ReadProjectionSource(Multicad.Mc3D.DrawingView view, LocalSource source, int marker, bool requireSourceObject = false)
+    private static (SourceTopology? Topology, string? Reason) ReadProjectionSource(Multicad.Mc3D.DrawingView view, LocalSource source, int marker, bool requireSourceObject = false)
     {
         using var projected = NativeProjection(() => view.GetProjectedObjectByGsm(marker));
         bool hasProjectedId = projected != null && !projected.IsNull;
@@ -194,7 +197,7 @@ internal static class DrawingViewsReader
             path[0] != source.Id || projected.LeafId != source.Id))
             return (null, SourceMismatch);
         bool needsEdgeIdentity = hasProjectedId && (projected!.TopId != source.Id || projected.TargetId != source.Id);
-        (SourceEdge?, string) UnavailableEdge(string reason) => (null, needsEdgeIdentity ? SourceMismatch : reason);
+        (SourceTopology?, string) UnavailableEdge(string reason) => (null, needsEdgeIdentity ? SourceMismatch : reason);
 
         // Pages establish visibility separately. A direct lookup requires the native
         // source object as well as the reversible subentity key.
@@ -204,7 +207,8 @@ internal static class DrawingViewsReader
         try { edge = McObjectId.FromRefKey(source.Id, key); }
         catch (Exception e) when (e is NotSupportedException or NotImplementedException or Teigha.Runtime.Exception)
         { return UnavailableEdge("native_projection_edge_cannot_resolve_exactly"); }
-        if (edge.IsNull || !edge.IsEdge || edge.IsInexactFEV) return UnavailableEdge("native_projection_edge_cannot_resolve_exactly");
+        if (edge.IsNull || !(edge.IsEdge || edge.IsFace || edge.IsVertex) || edge.IsInexactFEV)
+            return UnavailableEdge("native_projection_subelement_cannot_resolve_exactly");
         if (needsEdgeIdentity && ((projected!.TopId != source.Id && projected.TopId != edge) ||
             (projected.TargetId != source.Id && projected.TargetId != edge))) return (null, SourceMismatch);
         if (edge.ParentId != source.Id) return (null, SourceMismatch);
@@ -214,20 +218,33 @@ internal static class DrawingViewsReader
         return (new(edge, key.ToString()), null);
     }
 
-    private static ProjectionSource ObserveEdge(Multicad.Mc3D.DrawingView view, LocalSource source, int marker,
-        Lazy<HashSet<McObjectId>?> members, bool requireSourceObject = false)
+    private static ProjectionSource ObserveTopology(Multicad.Mc3D.DrawingView view, LocalSource source, int marker,
+        Lazy<HashSet<McObjectId>?> members, bool requireSourceObject, out McObjectId creator)
     {
         var binding = ReadProjectionSource(view, source, marker, requireSourceObject);
-        if (binding.Edge is not { } edge) return ProjectionSource.Unavailable(binding.Reason!);
-        string? creator = null;
+        creator = McObjectId.Null;
+        if (binding.Topology is not { } topology) return ProjectionSource.Unavailable(binding.Reason!);
+        return DescribeTopology(source, marker, members, topology, out creator);
+    }
+
+    private static ProjectionSource DescribeTopology(LocalSource source, int marker, Lazy<HashSet<McObjectId>?> members,
+        SourceTopology topology, out McObjectId creator)
+    {
+        creator = McObjectId.Null;
         try
         {
-            var feature = Multicad.Mc3D.Service.GetFeatureObjectIdForFEV(edge.Id);
-            if (!feature.IsNull && members.Value?.Contains(feature) == true) creator = feature.ToString();
+            var feature = Multicad.Mc3D.Service.GetFeatureObjectIdForFEV(topology.Id);
+            if (!feature.IsNull && members.Value?.Contains(feature) == true) creator = feature;
         }
         catch (Exception error) when (error is NotImplementedException or NotSupportedException or Teigha.Runtime.Exception) { }
-        return new("observed", null, marker.ToString(CultureInfo.InvariantCulture), source.Ref, edge.Id.ToString(), edge.RefKey, creator);
+        var id = topology.Id;
+        return new("observed", null, marker.ToString(CultureInfo.InvariantCulture), source.Ref, id.IsEdge ? id.ToString() : null,
+            topology.RefKey, creator.IsNull ? null : creator.ToString(), id.ToString(), id.IsEdge ? "edge" : id.IsFace ? "face" : "vertex");
     }
+
+    private static ProjectionSource ObserveEdge(Multicad.Mc3D.DrawingView view, LocalSource source, int marker,
+        Lazy<HashSet<McObjectId>?> members, bool requireSourceObject = false) =>
+        ObserveTopology(view, source, marker, members, requireSourceObject, out _);
 
     private static Lazy<HashSet<McObjectId>?> Members(LocalSource? source) => new(() =>
     {
@@ -236,33 +253,112 @@ internal static class DrawingViewsReader
     });
 
     internal static object[] ReadStoredMarkerSources(Multicad.Mc3D.DrawingView view, ICollection<McObjectId> sourceIds,
-        EntityRef[] sourceRefs, IEnumerable<int> markers, Action cancel)
+        EntityRef[] sourceRefs, IEnumerable<int> markers, double? observedDiameter, Action cancel)
     {
-        var source = NativeProjection(() => OrdinarySource(view, sourceIds, sourceRefs, view.Attached2dBreaks is { Length: 0 }));
+        var source = NativeProjection(() => EligibleSource(view, sourceIds, sourceRefs, view.Attached2dBreaks is { Length: 0 }, true));
         var members = Members(source);
+        var visibility = new Lazy<LocalVisibility?>(() => source == null ? null : ReadLocalVisibility(view, source.Id, cancel, true));
         return markers.OrderBy(value => value).Select(marker =>
         {
             cancel();
-            var observation = source == null ? ProjectionSource.Unavailable("requires_healthy_ordinary_projection_of_one_local_solid")
+            McObjectId creator = McObjectId.Null;
+            var observation = source == null ? ProjectionSource.Unavailable("requires_healthy_single_local_source_view")
                 : marker < 0 ? ProjectionSource.Unavailable("stored_anchor_has_no_marker")
-                : NativeProjection(() => ObserveEdge(view, source, marker, members, true))
+                : NativeProjection(() => ObserveTopology(view, source, marker, members, true, out creator))
                     ?? ProjectionSource.Unavailable("native_marker_lookup_unavailable");
-            return (object)new { marker, projection_source = observation };
+            var evidence = observation.source_ref != null ? "native_projected_object_and_reversible_key" :
+                observation.unavailable_reason is "native_projection_edge_key_unavailable" or "native_projection_edge_cannot_resolve_exactly" or
+                    "native_projection_subelement_cannot_resolve_exactly" or "native_projection_edge_key_does_not_round_trip"
+                ? "native_projected_object" : null;
+            if (source != null && marker >= 0 && observation.unavailable_reason == "native_marker_source_object_unavailable" &&
+                NativeProjection(() => visibility.Value) is { } local && (local.Matches(marker, true, cancel) || local.Matches(marker, false, cancel)))
+            {
+                evidence = "unique_marker_on_visible_body_projection";
+                observation = NativeProjection(() => ObserveTopology(view, source, marker, members, false, out creator))
+                    ?? ProjectionSource.Unavailable("native_marker_lookup_unavailable");
+            }
+            OriginalMarkerTopology? originalTopology = null;
+            if (source != null && marker >= 0 && observation.unavailable_reason == "native_projection_edge_key_unavailable" &&
+                NativeProjection(() => visibility.Value) is { } bodyProjection &&
+                (bodyProjection.Matches(marker, true, cancel) || bodyProjection.Matches(marker, false, cancel)))
+            {
+                // getSrcGsm identifies the original primitive's marker. On an axial
+                // section it can resolve to a vertex even for a long straight line.
+                // Only the drawing view's projected FEV key identifies projected topology.
+                originalTopology = NativeProjection(() => OriginalTopology(view, source, marker, members));
+            }
+            var feature = creator.IsNull || source == null ? null : NativeProjection(() => ProjectedFeatureSource.Read(creator, source.Id));
+            var driver = feature != null && observedDiameter is { } diameter && view.SectionID.IsNull &&
+                NativeProjection(() => visibility.Value) is { } projected && projected.Matches(marker, false, cancel) &&
+                projected.Whole.CircularMarkers[marker] is { FullCircle: true } circle
+                ? NativeProjection(() => ProjectedFeatureSource.HoleDiameter(creator, observation.native_subelement_id,
+                    observation.native_subelement_kind, diameter, 2 * circle.Radius * projected.PaperDenominator)) : null;
+            return (object)new
+            {
+                marker,
+                projection_source = observation,
+                design_source = new
+                {
+                    view_source_ref = sourceIds.Count == 1 && sourceRefs.Length == 1 ? sourceRefs[0] : null,
+                    section_mc_id = source != null && !view.SectionID.IsNull ? view.SectionID.ToString() : null,
+                    marker_source_evidence = evidence,
+                    original_marker_topology = originalTopology,
+                    creating_feature = feature,
+                    feature_unavailable_reason = feature != null ? null : observation.unavailable_reason ??
+                        (creator.IsNull ? "native_subelement_creator_unavailable" : "native_feature_details_unavailable"),
+                    measurement_driver = driver,
+                    measurement_driver_unavailable_reason = driver == null ? "native_view_anchor_does_not_identify_a_model_parameter" : null
+                }
+            };
         }).ToArray();
     }
 
+    private static OriginalMarkerTopology? OriginalTopology(Multicad.Mc3D.DrawingView view, LocalSource source, int marker,
+        Lazy<HashSet<McObjectId>?> members)
+    {
+        var original = NativeModelHistory421.OriginalProjectionMarker(view.DbEntity.DocumentID.ToString(), view.ID.ToString(), marker);
+        if (original == null) return null;
+        var id = McObjectId.FromGsMarker(source.Id, original.Value);
+        if (id.IsNull || id.IsInexactFEV || !(id.IsEdge || id.IsFace || id.IsVertex) || id.ParentId != source.Id || id.GsMarker != original)
+            return null;
+        using var key = id.RefKey;
+        if (key == null || key.IsNull || McObjectId.FromRefKey(source.Id, key) != id) return null;
+        var related = DescribeTopology(source, marker, members, new(id, key.ToString()), out var creator);
+        return new(original.Value.ToString(CultureInfo.InvariantCulture), id.ToString(), related.native_subelement_kind!,
+            related.native_ref_key!, related.creating_feature_id,
+            creator.IsNull ? null : NativeProjection(() => ProjectedFeatureSource.Read(creator, source.Id)));
+    }
+
     private static LocalSource? OrdinarySource(Multicad.Mc3D.DrawingView view, ICollection<McObjectId>? nativeSources,
-        EntityRef[]? refs, bool noAttachedBreaks)
+        EntityRef[]? refs, bool noAttachedBreaks) => EligibleSource(view, nativeSources, refs, noAttachedBreaks, false);
+
+    private static LocalSource? EligibleSource(Multicad.Mc3D.DrawingView view, ICollection<McObjectId>? nativeSources,
+        EntityRef[]? refs, bool noAttachedBreaks, bool allowPlaneSection)
     {
         if (nativeSources is not { Count: 1 } || refs is not [var sourceRef] ||
-            view.Status.ToString() != "Ok" || view.IsSuppressed || !view.SectionID.IsNull || view.IsBasedOnSection ||
+            view.Status.ToString() != "Ok" || view.IsSuppressed ||
             !noAttachedBreaks || view.AttachedLocalCuts is not { Length: 0 } || !view.OuterCutSketch.IsNull)
             return null;
-        return new(nativeSources.Single(), sourceRef);
+        var source = nativeSources.Single();
+        if (!view.SectionID.IsNull || view.IsBasedOnSection)
+        {
+            if (!allowPlaneSection || !view.IsRootSectionView || !view.IsBasedOnSection || !view.ParentViewID.IsNull ||
+                view.IsSlice || view.DependsOnSlice || !view.EnableAutoUpdate || view.ShowHiddenLines || view.SectionID.IsNull)
+                return null;
+            var section = view.SectionID.GetObjectOfType<Multicad.Mc3D.Section>();
+            var top = view.DbEntity.Document?.TopDoc;
+            if (section == null || section.ID != view.SectionID || top == null || section.DbEntity.Document?.TopDoc?.ID != top.ID ||
+                section.Status.ToString() != "Ok" || section.IsSuppressed || section.State.ToString() != "Plane" ||
+                section.LiveSectionEnabled || !section.AssociatedPlanarObjectID.IsNull || section.GetVertices() is not { Count: 2 } ||
+                section.GetViews()?.Contains(view.ID) != true ||
+                section.GetTop3dEntitiesForSectioning() is not { Count: 1 } cutSources || cutSources.Single() != source)
+                return null;
+        }
+        return new(source, sourceRef);
     }
 
     private static (Multicad.Mc3D.DrawingView View, McObjectId ViewId, LocalSource Source) ResolveProjectedSource(
-        Entity entity, DocumentState state, Transaction tx, string instance, Action cancel)
+        Entity entity, DocumentState state, Transaction tx, string instance, Action cancel, bool allowPlaneSection = false)
     {
         var database = state.Document.Database;
         var document = Multicad.DatabaseServices.McDocument.ActiveDocument;
@@ -278,15 +374,17 @@ internal static class DrawingViewsReader
             throw new DomainException("OBJECT_IDENTITY_MISMATCH", "The selected DrawingView identity is unavailable.");
         var nativeSources = view.GetTop3dEntitiesInView();
         var sourceRefs = CadDrawingViewLifecycleState345.SourceRefs(nativeSources, database, tx, instance, state.Id, cancel);
-        var source = OrdinarySource(view, nativeSources, sourceRefs.Refs, view.Attached2dBreaks is { Length: 0 })
-            ?? throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "Select a healthy ordinary projection of one local model solid.");
+        var source = EligibleSource(view, nativeSources, sourceRefs.Refs, view.Attached2dBreaks is { Length: 0 }, allowPlaneSection)
+            ?? throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", allowPlaneSection
+                ? "Select a healthy single-solid projection or an automatically updated root Plane section with visible lines and one verified local source."
+                : "Select a healthy ordinary projection of one local model solid.");
         return (view, viewId, source);
     }
 
     internal static ProjectedLine ResolveProjectedLine(Entity entity, DocumentState state, Transaction tx,
-        string instance, int index, Action cancel)
+        string instance, int index, Action cancel, bool allowPlaneSection = false)
     {
-        var (view, viewId, source) = ResolveProjectedSource(entity, state, tx, instance, cancel);
+        var (view, viewId, source) = ResolveProjectedSource(entity, state, tx, instance, cancel, allowPlaneSection);
         cancel();
         var geometry = view.GetViewGeometry(true, 0);
         if (geometry == null || geometry.Count == 0)
@@ -301,7 +399,10 @@ internal static class DrawingViewsReader
             int marker = item.GSMarker;
             if (marker < 0 || !IndexLines(geometry, cancel).ContainsUnique(marker, canonical))
                 throw new DomainException("VIEW_GEOMETRY_UNAVAILABLE", "The selected line has no unique visible native projection marker.");
-            RequireLocalVisibility(view, source.Id, marker, true, cancel);
+            // The section computes its own cut edges. Its reciprocal section/source
+            // links, visible-only result and original native endpoint anchors identify
+            // the line in this view, including cuts without a 3D edge of their own.
+            if (view.SectionID.IsNull) RequireLocalVisibility(view, source.Id, marker, true, cancel);
             var binding = ReadProjectionSource(view, source, marker);
             if (binding.Reason == SourceMismatch)
                 throw new DomainException("DRAWING_VIEW_SOURCE_UNAVAILABLE", "The native projection marker reports a conflicting source identity.");
@@ -608,6 +709,7 @@ internal static class DrawingViewsReader
         object Plane(Multicad.Geometry.Plane3d plane) => new { origin = Point(plane.Origin), axis_u = Vector(plane.DirU), axis_v = Vector(plane.DirV), normal = Vector(plane.Normal) };
         var items = new List<object>();
         var found = new List<(Entity Entity, Multicad.McObjectId Id, Multicad.Mc3D.DrawingView View)>();
+        var layoutDimensions = args.MarkerDimensions == null ? null : new List<ObjectId>();
         var layoutHandles = new Dictionary<Multicad.McObjectId, List<string>>();
         LocalSource? selectedSource = null;
         foreach (ObjectId nativeId in block)
@@ -616,6 +718,7 @@ internal static class DrawingViewsReader
             if (nativeId.IsErased || nativeId.IsEffectivelyErased || nativeId.ObjectClass.DxfName.Equals("3DSOLID", StringComparison.OrdinalIgnoreCase)) continue;
             if (tx.GetObject(nativeId, OpenMode.ForRead) is not Entity entity || entity.OwnerId != block.ObjectId)
                 throw new DomainException("OBJECT_READ_FAILED", "Invalid layout member.");
+            if (entity is Dimension) layoutDimensions?.Add(nativeId);
             var id = Multicad.McObjectId.FromHandle(entity.Handle.Value, document.ID);
             if (id.IsNull) continue;
             if (!layoutHandles.TryGetValue(id, out var handles)) { handles = new List<string>(); layoutHandles.Add(id, handles); }
@@ -708,7 +811,7 @@ internal static class DrawingViewsReader
                 {
                     view_handle = args.GeometryViewHandle,
                     marker,
-                    scope = "native_marker_source_object_and_edge_key",
+                    scope = "native_marker_source_object_and_subelement_key",
                     visible_uniqueness_evaluated = false,
                     projection_source = binding
                 };
@@ -732,6 +835,25 @@ internal static class DrawingViewsReader
             complete = true,
             items
         };
+        if (args.MarkerDimensions is { } page)
+        {
+            var output = JsonSerializer.SerializeToNode(result, Wire.Json)!.AsObject();
+            var selected = found.Single(item => Validation.NormalizeHandle(item.Entity.Handle.ToString()) == args.GeometryViewHandle);
+            int room = Wire.PayloadBudget - 8192 - JsonSerializer.SerializeToUtf8Bytes(output, Wire.Json).Length;
+            output["marker_dimensions"] = JsonSerializer.SerializeToNode(CadViewMarkerDimensions.Read(layoutDimensions!, page,
+                selected.Entity, selected.Id, args.GeometrySourceMarker!.Value, state, tx, instance, Budget, room), Wire.Json);
+            CadDrawingViewLifecycleState345.Bytes(output, Budget, Wire.PayloadBudget - 8192);
+            return Wire.Element(output);
+        }
+        if (args.SheetPlacement is { } placement)
+        {
+            var output = JsonSerializer.SerializeToNode(result, Wire.Json)!.AsObject();
+            int room = Wire.PayloadBudget - 8192 - JsonSerializer.SerializeToUtf8Bytes(output, Wire.Json).Length;
+            output["sheet_placement"] = JsonSerializer.SerializeToNode(
+                CadSheetPlacement.Read(placement, layout, block, tx, found, Budget, room), Wire.Json);
+            CadDrawingViewLifecycleState345.Bytes(output, Budget, Wire.PayloadBudget - 8192);
+            return Wire.Element(output);
+        }
         if (args.DrawingViewSourceIdentityHandle is { } sourceHandle)
         {
             var selected = found.SingleOrDefault(item => Validation.NormalizeHandle(item.Entity.Handle.ToString()) == sourceHandle);

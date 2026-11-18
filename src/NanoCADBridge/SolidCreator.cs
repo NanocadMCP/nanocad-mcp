@@ -159,7 +159,22 @@ internal static class SolidCreator
                 default: throw new DomainException("INVALID_ARGUMENT", "Unsupported solid primitive.");
             }
             var center = solid.MassProperties.Centroid;
-            solid.TransformBy(Matrix3d.Displacement(new Point3d(spec.Center.X, spec.Center.Y, spec.Center.Z) - center));
+            if (spec.BaseFrame is { } frame)
+            {
+                var bounds = solid.GeometricExtents;
+                // The wedge's mass center is offset from its rectangular base center.
+                // A regular odd-sided pyramid has no centrally symmetric bounding box.
+                // Its mass centroid lies on its axis just as it does for a frustum.
+                var baseCenter = spec.Kind is "wedge" or "box"
+                    ? new Point3d((bounds.MinPoint.X + bounds.MaxPoint.X) / 2,
+                        (bounds.MinPoint.Y + bounds.MaxPoint.Y) / 2, bounds.MinPoint.Z)
+                    : new Point3d(center.X, center.Y, bounds.MinPoint.Z);
+                solid.TransformBy(DrawingWorkplaneNative.Matrix(frame) * Matrix3d.Displacement(Point3d.Origin - baseCenter));
+            }
+            else
+            {
+                solid.TransformBy(Matrix3d.Displacement(new Point3d(spec.Center.X, spec.Center.Y, spec.Center.Z) - center));
+            }
             return solid;
         }
         catch { solid.Dispose(); throw; }

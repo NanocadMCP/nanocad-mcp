@@ -205,6 +205,7 @@ internal static class OutputSchemas
             ("constraints", Array(Object(("constraint_id", Text()), ("kind", Text()), ("first_handle", Text()), ("second_handle", Nullable(Text())), ("variable_id", Nullable(Text())), ("value", Nullable(Number()))))),
             ("body_ref", Nullable(Ref("ref"))), ("sketch_id", Nullable(Text())), ("projection_ids", Array(Text())), ("feature_id", Nullable(Text())), ("rebuilt_bodies", Array(Ref("ref")))));
         data["properties"]!["model_parameter_names"] = Array(Object(("body_ref", Ref("ref")), ("variable_id", Text()), ("previous_name", Text()), ("name", Text()), ("rewritten_expression_ids", Array(Text()))));
+        data["properties"]!["model_body_names"] = Array(Object(("body_ref", Ref("ref")), ("previous_name", Text()), ("name", Text())));
         var relation431 = data["properties"]!["drawing_profile_changes"]!["items"]!["properties"]!["constraints"]!["items"]!["properties"]!.AsObject();
         relation431["third_handle"] = Nullable(Text());
         foreach (var field in new[] { "first_segment_index", "second_segment_index", "third_segment_index" }) relation431[field] = Nullable(Integer());
@@ -264,11 +265,21 @@ internal static class OutputSchemas
             ("plane", Nullable(Object(("origin", Point()), ("normal", Point())))),
             ("detail_unavailable_reason", Nullable(Text()))));
         modelFaces["items"]!["properties"]!["cylinder"] = Nullable(Object(("axis_origin", Point()), ("axis_direction", Point()), ("radius", Number()), ("length", Number())));
-        result["properties"]!["native_model_edges"] = Object(("source_ref", Ref("ref")), ("body_mc_id", Text()), ("last_item_id", Text()), ("edge_token", Text()), ("edges", Array(Object(("marker", Text()), ("model_edge_id", Text()), ("curve_type", Text()), ("start", Point()), ("end", Point()), ("length", Number()), ("circle", Nullable(Object(("center", Point()), ("normal", Point()), ("radius", Number()))))))));
+        var modelEdges = Array(Object(("marker", Text()), ("model_edge_id", Text()), ("curve_type", Text()), ("start", Point()), ("end", Point()), ("length", Number()), ("circle", Nullable(Object(("center", Point()), ("normal", Point()), ("radius", Number()))))));
+        result["properties"]!["native_model_edges"] = Object(("source_ref", Ref("ref")), ("body_mc_id", Text()), ("last_item_id", Text()), ("edge_token", Text()), ("edges", modelEdges));
         result["properties"]!["native_model_faces"] = Object(("source_ref", Ref("ref")), ("body_mc_id", Text()),
             ("last_item_id", Text()), ("face_token", new JsonObject { ["type"] = "string", ["pattern"] = "^[0-9A-F]{64}$" }),
             ("identity_scope", Text()), ("complete", Bool()), ("faces", modelFaces));
-        return result;
+        var focused = Object(("source_ref", Ref("ref")), ("body_mc_id", Text()), ("face_token", Text()), ("selection_scope", Text()),
+            ("surface", Text()), ("distance_reference", Text()), ("scanned_faces", Integer()), ("unavailable_supports", Integer()),
+            ("inventory_complete", Bool()), ("total_matches", Integer()), ("start_index", Integer()), ("next_index", Nullable(Integer())), ("complete", Bool()),
+            ("candidates", Array(Object(("face", modelFaces["items"]!.DeepClone().AsObject()), ("datum_distance", Nullable(Number())),
+                ("feature", Nullable(AnyObject())), ("feature_unavailable_reason", Nullable(Text()))))));
+        var boundary = Object(("source_ref", Ref("ref")), ("body_mc_id", Text()), ("last_item_id", Text()), ("source_revision", Text()),
+            ("edge_token", Text()), ("boundary_of_face_id", Text()), ("curve", Nullable(Text())), ("boundary_edges", Integer()),
+            ("unavailable_curve_classifications", Integer()), ("inventory_complete", Bool()), ("total_matches", Integer()),
+            ("start_index", Integer()), ("next_index", Nullable(Integer())), ("complete", Bool()), ("edges", modelEdges.DeepClone().AsObject()));
+        return new JsonObject { ["oneOf"] = new JsonArray(result, focused, boundary) };
     }
     private static JsonObject DrawingViews()
     {
@@ -298,6 +309,12 @@ internal static class OutputSchemas
         var item = result["properties"]!["items"]!["items"]!.AsObject();
         AddOptional(item, "native_owner_document_id", Nullable(Text()));
         AddOptional(result, "selected_source_identity", PaperDrawingViewsSchema356.SelectedSources(Ref("ref")));
+        AddOptional(result, "sheet_placement", AnyObject());
+        AddOptional(result, "marker_dimensions", Object(("view_ref", Ref("ref")), ("marker", Integer()), ("scope", Text()),
+            ("start_index", Integer()), ("total_dimensions", Integer()), ("examined_count", Integer()),
+            ("next_index", Nullable(Integer())), ("page_complete", Bool()),
+            ("items", Array(Object(("dimension_ref", Ref("ref")), ("dimension_type", Text()), ("anchor_slots", Array(Integer()))))),
+            ("unclassified", Array(Object(("dimension_ref", Ref("ref")), ("reason", Nullable(Text())))))));
         AddOptional(result, "selected_marker_source", Nullable(Object(("view_handle", Text()), ("marker", Integer()),
             ("scope", Text()), ("visible_uniqueness_evaluated", Bool()), ("projection_source", projectedSource))));
         AddOptional(item, "align_on_parent", Bool());
@@ -321,6 +338,8 @@ internal static class OutputSchemas
                 ("first", Reference()), ("second", Reference()), ("third", Reference()), ("parameter_value", Nullable(Number())), ("parameter_value_unit", Text()),
                 ("variable_id", Nullable(Text())), ("variable_name", Nullable(Text())), ("variable_expression", Nullable(Text())), ("dimension_id", Nullable(Text()))))));
         data["properties"]!["presentation"] = ModelSketchVisibilitySchema436.Presentation();
+        data["properties"]!["smooth_measurements"] = Nullable(Array(new JsonObject { ["type"] = "object" }));
+        data["properties"]!["sketch_membership"] = Text();
         return data;
     }
     private static JsonObject DocumentConstraints()
@@ -349,6 +368,8 @@ internal static class OutputSchemas
         var item = schema["properties"]!["variables"]!["items"]!["properties"]!.AsObject();
         foreach (string field in new[] { "owner_kind", "sketch_id", "constraint_id", "control_kind" }) item[field] = Nullable(Text());
         item["native_control"] = Nullable(Object(("native_value_category", Integer()), ("native_extent", Integer()), ("value_unit", Text()), ("scope", Text())));
+        schema["properties"]!["focused_feature_id"] = Nullable(Text());
+        schema["properties"]!["unavailable_consumer_inventories"] = Array(Text());
         schema["properties"]!["parameter_binding_notes"] = Array(Object(("host_object_id", Text()), ("code", Text()), ("reason", Text())));
         return schema;
     }
@@ -365,7 +386,9 @@ internal static class OutputSchemas
         });
         var body = Object(("ref", Ref("ref")), ("mc_id", Text()), ("mc_document_id", Text()),
             ("last_item_id", Nullable(Text())), ("complete", Bool()), ("nodes", Array(node)));
+        body["properties"]!["body_name"] = Nullable(Text());
         body["properties"]!["edit_routes"] = AnyObject();
+        body["properties"]!["dependency_trace"] = AnyObject();
         body["properties"]!["reference_planes"] = Array(Object(("name", Text()), ("plane_id", Text()), ("scope", Text())));
         var result = Object(("identity_scope", Text()), ("graph_scope", Text()), ("items", Array(body)));
         result["properties"]!["document_sketch_inventory"] = Nullable(ModelSketchLifecycleSchema362.InventoryOutput());
@@ -424,6 +447,12 @@ internal static class OutputSchemas
         SolidGeometryAnalysisSchema.ExtendOutput(result);
         result["oneOf"]!.AsArray().Add(BoundaryTraceSchema408.Output());
         result["oneOf"]!.AsArray().Add(SolidMeasurementSchema409.Output());
+        result["oneOf"]!.AsArray().Add(SolidSectionSchema.Output(false));
+        result["oneOf"]!.AsArray().Add(SolidSectionSchema.Output(true));
+        result["oneOf"]!.AsArray().Add(JsonNode.Parse("""
+            {"type":"object","required":["mode","workplane","units","endpoint_tolerance","components","nearest_gaps","contacts","confirmed_hole_count","classification_complete"],
+             "properties":{"mode":{"const":"selected_contours"},"components":{"type":"array"},"nearest_gaps":{"type":"array"},"contacts":{"type":"array"},"confirmed_hole_count":{"type":"integer"},"classification_complete":{"type":"boolean"}}}
+            """));
         return result;
     }
     private static JsonObject MTextFormattingOutput()
@@ -476,6 +505,8 @@ internal static class OutputSchemas
             ("view_marker", Nullable(Text())), ("source_ref", Nullable(Ref("ref"))),
             ("native_edge_id", Nullable(Text())), ("native_ref_key", Nullable(Text())));
         source["properties"]!["creating_feature_id"] = Nullable(Text());
+        source["properties"]!["native_subelement_id"] = Nullable(Text());
+        source["properties"]!["native_subelement_kind"] = Nullable(Text());
         return source;
     }
 
@@ -501,9 +532,28 @@ internal static class OutputSchemas
         ("unavailable_reason", Nullable(Text())), ("stored_anchor_parameters_available", Bool()),
         ("stored_anchor_parameters_unavailable_reason", Nullable(Text())), ("scope", Text()));
         association["properties"]!["measurement"] = Nullable(AnyObject());
-        association["properties"]!["links"]!["items"]!["properties"]!["marker_sources"] =
-            Array(Object(("marker", Integer()), ("projection_source", ProjectionSource())));
+        var link = association["properties"]!["links"]!["items"]!["properties"]!;
+        link["source_parts"] = Array(Object(("ref", Ref("ref")), ("mc_id", Text()),
+            ("body_name", Nullable(Text())), ("dwg_material_handle", Nullable(Text()))));
+        link["marker_sources"] = Array(Object(("marker", Integer()), ("projection_source", ProjectionSource()),
+            ("design_source", Ref("projected_design_source"))));
         return association;
+    }
+    private static JsonObject ProjectedFeature()
+    {
+        var variable = Object(("mc_id", Text()), ("name", Nullable(Text())), ("expression", Nullable(Text())));
+        var parameter = Object(("property", Text()), ("value", Number()), ("unit", Text()), ("variable", Nullable(variable)));
+        return Object(("mc_id", Text()), ("name", Nullable(Text())), ("runtime_type", Text()), ("status", Text()),
+            ("suppressed", Bool()), ("parameters", Array(parameter)));
+    }
+    private static JsonObject ProjectedDesignSource()
+    {
+        var driver = Object(("feature_mc_id", Text()), ("property", Text()), ("value", Number()), ("unit", Text()), ("evidence", Text()));
+        return Object(("view_source_ref", Nullable(Ref("ref"))), ("section_mc_id", Nullable(Text())),
+            ("marker_source_evidence", Nullable(Text())), ("original_marker_topology", Nullable(Ref("original_marker_topology"))),
+            ("creating_feature", Nullable(Ref("projected_feature"))),
+            ("feature_unavailable_reason", Nullable(Text())), ("measurement_driver", Nullable(driver)),
+            ("measurement_driver_unavailable_reason", Nullable(Text())));
     }
     public static JsonElement For(string operation)
     {
@@ -513,6 +563,11 @@ internal static class OutputSchemas
             ["error"] = Object(("code", Text()), ("message", Text()), ("retryable", Bool()), ("details", Nullable(AnyObject()))),
             ["context"] = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("revision", Text()), ("captured_at_utc", Text())),
             ["ref"] = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("handle", Text())),
+            ["projected_design_source"] = ProjectedDesignSource(),
+            ["projected_feature"] = ProjectedFeature(),
+            ["original_marker_topology"] = Object(("original_marker", Text()), ("native_subelement_id", Text()),
+                ("native_subelement_kind", Text()), ("native_ref_key", Text()), ("creating_feature_id", Nullable(Text())),
+                ("subelement_creator", Nullable(Ref("projected_feature")))),
             ["layer"] = Object(("name", Text()), ("handle", Nullable(Text()))),
             ["summary"] = Object(("ref", Ref("ref")), ("type", Text()), ("runtime_type", Text()), ("layer", Nullable(Ref("layer"))),
                 ("space", Text()), ("detail_support", Text())),
@@ -563,7 +618,7 @@ internal static class OutputSchemas
             ["hatch"] = Object(("annotation_kind", new JsonObject { ["const"] = "Hatch" }), ("pattern_name", Text()), ("pattern_type", Text()),
                 ("pattern_angle", Number()), ("pattern_scale", Number()), ("pattern_double", Bool()), ("associative", Bool()), ("normal", Point()), ("elevation", Number()),
                 ("boundary_complete", Bool()), ("loops", Array(Object(("loop_type", Text()), ("boundary_kind", Text()),
-                    ("vertices", Array(Object(("point_ocs", Point(2)), ("bulge", Number())))), ("associated_handles", Array(Nullable(Text()))))))),
+                    ("vertices", Array(Object(("point_ocs", Point(2)), ("bulge", Number())))), ("curves_ocs", Nullable(Array(new JsonObject { ["type"] = "object" }))), ("associated_handles", Array(Nullable(Text()))))))),
             ["table"] = Object(("annotation_kind", new JsonObject { ["const"] = "Table" }), ("position", Point()), ("direction", Point()), ("normal", Point()),
                 ("width", Number()), ("height", Number()), ("rows", Integer()), ("columns", Integer()), ("row_heights", Array(Number())), ("column_widths", Array(Number())),
                 ("cells", Array(Object(("row", Integer()), ("column", Integer()), ("text_contents", Array(Text())), ("text_observations", Array(Object(("content_index", Integer()), ("text_source", Text()), ("text_unavailable_reason", Nullable(Text())))))))), ("content_scope", Text())),
@@ -620,6 +675,8 @@ internal static class OutputSchemas
             ("space", Text()), ("detail_support", Text()), ("coordinate_system", Text()),
             ("geometry", new JsonObject { ["oneOf"] = new JsonArray(Ref("line"), Ref("point"), Ref("ray"), Ref("xline"), Ref("circle"), Ref("ellipse"), Ref("spline"), Ref("region"), Ref("helix"), Ref("block_reference"), Ref("block_array"), Ref("wipeout"), Ref("external_reference"), Ref("arc"), Ref("polyline"), Ref("polyline2d"), Ref("polyline3d"), Ref("text"), Ref("mtext"), Ref("dimension"), Ref("tolerance"), Ref("mleader"), Ref("hatch"), Ref("table"), Ref("solid3d")) }),
             ("properties", Ref("properties")), ("warnings", Array(Text())));
+        definitions["summary"]!["properties"]!["body_name"] = Text();
+        definitions["entity"]!["properties"]!["body_name"] = Text();
         if (operation == "inspect_objects") definitions["compact_entity"] = TargetedReadSchema407.CompactEntityOutput(Ref("ref"));
         definitions["item"] = Object(("handle", Text()), ("success", Bool()),
             ("entity", Nullable(operation == "inspect_objects" ? new JsonObject { ["anyOf"] = new JsonArray(Ref("entity"), Ref("compact_entity")) } : Ref("entity"))), ("error", Nullable(Ref("error"))));
@@ -631,6 +688,8 @@ internal static class OutputSchemas
         children["description"] = "Complete created native children. For define_block, entity/attribute_definition source_index identifies the requested array member. nested_attribute identifies a newly owned attribute of the BlockReference at that entities source_index; tag is its actual tag. inspect_block supplies the actual parent/occurrence path. For set_block_definition_members, added_member/added_nested_attribute source_index identifies add_entities; retired_member/retired_nested_attribute identifies remove_handles, including the actual owned attribute tag. block_reference children are actual retained consumers marked for redraw. Retired IDs are inactive and must not be reused for a later edit. No fixed child-count truncation.";
         structureChange["properties"]!["children"] = children;
         structureChange["properties"]!["raster_calibration"] = Object(("mm_per_pixel", Number()), ("check_error_mm", Nullable(Number())));
+        structureChange["properties"]!["decoration_copies"] = Array(Object(("source_ref", Ref("ref")), ("copy_ref", Ref("ref")),
+            ("attributes", Array(Object(("source_ref", Ref("ref")), ("copy_ref", Ref("ref")), ("tag", Text()))))));
         JsonObject data = operation switch
         {
             "analyze_geometry" => GeometryAnalysis(),

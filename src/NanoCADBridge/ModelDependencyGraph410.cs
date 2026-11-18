@@ -116,6 +116,7 @@ internal static class ModelDependencyGraph410
             if (affected.Contains(id))
             {
                 string? kind = p["kind"]?.GetValue<string>();
+                if (kind == "hole") ModelConcentricHole.NormalizeAffectedCenter(p, affected);
                 if (kind is "fillet" or "chamfer")
                 {
                     if (p["edge_ids"] is not JsonArray && p["edge_count"] is not JsonValue) throw new DomainException("HISTORY_UNAVAILABLE", "Retained edge-feature bindings are unavailable.");
@@ -160,8 +161,11 @@ internal static class ModelDependencyGraph410
         foreach (string field in new[] { "owner", "body", "last_item", "external_sources", "native_source_ids" })
             if (!ModelParameterSnapshot.Equivalent(before.GetProperty(field), after.GetProperty(field)))
                 throw new DomainException("MODEL_STATE_UNAVAILABLE", "Parameter rebuild changed native body identity, terminal or retained source bindings.");
-        if (!ModelParameterSnapshot.Equivalent(ProtectedNodes(before, affected, edited, cancel: cancel, sketchMotion: sketchMotion), ProtectedNodes(after, affected, edited, cancel: cancel, sketchMotion: sketchMotion)))
-            throw new DomainException("MODEL_STATE_UNAVAILABLE", "Parameter rebuild changed stored design or an unrelated history item outside the native dependency closure.");
+        var previous = ProtectedNodes(before, affected, edited, cancel: cancel, sketchMotion: sketchMotion);
+        var current = ProtectedNodes(after, affected, edited, cancel: cancel, sketchMotion: sketchMotion);
+        if (!ModelParameterSnapshot.Equivalent(previous, current))
+            throw new DomainException("MODEL_STATE_UNAVAILABLE", "Parameter rebuild changed a protected native history field.", false,
+                ModelParameterSnapshot.ChangedNode(previous, current, affected, cancel));
     }
     // Native sketch edits use the richer part snapshot. Its stored IDs, source
     // bindings, metadata, formulas and topology are retained. Only geometric

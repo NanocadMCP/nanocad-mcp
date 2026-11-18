@@ -159,6 +159,15 @@ internal static class ModelManufacturingSchema
                     definition2["required"] = new JsonArray(definition2["required"]!.AsArray()
                         .Where(field => properties.ContainsKey(field!.GetValue<string>())).Select(field => field!.DeepClone()).Append(JsonValue.Create("center")).ToArray());
                     fixedSchema["description"] = "Native parametric hole with an explicit fixed WCS center on a selected planar support face. Keeps HoleFeature dimensions and face support but adds NO edge-offset constraints; use only when explicit placement matches the task, never present it as TwoEdges placement. Updates require an existing fixed-placement hole. Sole operation. Get expected_last_item_id from inspect_model_history. For creation get face_token and the planar native model face ID from inspect_solid_topology with include_native_model_faces=true. Omit seat_* for seat=none. Read body_ref after rebuild; ROLLBACK_NOT_GUARANTEED. Assess the hole geometry and required dimensions.";
+                    if (add)
+                    {
+                        var required = definition2["required"]!.AsArray();
+                        required.RemoveAt(required.Count - 1);
+                        properties["edge_token"] = Token();
+                        properties["concentric_edge_id"] = Id();
+                        definition2["oneOf"] = JsonNode.Parse("""[{"required":["center"],"not":{"anyOf":[{"required":["edge_token"]},{"required":["concentric_edge_id"]}]}},{"required":["edge_token","concentric_edge_id"],"not":{"required":["center"]}}]""");
+                        fixedSchema["description"] = "Add one native HoleFeature on a current planar face. Supply a fixed WCS center or select a full circular boundary of that same face with edge_token and concentric_edge_id. Concentric placement requires a verified native reference and placement frame. Read current face and edge identities with inspect_solid_topology. Use the returned body_ref after regeneration.";
+                    }
                     yield return fixedSchema;
                 }
             }

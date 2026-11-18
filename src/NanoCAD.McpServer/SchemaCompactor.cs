@@ -232,6 +232,52 @@ internal static class SchemaCompactor
         foreach (var child in Children(schema)) RemoveDescriptions(child);
     }
 
+    // These tools publish their complete parameter semantics through topic=schema.
+    // Keep the coordinate frames, units and editing preconditions at the call site.
+    public static JsonElement PublishSelectionHelp(string operation, JsonElement input)
+    {
+        var schema = JsonNode.Parse(input.GetRawText())!.AsObject();
+        RemoveDescriptions(schema);
+        var properties = schema["properties"]!.AsObject();
+        void Hint(string name, string text) => properties[name]!["description"] = text;
+        schema["description"] = $"Full field definitions and supported cases: get_guidance(topic=schema, operation={operation}).";
+        switch (operation)
+        {
+            case "inspect_model_history":
+                Hint("history_focus", "One part. Request its issues or a current feature ID and its dependencies, consumers and controls.");
+                Hint("sketch_geometry_ids", "Read selected PlanarSketch elements in WCS.");
+                Hint("profile_ids", "Read selected native SketchProfile definitions in their owning document.");
+                Hint("sketch_ids", "Read selected sketch identities and their lifecycle information.");
+                Hint("profile_region_ids", "Read editable circular regions of a consumed profile on one part.");
+                Hint("profile_element_ids", "Read selected profile elements and their current edit metadata.");
+                Hint("extrusion_extent_ids", "Read native terminations, drivers, body bounds and extent tokens.");
+                Hint("feature_deletion_ids", "Assess the selected features, their dependents and deletion tokens.");
+                Hint("sketch_constraint_parameter_ids", "Inspect exact internal dimensional constraint controls.");
+                Hint("datum_plane_ids", "Read selected native work planes in the parts' owning document.");
+                Hint("datum_plane_revision_ids", "Read current fixed datum dependencies and revision tokens.");
+                break;
+            case "set_model_parameter":
+                Hint("expected_expression", "Exact current stored expression from get_model_variables.");
+                Hint("value", "Updates a literal in the owning control's verified units. Counts must be positive integers.");
+                Hint("expression", "Use known variable names, numbers, parentheses and + - * /. This can replace a formula.");
+                Hint("scope_handles", "Include the selected body and every affected or referenced part in the same native MCS network.");
+                Hint("propagate", "Allow changes to supported downstream variables in the explicitly selected scope.");
+                break;
+            case "analyze_point_cloud":
+                Hint("handle", "Select the Model cloud insertion handle.");
+                Hint("units", "All lengths use drawing units.");
+                Hint("region", "Inclusive WCS box, intersected with the slab when both are supplied.");
+                Hint("section", "Oriented WCS slab with a center, nonzero normal, perpendicular X axis and thickness.");
+                Hint("cursor", "Reuse the preceding cursor with the same filters, page size and drawing revision.");
+                Hint("measurement", "Select current native points or a WCS plane for the requested measurement.");
+                Hint("comparison", "Compare slab points in the WCS region with the selected solid's section.");
+                Hint("include_attributes", "Request available native point attributes in points or section mode.");
+                break;
+            default: throw new InvalidOperationException("No compact selection help for " + operation);
+        }
+        return JsonSerializer.SerializeToElement(schema);
+    }
+
     private static IEnumerable<JsonObject> Alternatives(JsonObject node)
     {
         var alternatives = node["oneOf"] as JsonArray ?? node["anyOf"] as JsonArray;

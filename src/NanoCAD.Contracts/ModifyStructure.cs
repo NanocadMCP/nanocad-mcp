@@ -30,7 +30,8 @@ public sealed record StructureWriteArguments(string BridgeId, string DocumentId,
 public sealed record StructureChild(EntityRef @ref, string kind, int source_index, string? tag);
 public sealed record StructureChange(int operation_index, string operation, EntityRef @ref, string kind, string name, bool created,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] StructureChild[]? children = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RasterCalibrationResult? raster_calibration = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] RasterCalibrationResult? raster_calibration = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LayoutDecorationCopy[]? decoration_copies = null);
 public sealed record ModifiedStructure(string operation_id, string status, bool replayed, StructureChange[] changes, string undo_history,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ViewportLifecycleChange[]? viewport_lifecycle_results = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] TableStyleChange337[]? table_style_changes = null,

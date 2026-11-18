@@ -71,9 +71,11 @@ public static partial class ModifyValidation
         else if (kind.EndsWith("_hole", StringComparison.Ordinal))
         {
             var fixedPosition = d.TryGetProperty("center", out _);
-            if (add && !fixedPosition) throw new DomainException("CAPABILITY_UNAVAILABLE", "Native TwoEdges hole creation did not complete on this host. Use a fixed-center hole only when fixed placement expresses the task, or a supported retained sketch cut for positional dependencies. Existing hole editing has a separate scope.");
-            var common = new[] { "diameter", "through", "depth", "seat", "seat_diameter", "seat_depth", "seat_angle_degrees", "flat_bottom", "bottom_angle_degrees" }.Concat(fixedPosition ? new[] { "center" } : new[] { "offset1", "offset2", "sector" }).ToArray();
-            Shape(d, at, (add ? common.Concat(fixedPosition ? new[] { "face_token", "face_id" } : new[] { "face_token", "face_id", "edge_token", "first_edge_id", "second_edge_id" }) : common).Append("replace_driver_formulas").ToArray());
+            bool concentric = add && d.TryGetProperty("concentric_edge_id", out _);
+            if (add && !fixedPosition && !concentric) throw new DomainException("CAPABILITY_UNAVAILABLE", "Native TwoEdges hole creation did not complete on this host. Use a fixed-center hole only when fixed placement expresses the task, or a supported retained sketch cut for positional dependencies. Existing hole editing has a separate scope.");
+            var placementKeys = concentric ? new[] { "edge_token", "concentric_edge_id" } : fixedPosition ? new[] { "center" } : new[] { "offset1", "offset2", "sector" };
+            var common = new[] { "diameter", "through", "depth", "seat", "seat_diameter", "seat_depth", "seat_angle_degrees", "flat_bottom", "bottom_angle_degrees" }.Concat(placementKeys);
+            Shape(d, at, (add ? common.Concat(new[] { "face_token", "face_id" }) : common).Append("replace_driver_formulas").ToArray());
             if (d.TryGetProperty("replace_driver_formulas", out _)) Flag("replace_driver_formulas");
             double diameter = Num("diameter", .001);
             bool through = Flag("through");
@@ -97,8 +99,9 @@ public static partial class ModifyValidation
             else if (d.TryGetProperty("seat_depth", out _)) Num("seat_depth");
             if (seat == "countersink" || d.TryGetProperty("seat_angle_degrees", out _)) Num("seat_angle_degrees", .001, 179.999);
             if (fixedPosition) { var c = Required(d, "center", at); if (c.ValueKind != JsonValueKind.Array || c.GetArrayLength() != 3) throw Invalid(at, "center requires WCS XYZ."); foreach (var v in c.EnumerateArray()) Number(v, at, -1e6, 1e6); }
+            else if (concentric) { Token("edge_token"); Id(d, "concentric_edge_id"); }
             else { Num("offset1", -1e6); Num("offset2", -1e6); var v = Required(d, "sector", at); if (v.ValueKind != JsonValueKind.Number || !v.TryGetInt32(out int sector) || sector < 0 || sector > 3) throw Invalid(at, "sector must be0..3 as defined by IppDefinition."); }
-            if (add) { Token("face_token"); Id(d, "face_id"); if (!fixedPosition) { Token("edge_token"); if (Id(d, "first_edge_id") == Id(d, "second_edge_id")) throw Invalid(at, "Use two distinct datum edges."); } }
+            if (add) { Token("face_token"); Id(d, "face_id"); }
         }
         else if (kind.EndsWith("_thread", StringComparison.Ordinal))
         {

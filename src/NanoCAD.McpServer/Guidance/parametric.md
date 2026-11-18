@@ -4,6 +4,10 @@ Choose the result identity and retained relationships before selecting a branch.
 
 Drawing-view-owned local/outer-cut sketches are read-only through MCP.
 
+To choose a feature edge on a particular face, find that face with inspect_solid_topology and face_query. Pass its model_face_id to edge_query.boundary_of_face_id on the same body and revision. Use the returned WCS geometry to distinguish the bore ring from the outer ring or choose a straight boundary. Carry the actual model_edge_id and edge_token to the feature editor. Some features also require the selected face_id and face_token. Follow next_index for more boundary edges and reacquire the references after a rebuild.
+
+Give each independently modeled part a useful construction-tree label with modify_entities, variant name_model_body. For example, name the housing, cover and guide bushing using the same terminology as the drawing or parts list. Send one current body handle per entry. Several distinct bodies may be named together. Search their actual labels with query_objects(body_name=...) and use each returned handle to identify the intended solid. Repeated labels are allowed. inspect_objects and inspect_model_history return body_name when a native body root supplies it. The optional expected_name compares the existing label exactly before renaming a body.
+
 | Intended result | Route | First useful read and retained meaning |
 |---|---|---|
 | A new independent shell body | CE Solid3d kind=shell_copy | inspect_solid_topology of the source; new result, source retained, no ShellFeature |

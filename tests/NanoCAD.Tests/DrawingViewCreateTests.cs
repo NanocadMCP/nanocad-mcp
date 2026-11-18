@@ -28,6 +28,12 @@ internal static class DrawingViewCreateTests
             var pair2 = new { pixel = new[] { 10, 0 }, drawing = new[] { 10, 40 } };
             var calibration = RasterCalibration.Parse(Wire.Element(new { anchors = new[] { pair1, pair2 }, check_point = new { pixel = new[] { 10, 5 }, drawing = new[] { 0, 40 } }, max_check_error_mm = 0.1 }), "calibration");
             if (calibration.Map(new(10, 5), 1) != new Point2(0, 40) || calibration.Map(new(10, 5), -1) != new Point2(20, 40)) throw new Exception("Control-frame handedness or scale was lost.");
+            try
+            {
+                RasterCalibration.Parse(Wire.Element(new { anchors = new[] { pair1, pair2 }, check_point = pair1, max_check_error_mm = 0 }), "calibration");
+                throw new Exception("A fitted pixel was accepted as independent calibration evidence.");
+            }
+            catch (DomainException e) when (e.Error.code == "INVALID_ARGUMENT") { }
             var edit = new Dictionary<string, object> { ["operation"] = "reload_xref", ["reference_kind"] = "xref", ["handle"] = "A", ["reference_token"] = new string('A', 64), ["source_path"] = @"..\parts\base.dwg" };
             if (((ReferenceLifecycle385)Parse(edit).Operations.Single()).SourcePath != @"..\parts\base.dwg") throw new Exception("Relative link was resolved against the process directory.");
             edit["operation"] = "detach_xref"; Reject(Input(edit));

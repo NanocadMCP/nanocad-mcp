@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NanoCAD.Contracts;
 
@@ -52,9 +53,17 @@ public sealed class DomainException : Exception
 
 public sealed record EntityRef(string bridge_instance_id, string document_id, string handle);
 public sealed record LayerDto(string name, string? handle);
-public sealed record EntitySummary(EntityRef @ref, string type, string runtime_type, LayerDto? layer, string space, string detail_support);
+public sealed record EntitySummary(EntityRef @ref, string type, string runtime_type, LayerDto? layer, string space, string detail_support)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? body_name { get; init; }
+}
 public sealed record EntityDetail(EntityRef @ref, string type, string runtime_type, LayerDto? layer, string space,
-    string detail_support, string coordinate_system, object geometry, object properties, string[] warnings);
+    string detail_support, string coordinate_system, object geometry, object properties, string[] warnings)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? body_name { get; init; }
+}
 public sealed record ItemResult(string handle, bool success, EntityDetail? entity, DomainError? error);
 public sealed record Page(EntitySummary[] items, int? total_count, int returned_count, bool complete, string? next_cursor, string? selection_revision);
 public sealed record Descriptor(string protocol_version, string bridge_instance_id, string pipe_name, int process_id,
@@ -69,18 +78,27 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     bool IncludeDocumentProfiles = false, string? DocumentProfileCursor = null, string[]? ModelProfileIds = null, string[]? ModelProfileRegionIds = null, string[]? ModelExtrusionExtentIds = null, bool IncludeDocumentDatumPlanes = false, string? DocumentDatumCursor = null, string[]? ModelDatumPlaneIds = null, string[]? ModelDatumPlaneRevisionIds = null, string? DrawingViewSourceIdentityHandle = null, string[]? ModelProfileElementIds = null, bool IncludeDocumentSketches = false, string? DocumentSketchCursor = null, string[]? ModelSketchIds = null)
 {
     public string[]? ModelFeatureDeletionIds { get; init; }
+    public SheetPlacementRequest? SheetPlacement { get; init; }
     public bool IncludeGeometrySources { get; init; }
     public int? GeometrySourceMarker { get; init; }
+    public MarkerDimensionPage? MarkerDimensions { get; init; }
     public string[]? SketchConstraintParameterIds { get; init; }
+    public bool MeasureSmooth { get; init; }
+    public bool DocumentSketchScope { get; init; }
     public QueryBounds407? QueryBounds { get; init; }
     public bool SummaryOnly { get; init; }
     public QueryText407? QueryText { get; init; }
+    public string? BodyName { get; init; }
+    public ModelFaceQuery? FaceQuery { get; init; }
+    public ModelEdgeQuery? EdgeQuery { get; init; }
+    public string? HistoryFocus { get; init; }
+    public string? VariableFeatureId { get; init; }
     public QueryBlock407? QueryBlock { get; init; }
     public string[]? DetailSections { get; init; }
     public bool EraseAssessment { get; init; }
     public string? StructureRecordHandle { get; init; }
     public string[]? OccurrencePath { get; init; }
-    public string FilterKey(string operation) => JsonSerializer.Serialize(new { operation, Types, Layers, Section, ReadSpace, QueryBounds, QueryText, QueryBlock, SummaryOnly }, Wire.Json);
+    public string FilterKey(string operation) => JsonSerializer.Serialize(new { operation, Types, Layers, Section, ReadSpace, QueryBounds, QueryText, QueryBlock, BodyName, SummaryOnly }, Wire.Json);
 }
 
 public static class Validation
@@ -117,7 +135,7 @@ public static class Validation
         if (operation is "get_selection" or "query_objects" or "inspect_objects")
             allowed.UnionWith(new[] { "document_id", "expected_revision" });
         if (operation is "get_selection" or "query_objects") allowed.UnionWith(new[] { "page_size", "cursor" });
-        if (operation == "query_objects") allowed.UnionWith(new[] { "space", "types", "layers", "bounds", "text", "block_definition", "summary_only" });
+        if (operation == "query_objects") allowed.UnionWith(new[] { "space", "types", "layers", "bounds", "text", "block_definition", "body_name", "summary_only" });
         if (operation == "inspect_objects") allowed.UnionWith(new[] { "handles", "sections", "erase_assessment" });
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in input.EnumerateObject())
@@ -194,6 +212,7 @@ public static class Validation
             QueryBounds = TargetedRead407.Bounds(input),
             SummaryOnly = summaryOnly,
             QueryText = TargetedRead407.TextFilter(input),
+            BodyName = ReadString("body_name", Wire.MaxRequestBytes),
             QueryBlock = TargetedRead407.BlockFilter(input),
             DetailSections = TargetedRead407.Sections(input),
             EraseAssessment = eraseAssessment

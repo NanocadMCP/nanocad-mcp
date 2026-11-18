@@ -41,7 +41,7 @@ internal static class ExternalReferenceSchema385
                     ("check_point", pair), ("max_check_error_mm", new JsonObject { ["type"] = "number", ["minimum"] = 0 }));
                 Optional(controls, "check_point", "max_check_error_mm");
                 controls["dependentRequired"] = new JsonObject { ["max_check_error_mm"] = new JsonArray("check_point") };
-                controls["description"] = "Two native pixel coordinates and their corresponding drawing XY coordinates (mm) define a uniform scale and rotation. An independent check_point reports its residual. A specified maximum stops the change if exceeded.";
+                controls["description"] = "Two native pixel coordinates and their corresponding drawing XY coordinates (mm) define a uniform scale and rotation. A check_point at a separately observed pixel reports its residual. A check off the line between anchors also tests alignment across the image. A specified maximum stops the change if exceeded.";
                 properties["properties"]!["calibration"] = controls;
                 properties["if"] = new JsonObject { ["required"] = new JsonArray("calibration") };
                 properties["then"] = new JsonObject { ["maxProperties"] = 1 };
@@ -90,6 +90,11 @@ internal static class ExternalReferenceSchema385
         var underlay = (JsonObject)block.DeepClone(); var props = underlay["properties"]!.AsObject();
         props["is_on"] = new JsonObject { ["type"] = "boolean" }; props["is_clipped"] = new JsonObject { ["type"] = "boolean" }; props["clip_boundary"] = new JsonObject { ["type"] = "array", ["items"] = Point(2) }; props["fade"] = new JsonObject { ["type"] = "integer" }; props["contrast"] = new JsonObject { ["type"] = "integer" }; props["monochrome"] = new JsonObject { ["type"] = "boolean" }; props["adjust_color_for_background"] = new JsonObject { ["type"] = "boolean" };
         underlay["required"] = new JsonArray(props.Select(p => (JsonNode?)JsonValue.Create(p.Key)).ToArray());
-        return Object(("reference_kind", Enum("xref", "raster_image", "dwf", "dgn", "pdf")), ("native_type", Text()), ("owner_ref", reference.DeepClone()), ("definition_ref", reference.DeepClone()), ("placement", new JsonObject { ["oneOf"] = new JsonArray(block, image, underlay) }), ("definition", Definition(reference)), ("reference_token", Nullable(Token())), ("editing_unavailable_reason", Nullable(Text())));
+        var result = Object(("reference_kind", Enum("xref", "raster_image", "dwf", "dgn", "pdf")), ("native_type", Text()), ("owner_ref", reference.DeepClone()), ("definition_ref", reference.DeepClone()), ("placement", new JsonObject { ["oneOf"] = new JsonArray(block, image, underlay) }), ("definition", Definition(reference)), ("reference_token", Nullable(Token())), ("editing_unavailable_reason", Nullable(Text())));
+        var frame = Object(("source", Text()), ("coordinate_system", Text()), ("unit", Text()), ("origin_wcs", Nullable(Point())),
+            ("step_x_wcs", Nullable(Point())), ("step_y_wcs", Nullable(Point())), ("unavailable_reason", Nullable(Text())));
+        frame["description"] = "Map native image pixel [u,v] to WCS as origin_wcs + u*step_x_wcs + v*step_y_wcs. The measured steps carry the occurrence's handedness, independent axis scales and orientation, including elevation.";
+        result["properties"]!["raster_pixel_frame"] = Nullable(frame);
+        return result;
     }
 }

@@ -39,7 +39,8 @@ internal static class TargetedReadSchema407
         text["description"] = "Literal ordinary note content or explicit dimension override; decoded plain MTEXT/MLeader when available. No Field evaluation, Table-cell scan or nested block-attribute traversal. match defaults contains, case_sensitive defaults false.";
         var summary = Flag();
         summary["description"] = "Count filtered objects by type and layer and combine WCS XYZ bounds. For a paged summary, follow next_cursor with the same filters, sum page counts by type/layer and take the union of page bounds. aggregation_scope distinguishes entire_query from this_page.";
-        return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block, ["summary_only"] = summary };
+        var bodyName = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["description"] = "Exact native tree name of a top-level Model Space solid, matched case-insensitively. Names may repeat. Use the returned handles to inspect the candidates before editing. A page reports solids excluded because no native name was available." };
+        return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block, ["body_name"] = bodyName, ["summary_only"] = summary };
     }
     internal static JsonObject InspectProperties() => new()
     {
@@ -76,6 +77,7 @@ internal static class TargetedReadSchema407
             ["layer"] = new JsonObject { ["anyOf"] = new JsonArray(Object(new JsonObject { ["name"] = Text(), ["handle"] = new JsonObject { ["anyOf"] = new JsonArray(Text(), new JsonObject { ["type"] = "null" }) } }, "name", "handle"), new JsonObject { ["type"] = "null" }) },
             ["space"] = Text(),
             ["detail_support"] = Text(),
+            ["body_name"] = Text(),
             ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
             ["owner_ref"] = reference.DeepClone(),
             ["geometry"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
@@ -137,6 +139,7 @@ internal static class TargetedReadSchema407
             ["bounds"] = new JsonObject { ["anyOf"] = new JsonArray(bounds, new JsonObject { ["type"] = "null" }) },
             ["bounds_unavailable_count"] = Count(),
             ["spatial_excluded_unavailable_bounds_count"] = Count(),
+            ["page_solids_excluded_unavailable_name"] = Count(),
             ["space"] = Enum("model", "paper")
         }, "summary_only", "complete", "total_count", "by_type", "by_layer", "bounds", "bounds_unavailable_count", "spatial_excluded_unavailable_bounds_count", "space");
     }

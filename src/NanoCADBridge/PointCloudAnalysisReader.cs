@@ -21,17 +21,18 @@ internal static class PointCloudAnalysisReader
     public static object Read(PointCloudAnalysisArguments args, DocumentState state, Transaction tx, ObjectId model, string instance, CancellationToken cancellation)
     {
         var id = Resolve(args.Read, state, tx, model, cancellation);
-        return ReadLoaded(args, id, state, tx, instance, cancellation);
+        return ReadLoaded(args, id, state, tx, model, instance, cancellation);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static object ReadLoaded(PointCloudAnalysisArguments args, ObjectId id, DocumentState state, Transaction tx, string instance, CancellationToken cancellation)
+    private static object ReadLoaded(PointCloudAnalysisArguments args, ObjectId id, DocumentState state, Transaction tx, ObjectId model, string instance, CancellationToken cancellation)
     {
         var watch = Stopwatch.StartNew();
         using var source = Source.Open(id, state, tx, instance, cancellation);
         source.RequireLoaded();
         if (args.Mode == "measure" && args.Measurement!.Kind == "feature_diameter")
             return MeasureFeature(args, source, cancellation);
+        using var profile = args.Comparison == null ? null : CloudSectionProfile.Open(args, state, tx, model, cancellation);
         object result;
         PointCloudReadScope402.BindSource(source);
         var iterator = source.AllIterator(cancellation);
@@ -43,7 +44,7 @@ internal static class PointCloudAnalysisReader
             var frame = new Frame(info, access);
             result = args.Mode == "measure"
                 ? MeasurePoints(args, source, iterator, frame, cancellation)
-                : PagePoints(args, source, iterator, info, frame, watch, cancellation);
+                : PagePoints(args, source, iterator, info, frame, watch, cancellation, profile);
         }
         finally
         {
@@ -61,8 +62,17 @@ internal static class PointCloudAnalysisReader
         var watch = Stopwatch.StartNew();
         source.RequireLoaded();
         var info = source.Info ?? throw new DomainException("POINT_CLOUD_DATA_UNAVAILABLE", "Loaded insertion did not provide native feature metadata.");
-        var key = Digest(new { operation = "features", source.Fingerprint, source.SourceRef, source.State.Revision,
-            args.Read.BridgeId, args.Read.DocumentId, args.Read.ExpectedRevision, args.PageSize });
+        var key = Digest(new
+        {
+            operation = "features",
+            source.Fingerprint,
+            source.SourceRef,
+            source.State.Revision,
+            args.Read.BridgeId,
+            args.Read.DocumentId,
+            args.Read.ExpectedRevision,
+            args.PageSize
+        });
         var page = OpenCursor(args.Cursor, key, "features");
         uint featureId = page.NextFeature ?? NativeRead("feature_first", () => info.getFirstGeometricFeature(global::FeatureType.AnyType));
         if (featureId != uint.MaxValue && !NativeRead("feature_enumeration_validity", () => info.isGeometricFeatureValid(featureId)))
@@ -111,15 +121,34 @@ internal static class PointCloudAnalysisReader
     }
 
     private static object PagePoints(PointCloudAnalysisArguments args, Source source, Cloud.PointCloudVertexIterator iterator,
-        Cloud.PointCloudInfo info, Frame frame, Stopwatch watch, CancellationToken cancellation)
+        Cloud.PointCloudInfo info, Frame frame, Stopwatch watch, CancellationToken cancellation, CloudSectionProfile? profile)
     {
-        var key = Digest(new { operation = "analysis", source.Fingerprint, source.SourceRef, source.State.Revision,
-            args.Read.BridgeId, args.Read.DocumentId, args.Read.ExpectedRevision, args.Mode, args.Units,
-            args.Section, args.Region, args.PageSize, args.QueryPoint, args.IncludeAttributes,
+        var key = Digest(new
+        {
+            operation = "analysis",
+            source.Fingerprint,
+            source.SourceRef,
+            source.State.Revision,
+            args.Read.BridgeId,
+            args.Read.DocumentId,
+            args.Read.ExpectedRevision,
+            args.Mode,
+            args.Units,
+            args.Section,
+            args.Region,
+            args.PageSize,
+            args.QueryPoint,
+            args.IncludeAttributes,
+            args.Comparison,
+            profile_geometry = profile?.GeometryKey,
             coordinate_basis = "native_insertion_iterator_vertex",
-            transform = Matrix(frame.Transform), back_transform = Matrix(frame.BackTransform),
-            scheme = Decimal(info.DataScheme), metadata_count = Decimal(info.PointsCount) });
+            transform = Matrix(frame.Transform),
+            back_transform = Matrix(frame.BackTransform),
+            scheme = Decimal(info.DataScheme),
+            metadata_count = Decimal(info.PointsCount)
+        });
         var page = OpenCursor(args.Cursor, key, "points");
+        profile?.Restore(page.Profile);
         bool positioned;
         if (args.Cursor == null)
             positioned = First(iterator);
@@ -142,7 +171,7 @@ internal static class PointCloudAnalysisReader
             if (pageScanned > 0 && watch.ElapsedMilliseconds >= PageMilliseconds) break;
             var point = ReadPoint(iterator, frame, args.Section, args.IncludeAttributes, info);
             bool included = Included(point, args.Section, args.Region);
-            if (included && args.Mode != "statistics")
+            if (included && args.Mode != "statistics" && profile == null)
             {
                 int size = JsonSerializer.SerializeToUtf8Bytes(point, Wire.Json).Length + 1;
                 if (bytes + size > ItemByteBudget)
@@ -160,18 +189,21 @@ internal static class PointCloudAnalysisReader
             {
                 pageMatched = Increment(pageMatched); page.Matched = Increment(page.Matched);
                 if (args.Mode == "statistics") Accumulate(page.Statistics, point, args.QueryPoint);
+                if (profile != null) profile.Observe(point.point_index, point.section_coordinates!);
             }
             positioned = Advance(iterator);
             if (pageMatched >= (ulong)args.PageSize) break;
         }
         bool complete = !positioned;
         page.NextPoint = positioned ? NativeRead("iterator_continuation_index", () => iterator.Index) : null;
+        if (!complete && profile != null) page.Profile = profile.Save();
         var next = complete ? null : MakeCursor(page);
         NativeRead("source_verification", () => source.Verify(cancellation));
         return Analysis(args, source, items,
             new Scan(Decimal(pageScanned), Decimal(page.Scanned), Decimal(page.Matched), complete, next,
                 source.Info == null ? null : Decimal(source.Info.PointsCount)),
-            Observation(page.FrameChecked, page.VertexAgreement, page.BackAgreement, frame.AccessObservation), args.Mode == "statistics" ? Statistics(page.Statistics, args, complete) : null, null);
+            Observation(page.FrameChecked, page.VertexAgreement, page.BackAgreement, frame.AccessObservation), args.Mode == "statistics" ? Statistics(page.Statistics, args, complete) : null, null,
+            profile?.Report(complete, new EntityRef(source.SourceRef.bridge_instance_id, source.State.Id, args.Comparison!.SolidHandle)));
     }
 
     private static object MeasurePoints(PointCloudAnalysisArguments args, Source source, Cloud.PointCloudVertexIterator iterator,
@@ -233,15 +265,25 @@ internal static class PointCloudAnalysisReader
     }
 
     private static object Analysis(PointCloudAnalysisArguments args, Source source, IReadOnlyList<PointRecord> items,
-        Scan scan, FrameObservation observation, object? statistics, MeasurementRecord? measurement) => new
-    {
-        mode = args.Mode, source_ref = source.SourceRef, definition_ref = source.DefinitionRef,
-        units = "drawing_units", drawing_unit = new { name = source.State.Document.Database.Insunits.ToString(), value = (int)source.State.Document.Database.Insunits },
-        source_units_known = false, source_units_note = SourceUnitsNote,
-        coordinate_frame = "WCS", selection_method = args.Mode == "measure" && args.Measurement!.Kind == "feature_diameter"
+        Scan scan, FrameObservation observation, object? statistics, MeasurementRecord? measurement, object? comparison = null) => new
+        {
+            mode = args.Mode,
+            source_ref = source.SourceRef,
+            definition_ref = source.DefinitionRef,
+            units = "drawing_units",
+            drawing_unit = new { name = source.State.Document.Database.Insunits.ToString(), value = (int)source.State.Document.Database.Insunits },
+            source_units_known = false,
+            source_units_note = SourceUnitsNote,
+            coordinate_frame = "WCS",
+            selection_method = args.Mode == "measure" && args.Measurement!.Kind == "feature_diameter"
             ? "native_feature_identity" : "native_all_iterator_exact_predicate",
-        items, scan, frame_observation = observation, statistics, measurement
-    };
+            items,
+            scan,
+            frame_observation = observation,
+            statistics,
+            measurement,
+            comparison
+        };
 
     private static FeatureRecord Feature(Cloud.PointCloudInfo info, uint id)
     {
@@ -408,7 +450,7 @@ internal static class PointCloudAnalysisReader
         "Point coordinates are the actual native insertion iterator Vertex, without another CloudInfo transformation. " +
         "The diagnostic booleans describe cumulative evaluated CloudInfo Transform(BaseVertex)/BackTransform(Vertex) agreements; " +
         "false is observed disagreement, null is unavailable. These are not admission conditions. " +
-        "This getter basis is corroborated by observed insertion bounds and source coordinates; moved/rotated insertion semantics are not independently assessed.") +
+        "A loaded insertion retained coherent sampled WCS vertices after translation and rotation in the scoped 406 assessment. Shared and unloaded placement variants require their own observations.") +
         (accessObservation == null ? "" : " " + accessObservation));
 
     private static void Accumulate(StatisticsState statistics, PointRecord point, double[]? query)
@@ -471,7 +513,9 @@ internal static class PointCloudAnalysisReader
         standard_deviation_wcs = state.M2 == null || state.Count == 0 ? null : state.M2.Select(m => Finite(Math.Sqrt(Math.Max(0, m) / state.Count))).ToArray(),
         section_bounds = state.SectionMin == null ? null : new { min = state.SectionMin, max = state.SectionMax },
         signed_section_distance_range = state.DistanceMin == null ? null : new { min = state.DistanceMin.Value, max = state.DistanceMax!.Value },
-        query_point = args.QueryPoint, nearest_point = state.Nearest, nearest_distance = state.NearestDistance,
+        query_point = args.QueryPoint,
+        nearest_point = state.Nearest,
+        nearest_distance = state.NearestDistance,
         scope = (complete ? "Complete native All iterator traversal of the requested subset; original file density is not independently established." : "Partial cumulative scan; continue the cursor before treating statistics or nearest point as final.") +
             (state.Count > 0 && state.M2 == null ? " Population standard deviation is unavailable because its intermediate moment exceeds floating-point range." : " Population standard deviation is computed from observed points; no fit is performed.")
     };
@@ -534,6 +578,7 @@ internal static class PointCloudAnalysisReader
         public bool? VertexAgreement { get; set; } = true;
         public bool? BackAgreement { get; set; } = true;
         public StatisticsState Statistics { get; set; } = new();
+        public string? Profile { get; set; }
     }
     private sealed class StatisticsState
     {

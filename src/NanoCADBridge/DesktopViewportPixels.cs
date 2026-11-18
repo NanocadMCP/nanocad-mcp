@@ -7,7 +7,7 @@ internal static class DesktopViewportPixels
 {
     private static readonly IntPtr PerMonitorAwareV2 = new(-4);
 
-    internal static CaptureViewportPixels Read(IntPtr window, int viewportWidth, int viewportHeight)
+    internal static CaptureViewportPixels Read(IntPtr window, int viewportWidth, int viewportHeight, bool wholeViewport)
     {
         if (GetWindowThreadProcessId(window, out uint pid) == 0 || pid != (uint)Environment.ProcessId)
             throw Unavailable();
@@ -16,6 +16,9 @@ internal static class DesktopViewportPixels
         if (logical != ClientSize(window, GetWindowDpiAwarenessContext(window)) ||
             GetWindowThreadProcessId(window, out pid) == 0 || pid != (uint)Environment.ProcessId)
             throw Unavailable();
+        if (wholeViewport)
+            return CaptureViewportPixels.Whole(viewportWidth, viewportHeight, logical.Width, logical.Height,
+                physical.Width, physical.Height);
         return CaptureViewportPixels.Bind(viewportWidth, viewportHeight, logical.Width, logical.Height,
             physical.Width, physical.Height);
     }

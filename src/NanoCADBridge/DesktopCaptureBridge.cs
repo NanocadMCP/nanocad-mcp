@@ -45,7 +45,16 @@ internal static class DesktopCaptureBridge
             throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "Native drawing window or viewport pixel dimensions are unavailable.");
 
         RegionProjection? region = null;
-        int pixelWidth = (int)size.X, pixelHeight = (int)size.Y;
+        CaptureViewportPixels mapping;
+        try
+        {
+            mapping = DesktopViewportPixels.Read(view.Handle, (int)size.X, (int)size.Y, args.Bounds == null);
+        }
+        catch (DomainException error) when (args.Bounds == null && error.Error.code == "CAPTURE_BOUNDS_UNAVAILABLE")
+        {
+            throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", error.Message, false, error.Error.details);
+        }
+        int pixelWidth = mapping.Width, pixelHeight = mapping.Height;
         if (args.Bounds is { } bounds)
         {
             if (!document.Database.TileMode || (int)document.Database.Insunits != 4)
@@ -58,8 +67,6 @@ internal static class DesktopCaptureBridge
             // The native window DC may use logical pixels; WGC uses physical pixels.
             if (!view.MatrWorldToDC(out var matrix))
                 throw new DomainException("CAPTURE_BOUNDS_UNAVAILABLE", "The native renderer did not supply its orthographic pixel projection.");
-            var mapping = DesktopViewportPixels.Read(view.Handle, pixelWidth, pixelHeight);
-            pixelWidth = mapping.Width; pixelHeight = mapping.Height;
             (double, double) Project(double x, double y)
             {
                 var pixel = new NativePoint(x, y, bounds.Z).TransformBy(matrix);

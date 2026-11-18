@@ -6,6 +6,43 @@ internal static class QuerySummaryTests
 {
     internal static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("native face query filters supporting geometry and preserves distinct axis and plane distances", () =>
+        {
+            var cylinder = ModelFaceQuery.Parse(Wire.Element(new
+            {
+                surface = "cylinder",
+                direction = new[] { 0, 0, -5 },
+                min_radius = 2,
+                max_radius = 6,
+                datum_point = new[] { 3, 4, 100 },
+                max_distance = 5
+            }));
+            if (!cylinder.Accept([0, 0, 3], [0, 0, 1], 4, out var distance) || distance != 5 ||
+                cylinder.Accept([0, 0, 3], [0, 0, 1], 7, out _) || cylinder.Accept([0, 0, 3], [0, 0, 1], null, out _))
+                throw new Exception("Unexpected cylinder axis or radius filter.");
+            var plane = ModelFaceQuery.Parse(Wire.Element(new { surface = "plane", datum_point = new[] { 100, 200, 7 }, max_distance = 1 }));
+            if (!plane.Accept([0, 0, 6], [0, 0, -1], null, out distance) || distance != 1)
+                throw new Exception("Unexpected supporting plane distance.");
+            return Task.CompletedTask;
+        });
+        await test("native solid names are searchable across pages and optional in basic observations", () =>
+        {
+            var doc = Guid.NewGuid().ToString("D");
+            const string name = "Guide bushing \u00D824";
+            var args = Validation.Parse("query_objects", Wire.Element(new { document_id = doc, body_name = name, page_size = 1 }));
+            var other = args with { BodyName = "Cover" };
+            if (args.BodyName != name || args.FilterKey("query_objects") == other.FilterKey("query_objects"))
+                throw new Exception("The body-name filter must preserve the requested label and bind a cursor to that query.");
+
+            var summary = new EntitySummary(new(doc, doc, "2A"), "Solid3d", "Solid3d", null, "model", "supported");
+            if (Wire.Element(summary).TryGetProperty("body_name", out _) ||
+                Wire.Element(summary with { body_name = name }).GetProperty("body_name").GetString() != name)
+                throw new Exception("Only available native names should be emitted.");
+            var page = Wire.Element(new QuerySummary().Result("model", unavailableBodyNames: 2));
+            if (page.GetProperty("page_solids_excluded_unavailable_name").GetInt32() != 2)
+                throw new Exception("A name-filtered summary must disclose candidates without an available native name.");
+            return Task.CompletedTask;
+        });
         await test("query summary preserves list defaults and accepts paged spatial aggregation", () =>
         {
             var id = Guid.NewGuid().ToString("D");

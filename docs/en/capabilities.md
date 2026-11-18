@@ -6,8 +6,28 @@ nanoCAD MCP connects an AI assistant to a running nanoCAD session. You describe 
 
 See [installation](installation.md) for requirements and connection instructions, and the [user guide](user-guide.md) for the working process.
 
-This page describes the scope of build 456. Earlier published
+This page describes the scope of build 457. Earlier published
 packages retain the limits recorded in their release notes.
+
+## Working with named parts and drawing revisions
+
+Eligible top-level solids have an editable name on their native modeling-tree owner. A name search returns separate object references for duplicate labels. A bushing and a pin retained their names after a bore edit and DWG reopening. The operation also accepted a direct box with an existing native body owner. An imported body without an identifiable owner requires its own assessment.
+
+For a selected part, the assistant can filter planar and cylindrical faces by geometry, follow verified native feature links and inspect the inputs of a single feature. It can also inspect a planar section and the material intercepted by a finite segment. In a mounting plate, a length edit from 80 to 100 mm moved the two far holes by 20 mm and kept the four end offsets at 10 mm.
+
+After selecting a face, the assistant can read its boundary edges, limit the results to straight edges, full circles or circular arcs, and use the returned native references for supported part features. On the guide bushing end face, the two circles measured 12.5 and 20 mm in radius. A face belonging to the neighboring pin could not be used as a boundary of the bushing.
+
+A locating plate demonstrates the difference between dependent and independent dimensions. Increasing the pocket depth from 3 to 5 mm left a measured 5 mm wall and updated the section dimension. Increasing the hole spacing from 50 to 60 mm changed the projected distance between the nearest rims from 44 to 54 mm. The independent center-spacing annotation needed its defining points adjusted.
+
+An upstream parameter can change the length of a part with a through hole. Lengthening the guide bushing from 40 to 44 mm kept the Ø24 passage open along the axis and updated the existing sheet to 44 mm overall with a 10 mm shoulder. An eligible existing Simple Fixed through hole can also be reapplied to repair an incomplete cut while retaining the Hole feature.
+
+A native concentric Hole can follow a selected boss. Two Ø16 bosses had a 34 mm center spacing. The second carried a Ø6 blind hole, 5 mm deep. After DWG reopening, increasing the spacing to 46 mm moved the hole axis from X=48 to X=60 mm. The first boss remained solid at X=14 mm.
+
+An existing associative diameter label can be repositioned with an effective DIMTMOVE setting of 2. Moving the label from X=45 to X=52 mm retained its native link to the circle, both defining chord points and the measured diameter of 12 mm.
+
+On a sheet, the assistant can check the bounds of a proposed orthographic view against the current views, dimensions and other measured paper content. The report identifies measured conflicts and available shifts along the alignment axis. Text and arrow bounds depend on the graphics nanoCAD exposes. For loaded scans, the assistant can compare nearby observed points with a selected solid section. Each sampled boundary portion reports its deviation and point evidence. Gaps in coverage remain explicit.
+
+For an eligible raster attachment, the assistant can read the native transformation from image pixels to drawing coordinates. The origin and the two pixel-step vectors describe physical scale and orientation. On an 1800 × 1485 image whose pixel Y axis pointed toward negative drawing Y, this mapping reproduced both corners of the saved clip.
 
 ## Drawings
 

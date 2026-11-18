@@ -669,6 +669,7 @@ await ModelShellTests.Run(Test);
 await ModelFeatureSuppressionTests.Run(Test);
 await ModelRebuild419Tests.Run(Test);
 await ModelArithmeticTests.Run(Test);
+await ModelBodyNameTests.Run(Test);
 await SketchConstraintTests.Run(Test);
 await AngularOrdinateCreateTests.Run(Test);
 await HatchBoundaryReadTests.Run(Test);

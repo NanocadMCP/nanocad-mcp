@@ -27,6 +27,37 @@ internal static class PointCloudReadTests
             catch (DomainException) { }
             return Task.CompletedTask;
         });
+        await test("cloud profile comparison uses one explicit frame, observation box, reach and distinct solid", () =>
+        {
+            var request = new Dictionary<string, object>
+            {
+                ["bridge_instance_id"] = bridge,
+                ["document_id"] = doc,
+                ["expected_revision"] = "7",
+                ["handle"] = "1A",
+                ["mode"] = "compare_section",
+                ["units"] = "drawing_units",
+                ["section"] = new { origin = new[] { 0, 0, 5 }, normal = new[] { 0, 0, 2 }, x_axis = new[] { 3, 0, 0 }, thickness = .1 },
+                ["region"] = new { min = new[] { -5, -5, 4 }, max = new[] { 5, 5, 6 } },
+                ["comparison"] = new { solid_handle = "000bc", segment_length = 1.2, capture_distance = .3, start_segment = 20 }
+            };
+            var result = PointCloudAnalysisValidation.Parse(Wire.Element(request));
+            if (result.Comparison != new CloudProfileComparison("BC", 1.2, .3, 20) || result.Section?.Normal[2] != 1)
+                throw new Exception("Cloud profile query or normal normalization changed.");
+            void Reject(string key, object? value)
+            {
+                var altered = new Dictionary<string, object>(request);
+                if (value == null) altered.Remove(key); else altered[key] = value;
+                try { PointCloudAnalysisValidation.Parse(Wire.Element(altered)); }
+                catch (DomainException) { return; }
+                throw new Exception("Invalid profile comparison accepted: " + key);
+            }
+            Reject("region", null); Reject("section", null); Reject("comparison", null);
+            Reject("mode", "statistics"); Reject("include_attributes", true);
+            Reject("comparison", new { solid_handle = "1A", segment_length = 1, capture_distance = .3 });
+            Reject("comparison", new { solid_handle = "BC", segment_length = .1, capture_distance = 0 });
+            return Task.CompletedTask;
+        });
         await test("point cloud inspection and analysis are published as read-only operations", () =>
         {
             foreach (string name in new[] { "inspect_point_cloud", "analyze_point_cloud" })

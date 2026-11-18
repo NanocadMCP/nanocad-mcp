@@ -36,11 +36,35 @@ public sealed record CaptureWorldBounds(double MinX, double MinY, double MaxX, d
 
 public readonly record struct CaptureViewportPixels(int Width, int Height, double Scale)
 {
+    public static CaptureViewportPixels Whole(int viewportWidth, int viewportHeight, int logicalWidth, int logicalHeight,
+        int physicalWidth, int physicalHeight)
+    {
+        if (viewportWidth > 0 && viewportHeight > 0 && viewportWidth == physicalWidth && viewportHeight == physicalHeight)
+            return new(physicalWidth, physicalHeight, 1);
+        if (viewportWidth != logicalWidth || viewportHeight != logicalHeight)
+            throw new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE",
+                "The native drawing window includes pixels outside the active viewport. Its complete drawing rectangle is unavailable.", false,
+                new
+                {
+                    viewport = new[] { viewportWidth, viewportHeight },
+                    logical_client = new[] { logicalWidth, logicalHeight },
+                    physical_client = new[] { physicalWidth, physicalHeight }
+                });
+        var mapped = Bind(viewportWidth, viewportHeight, logicalWidth, logicalHeight, physicalWidth, physicalHeight);
+        return new(physicalWidth, physicalHeight, mapped.Scale);
+    }
+
     public static CaptureViewportPixels Bind(int viewportWidth, int viewportHeight, int logicalWidth, int logicalHeight,
         int physicalWidth, int physicalHeight)
     {
         DomainException Unavailable() => new("CAPTURE_BOUNDS_UNAVAILABLE",
-            "The native viewport and its logical-to-physical window mapping could not be verified.");
+            "The native viewport and its logical-to-physical window mapping could not be verified.", false,
+            new
+            {
+                viewport = new[] { viewportWidth, viewportHeight },
+                logical_client = new[] { logicalWidth, logicalHeight },
+                physical_client = new[] { physicalWidth, physicalHeight }
+            });
         // The renderer occupies the full width; the client can include layout
         // tabs below it. A partial-width viewport needs its own window origin.
         if (viewportWidth < 1 || viewportHeight < 1 || viewportWidth != logicalWidth || viewportHeight > logicalHeight ||

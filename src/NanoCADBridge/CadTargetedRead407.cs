@@ -79,7 +79,7 @@ internal static class CadTargetedRead407
         catch (Teigha.Runtime.Exception error) when (!error.ErrorStatus.ToString().Contains("Lock", StringComparison.OrdinalIgnoreCase))
         { cancel(); return null; }
     }
-    internal static object Semantics(Arguments args, int unavailableBounds) => new
+    internal static object Semantics(Arguments args, int unavailableBounds, int unavailableBodyNames) => new
     {
         filters_combined = "and",
         space = args.ReadSpace,
@@ -106,6 +106,12 @@ internal static class CadTargetedRead407
             table_cells_searched = false,
             nested_block_attributes_searched = false
         },
+        body_name = args.BodyName == null ? null : new
+        {
+            scope = "top_level_model_solid_native_tree_name",
+            match = "ordinal_ignore_case_equals",
+            page_solids_excluded_unavailable_name = unavailableBodyNames
+        },
         block_definition = args.QueryBlock == null ? null : new
         { scope = "canonical_named_definition_for_dynamic_insertions_else_direct_definition", nested_members_searched = false }
     };
@@ -123,6 +129,7 @@ internal static class CadTargetedRead407
             ["owner_ref"] = new EntityRef(summary.@ref.bridge_instance_id, summary.@ref.document_id,
                 Validation.NormalizeHandle(entity.OwnerId.Handle.ToString()))
         };
+        if (summary.body_name != null) result.Add("body_name", summary.body_name);
         bool editing = sections.Contains("editing", StringComparer.Ordinal);
         bool geometry = editing || sections.Contains("geometry", StringComparer.Ordinal);
         bool appearance = sections.Contains("appearance", StringComparer.Ordinal);

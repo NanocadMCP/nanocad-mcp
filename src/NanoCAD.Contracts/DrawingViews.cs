@@ -2,6 +2,8 @@ using System.Text.Json;
 
 namespace NanoCAD.Contracts;
 
+public sealed record MarkerDimensionPage(int StartIndex, int PageSize);
+
 public static class DrawingViewsValidation
 {
     public static Arguments Parse(JsonElement input)
@@ -10,6 +12,9 @@ public static class DrawingViewsValidation
         var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var p in input.EnumerateObject())
             if (!values.TryAdd(p.Name, p.Value)) throw new DomainException("INVALID_ARGUMENT", "Duplicate argument: " + p.Name);
+        var placement = values.Remove("sheet_placement", out var plan) ? SheetPlacementRequest.Parse(plan) : null;
+        if (placement != null && (values.ContainsKey("source_identity_view_handle") || values.ContainsKey("geometry_view_handle")))
+            throw new DomainException("INVALID_ARGUMENT", "Request sheet placement as a separate read from projection detail or source identity.");
         string? geometryViewHandle = null;
         if (values.Remove("geometry_view_handle", out var selected))
         {
@@ -40,6 +45,24 @@ public static class DrawingViewsValidation
             marker = value;
         }
         int start = PageValue("geometry_start_index", 0, 0, int.MaxValue), size = PageValue("geometry_page_size", 100, 1, int.MaxValue);
+        MarkerDimensionPage? dimensions = null;
+        if (values.Remove("marker_dimensions", out var options))
+        {
+            if (marker == null || sourceIdentityHandle != null || options.ValueKind != JsonValueKind.Object)
+                throw new DomainException("INVALID_ARGUMENT", "marker_dimensions requires a selected view and geometry_source_marker in its own marker read.");
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int first = 0, count = 100;
+            foreach (var property in options.EnumerateObject())
+            {
+                if (!seen.Add(property.Name) || property.Name is not ("start_index" or "page_size") ||
+                    property.Value.ValueKind != JsonValueKind.Number || !property.Value.TryGetInt32(out int value) ||
+                    value < (property.Name == "start_index" ? 0 : 1))
+                    throw new DomainException("INVALID_ARGUMENT", "Invalid marker_dimensions page option: " + property.Name);
+                if (property.Name == "start_index") first = value;
+                else count = value;
+            }
+            dimensions = new(first, count);
+        }
         bool geometrySources = false;
         if (values.Remove("include_geometry_sources", out var sourceOption))
         {
@@ -50,6 +73,6 @@ public static class DrawingViewsValidation
         if (!values.Remove("layout_handle", out var layout) || values.ContainsKey("handle"))
             throw new DomainException("INVALID_ARGUMENT", "Explicit layout_handle from get_structure layouts is required.");
         values.Add("handle", layout);
-        return ModelVariablesValidation.Parse(Wire.Element(values)) with { GeometryViewHandle = geometryViewHandle, GeometryStartIndex = start, GeometryPageSize = size, DrawingViewSourceIdentityHandle = sourceIdentityHandle, IncludeGeometrySources = geometrySources, GeometrySourceMarker = marker };
+        return ModelVariablesValidation.Parse(Wire.Element(values)) with { GeometryViewHandle = geometryViewHandle, GeometryStartIndex = start, GeometryPageSize = size, DrawingViewSourceIdentityHandle = sourceIdentityHandle, IncludeGeometrySources = geometrySources, GeometrySourceMarker = marker, MarkerDimensions = dimensions, SheetPlacement = placement };
     }
 }

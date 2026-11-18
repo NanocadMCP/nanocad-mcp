@@ -6,6 +6,7 @@ public sealed record GeometryAnalysisArguments(Arguments Read, string Mode, doub
 {
     public BoundaryTrace408? BoundaryTrace { get; init; }
     public SolidMeasurement409? SolidMeasurement { get; init; }
+    public SolidSectionRequest? Section { get; init; }
 }
 
 public static class GeometryAnalysisValidation
@@ -13,10 +14,13 @@ public static class GeometryAnalysisValidation
     public static IReadOnlyList<string> CurveModes { get; } = Array.AsReadOnly<string>(["metrics", "intersections", "distance", "relations", "containment"]);
     public const string TraceBoundaryMode = "trace_boundary";
     public static IReadOnlyList<string> Modes { get; } = CurveModes.Concat(SolidGeometryAnalysisValidation.Modes)
-        .Append(TraceBoundaryMode).Concat(SolidMeasurementValidation409.Modes).ToArray();
+        .Append(TraceBoundaryMode).Concat(SolidMeasurementValidation409.Modes)
+        .Concat([SolidSectionAnalysis.Section, SolidSectionAnalysis.Intervals, SelectedContours.Mode]).ToArray();
     public static GeometryAnalysisArguments Parse(JsonElement input)
     {
         if (input.ValueKind != JsonValueKind.Object) throw new DomainException("INVALID_ARGUMENT", "Arguments must be an object.");
+        if (input.TryGetProperty("mode", out var section) && section.ValueKind == JsonValueKind.String && SolidSectionAnalysis.Handles(section.GetString()))
+            return SolidSectionAnalysis.Parse(input);
         if (input.TryGetProperty("mode", out var boundaryMode) && boundaryMode.ValueKind == JsonValueKind.String && boundaryMode.GetString() == TraceBoundaryMode)
             return BoundaryTraceValidation408.Parse(input);
         if (input.TryGetProperty("mode", out var measurementMode) && measurementMode.ValueKind == JsonValueKind.String && SolidMeasurementValidation409.Handles(measurementMode.GetString()))
@@ -31,6 +35,14 @@ public static class GeometryAnalysisValidation
         var args = Validation.Parse("inspect_objects", Wire.Element(read));
         if (args.BridgeId == null || args.ExpectedRevision == null)
             throw new DomainException("INVALID_ARGUMENT", "Geometry analysis requires explicit bridge_instance_id and expected_revision.");
+        if (input.TryGetProperty("mode", out var selected) && selected.ValueKind == JsonValueKind.String && selected.GetString() == SelectedContours.Mode)
+        {
+            if (args.DocumentId == null || args.Handles is not { Length: > 0 } || names.Except(
+                ["bridge_instance_id", "document_id", "expected_revision", "mode", "handles", "workplane"]).Any())
+                throw new DomainException("INVALID_ARGUMENT", "selected_contours requires current handles, bridge, document and expected revision, plus an optional workplane.");
+            return new(args, SelectedContours.Mode, null, input.TryGetProperty("workplane", out var selectedFrame)
+                ? DrawingWorkplane.Parse(selectedFrame) : DrawingWorkplane.XY);
+        }
         if (input.TryGetProperty("mode", out var solidMode) && solidMode.ValueKind == JsonValueKind.String && SolidGeometryAnalysisValidation.Handles(solidMode.GetString()))
             return SolidGeometryAnalysisValidation.Parse(args, solidMode.GetString()!, input);
         if (!input.TryGetProperty("mode", out var mode) || mode.ValueKind != JsonValueKind.String || !CurveModes.Contains(mode.GetString()))

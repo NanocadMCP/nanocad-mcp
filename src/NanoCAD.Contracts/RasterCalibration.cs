@@ -21,6 +21,8 @@ public sealed record RasterCalibration(RasterControlPoint First, RasterControlPo
         var a = Pair(anchors[0], path + ".anchors[0]"); var b = Pair(anchors[1], path + ".anchors[1]");
         if (a.Pixel == b.Pixel || a.Drawing == b.Drawing) throw Invalid(path + ".anchors", "Both pixel and drawing baselines must have distinct endpoints.");
         var check = value.TryGetProperty("check_point", out var c) ? Pair(c, path + ".check_point") : null;
+        if (check != null && (check.Pixel == a.Pixel || check.Pixel == b.Pixel))
+            throw Invalid(path + ".check_point.pixel", "Use a separately observed pixel to check calibration away from its fitted anchors.");
         double? limit = value.TryGetProperty("max_check_error_mm", out var t) ? ExternalReferenceValidation385.Number(t, path + ".max_check_error_mm") : null;
         if (limit < 0 || limit.HasValue && check == null) throw Invalid(path + ".max_check_error_mm", "A nonnegative tolerance requires a check_point.");
         return new(a, b, check, limit);

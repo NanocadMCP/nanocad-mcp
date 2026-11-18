@@ -61,7 +61,7 @@ internal static class DimensionAssociationSchema385
             ("owner_handle", Nullable(Handle())), ("owned_by_dimension", Bool()), ("dimension_reverse_count", Integer()),
             ("source_reverse_links", Array(Object(("source_handle", Handle()), ("count", Integer()))))));
         read["properties"]!["notification_unavailable_reason"] = Nullable(Text());
-        read["description"] = "Stored native DimAssoc flags/whole source paths and Osnap picks, plus current native evaluated points; read performs no dimension update/regeneration. A fresh token admits the supported local association scope. Resident native AssocManager anchors and their readable owned records are observed by actual identity/ownership; the SDK exposes no complete private manager inventory. Inactive native storage is distinct from an active binding; null token/reason does not hide the independently readable stored dimension geometry."; return read;
+        read["description"] = "Stored DimAssoc flags, whole source paths, object snaps and their current evaluated points. A same-Circle diameter can retain one active quadrant chord (flags 1). Its opposite end is available in geometry.definition.far_chord_point. A fresh token identifies supported local association storage. The reader observes resident manager anchors and readable owned records by identity and ownership. Inactive storage and partial point masks are reported separately."; return read;
     }
     internal static JsonObject Change(JsonNode reference) => Object(("operation_index", Integer()), ("dimension_ref", reference), ("association_token", Token()), ("association_handle", Nullable(Handle())), ("source_handles", Array(Handle())), ("warnings", Array(Text())));
 }

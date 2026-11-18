@@ -108,6 +108,7 @@ internal static class CadLibraryBlockDwg
         }
     }
     static Type? StorageType(string role) => role switch { "block_begin" => typeof(BlockBegin), "block_end" => typeof(BlockEnd), "sequence_end" => typeof(SequenceEnd), _ => null };
+    internal static bool ExactNativeClass(DBObject value, Type type) => ClassIdentity(value, type).Exact;
     static NativeClass ClassIdentity(DBObject value, Type? expectedType = null)
     {
         Rx.RXClass? actual = null, expected = null;
@@ -178,7 +179,7 @@ internal static class CadLibraryBlockDwg
         return result.ToArray();
     }
 
-    static CadBlockMover.Preview Detached(BlockReference original, Transaction tr, Action cancel)
+    internal static CadBlockMover.Preview Detached(BlockReference original, Transaction tr, Action cancel)
     {
         BlockReference root = original is MInsertBlock array
             ? new MInsertBlock(original.Position, original.BlockTableRecord, array.Columns, array.Rows, array.ColumnSpacing, array.RowSpacing)

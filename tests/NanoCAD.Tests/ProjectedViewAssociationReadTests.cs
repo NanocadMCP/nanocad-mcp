@@ -26,6 +26,26 @@ internal static class ProjectedViewAssociationReadTests
                 Need(optional.EnumerateArray().Any(item => item.TryGetProperty("type", out var type) && type.GetString() == "null"),
                     "Cold/non-MCS dimensions must be able to omit native-view information.");
                 var view = optional.EnumerateArray().Single(item => item.TryGetProperty("properties", out _)).GetProperty("properties");
+                var link = view.GetProperty("links").GetProperty("items").GetProperty("properties");
+                var marker = link.GetProperty("marker_sources").GetProperty("items").GetProperty("properties");
+                // AuditServerContractSupport.Output expands the published local references.
+                var design = marker.GetProperty("design_source").GetProperty("properties");
+                var feature = design.GetProperty("creating_feature").GetProperty("anyOf").EnumerateArray()
+                    .Single(branch => branch.TryGetProperty("properties", out _)).GetProperty("properties");
+                var control = feature.GetProperty("parameters").GetProperty("items").GetProperty("properties");
+                var related = design.GetProperty("original_marker_topology").GetProperty("anyOf").EnumerateArray()
+                    .Single(branch => branch.TryGetProperty("properties", out _)).GetProperty("properties");
+                Need(related.TryGetProperty("original_marker", out _) && related.TryGetProperty("native_ref_key", out _) &&
+                    related.TryGetProperty("subelement_creator", out _), "The original primitive marker lost its separate topology observation.");
+                Need(control.TryGetProperty("unit", out _) && control.TryGetProperty("variable", out _) &&
+                    feature.TryGetProperty("mc_id", out _), "The expanded feature schema lost native ownership or parameter units.");
+                Need(link.GetProperty("source_parts").GetProperty("items").GetProperty("properties").TryGetProperty("body_name", out _) &&
+                    marker.GetProperty("projection_source").GetProperty("properties").TryGetProperty("native_subelement_kind", out _) &&
+                    design.TryGetProperty("view_source_ref", out _) && design.TryGetProperty("feature_unavailable_reason", out _) &&
+                    design.TryGetProperty("measurement_driver_unavailable_reason", out _) &&
+                    design.GetProperty("measurement_driver").GetProperty("anyOf").EnumerateArray().Any(branch =>
+                        branch.TryGetProperty("type", out var type) && type.GetString() == "null"),
+                    "A stored drawing anchor must retain the identified part independently of an unavailable feature or parameter driver.");
                 Need(view.GetProperty("stored_anchor_parameters_available").GetProperty("type").GetString() == "boolean" &&
                     view.TryGetProperty("stored_anchor_parameters_unavailable_reason", out _) && view.TryGetProperty("links_complete", out _),
                     "Native anchor availability or incomplete link inventory became an implied success.");
@@ -43,7 +63,6 @@ internal static class ProjectedViewAssociationReadTests
                 Need(anchor.GetProperty("data").GetProperty("anyOf").EnumerateArray().Any(item =>
                     item.TryGetProperty("type", out var type) && type.GetString() == "string"),
                     "Native Int64 anchor data must retain exact text rather than a lossy JSON floating-point value.");
-                var link = view.GetProperty("links").GetProperty("items").GetProperty("properties");
                 Need(link.TryGetProperty("view_ref", out _) && link.TryGetProperty("owner_document_id", out _) &&
                     link.TryGetProperty("source_refs", out _) && link.TryGetProperty("view_status", out _) &&
                     link.TryGetProperty("native_anchor_count", out _) && !link.TryGetProperty("native_reference_count", out _) &&

@@ -24,7 +24,17 @@ internal static class GeometryAnalysisSchema
         var frame = WorkplaneSchema.Input(); frame["description"] = "Optional plane for relations/containment on native Line/Circle/Arc/Polyline. Origin uses drawing units; axes are perpendicular unit WCS vectors. Input point and all output witness points remain WCS triples. No projection or UCS change. Omit for existing WCSXY/Z0 behavior.";
         root["properties"]!["workplane"] = frame;
         root["properties"]!["mode"]!["enum"] = new JsonArray(NanoCAD.Contracts.GeometryAnalysisValidation.CurveModes.Select(m => (JsonNode?)JsonValue.Create(m)).ToArray());
+        var contours = (JsonObject)root.DeepClone();
+        contours.Remove("allOf");
+        contours["properties"]!.AsObject().Remove("point");
+        contours["properties"]!["mode"] = new JsonObject { ["const"] = NanoCAD.Contracts.SelectedContours.Mode };
+        contours["properties"]!["workplane"] = WorkplaneSchema.Input();
         SolidGeometryAnalysisSchema.Extend(root);
-        return JsonSerializer.SerializeToElement(new JsonObject { ["type"] = "object", ["oneOf"] = new JsonArray(root, BoundaryTraceSchema408.Input(), SolidMeasurementSchema409.Input()) });
+        return JsonSerializer.SerializeToElement(new JsonObject
+        {
+            ["type"] = "object",
+            ["oneOf"] = new JsonArray(root, BoundaryTraceSchema408.Input(), SolidMeasurementSchema409.Input(),
+            SolidSectionSchema.Input(false), SolidSectionSchema.Input(true), contours)
+        });
     }
 }

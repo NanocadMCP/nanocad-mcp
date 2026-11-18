@@ -79,7 +79,8 @@ public sealed record ModifiedEntities(string operation_id, string status, bool r
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SolidImprintChange393[]? solid_imprint_changes = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] RepetitionResult407[]? repetition_results = null,
     [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ModelSketchVisibilityChange436[]? model_sketch_visibility_changes = null,
-    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] TextFormatChange442[]? text_format_changes = null)
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] TextFormatChange442[]? text_format_changes = null,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ModelBodyNameChange[]? model_body_names = null)
 {
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public DynamicBlockPropertyChange[]? dynamic_block_changes { get; init; }
@@ -277,6 +278,7 @@ public static partial class ModifyValidation
                 case "revolve_drawing_profile": edits.Add(ParseDrawingProfile(item, path, ids, kind)); break;
                 case "create_model_variable": edits.Add(ParseUserVariable(item, path, ids)); break;
                 case "name_model_parameter": edits.Add(ParseParameterName(item, path, ids)); break;
+                case "name_model_body": edits.Add(ParseModelBodyName(item, path, ids)); break;
                 case "trim_curve":
                 case "extend_curve":
                 case "offset_curve":
@@ -474,6 +476,7 @@ public static partial class ModifyValidation
         ModelProfileRegionsValidation350.Batch(edits);
         ModelProfileElementsValidation358.Batch(edits);
         ModelExtrusionExtentsValidation351.Batch(edits);
+        CheckModelBodyNames(edits);
         var result = new ModifyArguments(bridge, document, revisionNumber.ToString(CultureInfo.InvariantCulture), operation, units, edits.ToArray()) { TargetSpace = WriteSpace.Parse(value) };
         WriteSpace.Check(result); return result;
     }

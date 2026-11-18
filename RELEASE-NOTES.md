@@ -2,6 +2,22 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 457
+
+- Give individual solids recognizable names in the native model tree. Find the bushing and its matching pin again after reopening the DWG, even when two bodies share a name. Confirm the selected body by its handle and geometry before editing.
+- A two-sheet DWG retained the native names “Guide bushing” and “Locating pin” on reopening. The pin's sheet shows its 12 mm diameter in the end view and its 20 mm length in the side view.
+- Follow a cylindrical or planar face to the feature that created it when nanoCAD identifies the source. Inspect its driving variables, upstream features and downstream consumers. A focused history read can identify a failed sketch support and the features that depend on it.
+- Ask for the edges of a particular model face. The end of a guide bushing returned its two concentric rings at radii 12.5 and 20 mm, with distinct native edge IDs for feature selection.
+- Check the physical material inside a part using a planar section and a line segment. On a counterbored through-hole this distinguishes the open passage, annular shoulder and outer wall.
+- Check proposed paper-space view positions against measured view and annotation extents. A stepped bushing's axial section retained the shoulder and overall-length dimension anchors when the shoulder changed from 8 to 10 mm.
+- Find the dimensions attached to a selected element of a specific view. The bushing end view returned both diameters anchored to its chosen circle and distinguished an identical circle in another view.
+- A pocket-depth change from 3 to 5 mm updated the section dimension and left a measured 5 mm wall in a 10 mm plate. Changing the hole spacing from 50 to 60 mm updated the projected edge-to-edge distance from 44 to 54 mm. The independent center-spacing annotation needed an explicit edit.
+- A single change to the guide bushing's length from 40 to 44 mm kept the Ø24 passage open end to end. The existing section on the same sheet measured 44 mm overall and 10 mm at the shoulder. An existing Simple Fixed through hole with only 4 mm of open bore could also be repaired in place.
+- Place a native concentric blind hole on the chosen cylindrical boss. A Ø6 hole, 5 mm deep, stayed on the second of two Ø16 bosses after reopening and after their spacing increased from 34 to 46 mm. The first boss remained solid.
+- Enlarging the opening in an associative hatch from Ø8 to Ø12 updated the inner boundary and its retained diameter dimension. With effective DIMTMOVE=2, moving the label by 7 mm preserved the Ø12 measurement, both chord points and the native link to the circle. The eight line and arc segments of the hatch's outer boundary stayed in place.
+- Inspect measured gaps and joins in a selection of drawing curves. Compare points in a loaded scan with a solid section and see which portions of its boundary have measurements. Empty portions carry no deviation value.
+- Read the drawing coordinates of a raster's pixel origin and the two steps corresponding to one pixel in each direction. Use them to locate a detail in the drawing or check the saved image clip.
+
 ## Build 456
 
 - Place first-angle or third-angle projected views, select child view alignment and inspect section ownership on the chosen sheet. Projected dimensions account for view scale. A diameter on a 1:2 view followed a model edit from 20 to 24 mm. An angular dimension can use two converging visible line segments.

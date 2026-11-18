@@ -18,11 +18,11 @@ internal static class ModelVariablesReader
         if (id.IsErased || id.IsEffectivelyErased) throw new DomainException("OBJECT_ERASED", "The variable source body was erased.");
         if (transaction.GetObject(id, OpenMode.ForRead) is not Entity entity || entity.OwnerId != modelId)
             throw new DomainException("OUT_OF_SCOPE", "Variable source must be a top-level Model Space body.");
-        return ReadMultiCad(state, bits, new EntityRef(instance, state.Id, args.Handles[0]), cancellationToken, cancel);
+        return ReadMultiCad(state, bits, new EntityRef(instance, state.Id, args.Handles[0]), cancellationToken, cancel, args.VariableFeatureId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static object ReadMultiCad(DocumentState state, long handle, EntityRef source, CancellationToken cancellationToken, Action? cancel)
+    private static object ReadMultiCad(DocumentState state, long handle, EntityRef source, CancellationToken cancellationToken, Action? cancel, string? featureId)
     {
         void Budget()
         {
@@ -44,6 +44,36 @@ internal static class ModelVariablesReader
         if (manager == null) throw new DomainException("CAPABILITY_UNAVAILABLE", "The MCS variables manager is unavailable.");
         var ids = manager.GetAllVariables(); Budget();
         if (ids == null) throw new DomainException("VARIABLES_UNAVAILABLE", "The SDK did not return a variable inventory; no empty-inventory claim is made.");
+        HashSet<Multicad.McObjectId>? relevant = null;
+        var unknownConsumers = new List<string>();
+        if (featureId != null)
+        {
+            var members = ModelInventoryBudget.History(body, Budget);
+            if (!members.Any(member => string.Equals(member.ToString(), featureId, StringComparison.OrdinalIgnoreCase)))
+                throw new DomainException("OBJECT_NOT_FOUND", "The selected feature is absent from the current part.");
+            relevant = new();
+            var upstream = new Dictionary<Multicad.McObjectId, List<Multicad.McObjectId>>();
+            foreach (var variable in ids)
+            {
+                Budget();
+                var owner = manager.GetVariableHostObjectId(variable);
+                if (!owner.IsNull && string.Equals(owner.ToString(), featureId, StringComparison.OrdinalIgnoreCase)) relevant.Add(variable);
+                var children = manager.GetDependentOnVariables(variable);
+                if (children == null) { unknownConsumers.Add(variable.ToString()); continue; }
+                foreach (var child in children)
+                {
+                    if (!upstream.TryGetValue(child, out var parents)) upstream[child] = parents = new();
+                    parents.Add(variable);
+                }
+            }
+            var pending = new Queue<Multicad.McObjectId>(relevant);
+            while (pending.TryDequeue(out var child))
+            {
+                Budget();
+                if (upstream.TryGetValue(child, out var parents))
+                    foreach (var parent in parents) if (relevant.Add(parent)) pending.Enqueue(parent);
+            }
+        }
         string? Id(Multicad.McObjectId id) => id.IsNull ? null : id.ToString();
         string[]? References(List<Multicad.McObjectId>? values)
         {
@@ -58,6 +88,7 @@ internal static class ModelVariablesReader
         foreach (var id in ids)
         {
             Budget();
+            if (relevant != null && !relevant.Contains(id)) continue;
             var info = manager.GetVariableInfo(id);
             if (info == null) throw new DomainException("VARIABLES_UNAVAILABLE", "Variable metadata is unavailable.");
             bool available = manager.GetVariableValue(id, out double value);
@@ -152,6 +183,8 @@ internal static class ModelVariablesReader
             value_scope = "native_value_without_requested_recalculation_not_solver_validation",
             mc_document_id = document.ID.ToString(),
             source_ref = source,
+            focused_feature_id = featureId,
+            unavailable_consumer_inventories = unknownConsumers,
             variables,
             parameter_binding_notes = bindingNotes
         };

@@ -1,5 +1,6 @@
 using NanoCAD.Contracts;
 using NanoCAD.Ipc;
+using System.Text.Json;
 using Teigha.DatabaseServices;
 
 namespace NanoCADBridge;
@@ -8,13 +9,14 @@ internal static class CadLayoutWriter
 {
     internal sealed record Existing(ObjectId Id, string Name, ObjectId Block, string BlockName, LayoutProperties Properties);
     internal sealed record Resolved(ObjectId Dictionary, ObjectId BlockTable, Existing Source, Existing[] Existing,
-        EntityRef Context, string Name, string BlockName, int TabOrder);
-    internal sealed record Prepared(Layout Layout, BlockTableRecord Block, LayoutProperties Expected);
+        EntityRef Context, string Name, string BlockName, int TabOrder, CadLayoutDecoration.Item[] Decorations,
+        JsonElement? SourceDictionary);
+    internal sealed record Prepared(Layout Layout, BlockTableRecord Block, LayoutProperties Expected, CadLayoutDecoration.Prepared[] Decorations);
     private static EntityRef Reference(EntityRef context, ObjectId id) =>
         new(context.bridge_instance_id, context.document_id, Validation.NormalizeHandle(id.Handle.ToString()));
     private static LayoutProperties Read(Layout source, EntityRef context, Transaction tr, Database db, Action check) =>
         LayoutMetadataReader.ReadLayout(source, tr, db, id => Reference(context, id), check, check);
-    private static void RequirePlain(Layout source, Transaction tr, Action check)
+    private static JsonElement? CheckBase(Layout source, Transaction tr, Action check, bool selectedDecoration)
     {
         check();
         if (source.HasFields) throw new DomainException("UNSUPPORTED_LAYOUT", "Base layout contains fields.");
@@ -24,9 +26,33 @@ internal static class CadLayoutWriter
         if (!extension.IsNull)
         {
             check(); var dictionary = tr.GetObject(extension, OpenMode.ForRead);
-            if (dictionary.GetType() != typeof(DBDictionary) || ((DBDictionary)dictionary).Count != 0)
+            if (dictionary.GetType() != typeof(DBDictionary) || !selectedDecoration && ((DBDictionary)dictionary).Count != 0)
                 throw new DomainException("UNSUPPORTED_LAYOUT", "Base layout has nonempty extension dictionary data.");
+            if (selectedDecoration)
+            {
+                var entries = new List<object>();
+                foreach (DBDictionaryEntry entry in (DBDictionary)dictionary)
+                {
+                    check(); var item = tr.GetObject(entry.Value, OpenMode.ForRead);
+                    object? values = null;
+                    if (item is Xrecord record)
+                    {
+                        using var data = record.Data;
+                        if (data != null) values = NativeOwnedMetadata.Buffer(data, check, new ModelInventoryBudget(check).Add);
+                    }
+                    entries.Add(new
+                    {
+                        entry.Key,
+                        id = item.ObjectId.Handle.ToString(),
+                        owner = item.OwnerId.IsNull ? null : item.OwnerId.Handle.ToString(),
+                        type = item.GetType().FullName,
+                        values
+                    });
+                }
+                return Wire.Element(new { handle = extension.Handle.ToString(), entries });
+            }
         }
+        return null;
     }
     public static Resolved Resolve(StructureWriteArguments args, CreateLayoutEdit operation, int index, Database db, Transaction tr, Action check)
     {
@@ -51,7 +77,7 @@ internal static class CadLayoutWriter
         }
         var source = existing.SingleOrDefault(item => Reference(context, item.Id).handle == operation.BaseLayoutHandle);
         if (source is null || source.Properties.is_model) throw new DomainException("LAYOUT_UNAVAILABLE", "Base handle must refer to an existing native paper layout.");
-        RequirePlain((Layout)tr.GetObject(source.Id, OpenMode.ForRead), tr, check);
+        var sourceDictionary = CheckBase((Layout)tr.GetObject(source.Id, OpenMode.ForRead), tr, check, operation.DecorationHandles is { Length: > 0 });
         int order = LayoutCreateValidation.NextTabOrder(existing.Select(item => item.Properties.tab_order), index, args.Operations.Length);
         // Reserve the index-th free internal paper BTR name without renaming any existing record.
         string? blockName = null; int free = 0;
@@ -61,7 +87,8 @@ internal static class CadLayoutWriter
             if (!blocks.Has(name) && free++ == index) { blockName = name; break; }
         }
         if (blockName is null) throw new DomainException("UNSUPPORTED_LAYOUT", "No unused paper block name within the bounded search.");
-        return new(dictionary.ObjectId, blocks.ObjectId, source, existing.ToArray(), context, operation.Name, blockName, order);
+        var decorations = CadLayoutDecoration.Resolve(operation.DecorationHandles, source.Block, db, tr, check);
+        return new(dictionary.ObjectId, blocks.ObjectId, source, existing.ToArray(), context, operation.Name, blockName, order, decorations, sourceDictionary);
     }
     private static void VerifyExisting(Resolved resolved, Transaction tr, Database db, Action check)
     {
@@ -83,6 +110,12 @@ internal static class CadLayoutWriter
         var layout = new Layout(); owned.Add(layout);
         check(); layout.CopyFrom(tr.GetObject(resolved.Source.Id, OpenMode.ForRead));
         if (!layout.ObjectId.IsNull) throw new DomainException("API_EXCEPTION", "Copied layout is not detached; no database write was opened.");
+        if (resolved.SourceDictionary != null)
+        {
+            using var copiedData = layout.XData;
+            if (layout.HasFields || !layout.ExtensionDictionary.IsNull || copiedData != null)
+                throw new DomainException("UNSUPPORTED_LAYOUT", "Detached plot settings copied layout-owned metadata from the base sheet.");
+        }
         check(); layout.LayoutName = resolved.Name;
         check(); layout.TabOrder = resolved.TabOrder;
         check(); layout.TabSelected = false;
@@ -91,7 +124,8 @@ internal static class CadLayoutWriter
         LayoutCreateValidation.RequireNew(expected, LayoutMetadataReader.ReadLayoutDetached(layout, resolved.Context, expected.block_record, check));
         var block = new BlockTableRecord(); owned.Add(block); check(); block.Name = resolved.BlockName;
         if (!block.ObjectId.IsNull || block.Name != resolved.BlockName) throw new DomainException("API_EXCEPTION", "Paper block preview is not detached or changed its name.");
-        VerifyExisting(resolved, tr, db, check); return new(layout, block, expected);
+        VerifyExisting(resolved, tr, db, check);
+        return new(layout, block, expected, CadLayoutDecoration.Prepare(resolved.Decorations, tr, owned, check));
     }
     public static StructureChange Apply(int index, Resolved resolved, Prepared prepared, Transaction tr, Database db, WriteJob job)
     {
@@ -117,15 +151,30 @@ internal static class CadLayoutWriter
             prepared.Layout.BlockTableRecordId != blockId || prepared.Block.ObjectId != blockId || prepared.Block.OwnerId != resolved.BlockTable ||
             !prepared.Block.IsLayout || prepared.Block.LayoutId != layoutId)
             throw new DomainException("API_EXCEPTION", "Native layout insertion has unexpected identity, name or ownership.", false,
-                new { layout_owner_matches = prepared.Layout.OwnerId == resolved.Dictionary, layout_name_matches = prepared.Layout.LayoutName == resolved.Name,
-                    layout_block_matches = prepared.Layout.BlockTableRecordId == blockId, block_identity_matches = prepared.Block.ObjectId == blockId,
-                    block_owner_matches = prepared.Block.OwnerId == resolved.BlockTable, block_is_layout = prepared.Block.IsLayout,
-                    reverse_layout_matches = prepared.Block.LayoutId == layoutId, block_name_matches = prepared.Block.Name == resolved.BlockName });
+                new
+                {
+                    layout_owner_matches = prepared.Layout.OwnerId == resolved.Dictionary,
+                    layout_name_matches = prepared.Layout.LayoutName == resolved.Name,
+                    layout_block_matches = prepared.Layout.BlockTableRecordId == blockId,
+                    block_identity_matches = prepared.Block.ObjectId == blockId,
+                    block_owner_matches = prepared.Block.OwnerId == resolved.BlockTable,
+                    block_is_layout = prepared.Block.IsLayout,
+                    reverse_layout_matches = prepared.Block.LayoutId == layoutId,
+                    block_name_matches = prepared.Block.Name == resolved.BlockName
+                });
         foreach (ObjectId unused in prepared.Block)
         { job.CheckCancellation(); throw new DomainException("API_EXCEPTION", "New layout contains unexpected entities; batch cannot commit."); }
         var expected = prepared.Expected with { block_record = Reference(resolved.Context, blockId) };
         LayoutCreateValidation.RequireNew(expected, Read(prepared.Layout, resolved.Context, tr, db, job.CheckCancellation));
         VerifyExisting(resolved, tr, db, job.CheckCancellation);
-        return new(index, "create_layout", Reference(resolved.Context, layoutId), "layout", resolved.Name, true);
+        var copies = CadLayoutDecoration.Copy(resolved.Decorations, prepared.Decorations, resolved.Source.Block, prepared.Block, resolved.Context, tr, job.CheckCancellation);
+        if (resolved.SourceDictionary is { } before)
+        {
+            var current = CheckBase((Layout)tr.GetObject(resolved.Source.Id, OpenMode.ForRead), tr, job.CheckCancellation, true);
+            if (current == null || !NativeMetadataEquality.Same(before, current.Value))
+                throw new DomainException("UNSUPPORTED_LAYOUT", "Creating the new sheet changed the source layout's dictionary membership or stored records.");
+            CheckBase(prepared.Layout, tr, job.CheckCancellation, false);
+        }
+        return new(index, "create_layout", Reference(resolved.Context, layoutId), "layout", resolved.Name, true, decoration_copies: copies);
     }
 }

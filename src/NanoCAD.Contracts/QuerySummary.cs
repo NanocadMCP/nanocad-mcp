@@ -52,9 +52,10 @@ public sealed class QuerySummary
     private sealed record Page(bool summary_only, long total_count, object by_type, object by_layer,
         object? bounds, long bounds_unavailable_count, long spatial_excluded_unavailable_bounds_count,
         bool complete, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? next_cursor,
-        string aggregation_scope, string space);
+        string aggregation_scope, string space,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? page_solids_excluded_unavailable_name);
 
-    public object Result(string space, string? nextCursor = null, bool continuation = false) => new Page(
+    public object Result(string space, string? nextCursor = null, bool continuation = false, int? unavailableBodyNames = null) => new Page(
         true, _total, _types.Select(count => new { type = count.Key, count = count.Value }).ToArray(),
         _layers.Select(count => new { layer = count.Key, count = count.Value }).ToArray(),
         _bounds is { } bounds ? new
@@ -64,5 +65,5 @@ public sealed class QuerySummary
             coordinate_system = "WCS",
             kind = "combined_candidate_envelope"
         } : null, _unavailable, _spatiallyExcluded, nextCursor == null, nextCursor,
-        nextCursor == null && !continuation ? "entire_query" : "this_page", space);
+        nextCursor == null && !continuation ? "entire_query" : "this_page", space, unavailableBodyNames);
 }

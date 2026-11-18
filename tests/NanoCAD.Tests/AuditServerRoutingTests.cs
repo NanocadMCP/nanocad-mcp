@@ -93,6 +93,15 @@ internal static class AuditServerRoutingTests
                     }
                     if (tool.Name is not ("nanocad.modify_entities" or "nanocad.modify_structure"))
                     {
+                        if (tool.Name is "nanocad.inspect_model_history" or "nanocad.set_model_parameter" or "nanocad.analyze_point_cloud")
+                        {
+                            var operationName = tool.Name["nanocad.".Length..];
+                            if (!JsonNode.DeepEquals(WithoutDescriptions(tool.InputSchema), WithoutDescriptions(published.InputSchema)) ||
+                                !published.InputSchema.GetProperty("description").GetString()!.Contains("topic=schema, operation=" + operationName) ||
+                                !AuditServerContractSupport.Input(operationName).GetRawText().Contains("description"))
+                                throw new Exception("Compact selection help lost validation or its full guidance: " + tool.Name);
+                            continue;
+                        }
                         if (!JsonElement.DeepEquals(tool.InputSchema, published.InputSchema))
                             throw new Exception("Default projection changed an unrelated tool: " + tool.Name);
                         continue;

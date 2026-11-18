@@ -11,7 +11,7 @@ public sealed record ReadPreparationSelection433(string Operation, string? Varia
 // performs extra reads, creates identifiers or changes the original Result.
 public static class ReadPreparation433
 {
-    public static readonly string[] Readers = ["get_document", "inspect_objects", "inspect_model_history", "get_model_variables", "inspect_solid_topology", "inspect_sketch_constraints", "inspect_constraints"];
+    public static readonly string[] Readers = ["get_document", "inspect_objects", "inspect_model_history", "get_model_variables", "inspect_solid_topology", "inspect_sketch_constraints", "inspect_constraints", "get_drawing_views"];
     public static (JsonElement Arguments, ReadPreparationSelection433? Selection) Extract(string reader, JsonElement arguments)
     {
         if (arguments.ValueKind != JsonValueKind.Object || !arguments.TryGetProperty("prepare_for", out var option)) return (arguments, null);
@@ -71,6 +71,18 @@ public static class ReadPreparation433
         if (properties.TryGetProperty("expected_revision", out _)) Binding("/expected_revision", JsonValue.Create(result.context.revision), "/context/revision", "read_context");
         if (properties.TryGetProperty("units", out var units) && units.TryGetProperty("const", out var constant))
             Binding("/units", JsonNode.Parse(constant.GetRawText()), "schema:/properties/units/const", "schema_constant");
+        if (reader == "get_drawing_views")
+        {
+            if (properties.TryGetProperty("target_space", out _) && data.TryGetProperty("space", out var space) &&
+                space.ValueKind == JsonValueKind.String && space.GetString() is "paper" or "model")
+                Binding("/target_space", JsonNode.Parse(space.GetRawText()), "/data/space", "read_observation");
+            var arrayField = ArrayField(selection.Operation);
+            if (arrayField != null && selection.Branch.TryGetProperty("properties", out var itemFields))
+                foreach (var field in itemFields.EnumerateObject())
+                    if (field.Name is "type" or "kind" or "operation" && field.Value.TryGetProperty("const", out var value))
+                        Binding("/" + arrayField + "/0/" + field.Name, JsonNode.Parse(value.GetRawText()),
+                            "schema:/properties/" + arrayField + "/items/properties/" + field.Name + "/const", "schema_constant");
+        }
         output["status"] = "observed";
         output["detail"] = "Observed bindings and current values only, not an executable command or an eligibility/solver guarantee. Choose intended changes, supply remaining required inputs and a fresh operation_id. Do not copy current values as the desired edit. References expire with context; use focused operation help for the complete contract.";
         output["request_bindings"] = bindings;
@@ -98,6 +110,9 @@ public static class ReadPreparation433
                 ["inspect_solid_topology"] = "Set include_native_model_faces=true to read the current planar native model face ID and face_token."
             };
         }
+        if (reader == "get_drawing_views" && selection.Operation == "create_entities" &&
+            selection.Variant?.StartsWith("projected_", StringComparison.Ordinal) == true)
+            output["next_reads"] = new JsonObject { ["get_drawing_views"] = "Select geometry_view_handle on this layout. Continue geometry_start_index from selected_geometry.next_index to inspect more primitives; include_geometry_sources can identify a local model edge when available. Use current original-view indices under the same revision." };
         var facts = new JsonObject
         {
             ["request_distance_unit"] = units.ValueKind == JsonValueKind.Object && units.TryGetProperty("const", out var distance) ? JsonNode.Parse(distance.GetRawText()) : null,
@@ -139,13 +154,14 @@ public static class ReadPreparation433
         string? array = ArrayField(selection.Operation);
         if (array != null)
         {
-            if (selection.Branch.TryGetProperty("oneOf", out var alternatives))
+            if (selection.Branch.TryGetProperty("properties", out _))
+                Add(selection.Branch, "/" + array + "/0", "schema:/properties/" + array + "/items", null);
+            else if (selection.Branch.TryGetProperty("oneOf", out var alternatives))
             {
                 int index = 0;
                 foreach (var branch in alternatives.EnumerateArray())
                 { Add(branch, "/" + array + "/0", "schema:/properties/" + array + "/items/oneOf/" + index, index.ToString()); index++; }
             }
-            else Add(selection.Branch, "/" + array + "/0", "schema:/properties/" + array + "/items", null);
         }
         return fields;
     }

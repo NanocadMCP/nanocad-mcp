@@ -105,6 +105,15 @@ internal static class VisualCaptureTests
             Deny(() => CaptureViewportPixels.Bind(1136, 479, 1136, 500, 1420, 610), "CAPTURE_BOUNDS_UNAVAILABLE");
             return Task.CompletedTask;
         });
+        await test("whole-window viewport crop verifies full physical canvas and rejects additional layout controls", () =>
+        {
+            var scaled = CaptureViewportPixels.Whole(1136, 500, 1136, 500, 1420, 625);
+            if (scaled != new CaptureViewportPixels(1420, 625, 1.25)) throw new Exception("Incorrect viewport DPI mapping.");
+            var physical = CaptureViewportPixels.Whole(1420, 625, 1136, 500, 1420, 625);
+            if (physical != new CaptureViewportPixels(1420, 625, 1)) throw new Exception("Exact physical viewport dimensions changed.");
+            Deny(() => CaptureViewportPixels.Whole(1136, 479, 1136, 500, 1420, 625), "CAPTURE_VIEWPORT_UNAVAILABLE");
+            return Task.CompletedTask;
+        });
         await test("WCS region uses a conservative viewport pixel envelope", () =>
         {
             var crop = CapturePixelRect.Enclose((12.75, 17), (25.5, 5.25), (30, 30.1), (42.75, 18.35), 80, 60);

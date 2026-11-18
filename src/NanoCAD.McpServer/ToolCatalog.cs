@@ -100,7 +100,7 @@ public static class ToolCatalog
         {
             Name = "nanocad.get_model_variables",
             Description = "Read existing MultiCAD MCS (NCAD_ASSOCNETWORK) variables from the owning document of one top-level Mc3dSolid body handle. Returns expressions, stored values and direct downstream variable/3D-object references. Supported internal dimensions and new shell/hole/taper bindings report owner_kind/control_kind and exact observed units; parameter_binding_notes explains unavailable role identification without hiding the readable network. A readable variable alone does not establish an editable typed control. Explicit bridge/document/revision required. Reads the current variable/dependency inventory with cancellation and actual transport-byte limits; there is no fixed variable-count ceiling. No expression evaluation, solver update or document changes are requested. Use each variable's value_unit: identified revolution-angle variables return degrees; other angular units may be unverified. Feature history angles are radians, a different representation. Other variables use native variable units, not a universal length unit. MCS IDs are opaque and scoped to bridge/document/revision. Downstream references identify consumers, not input dependencies. Does not inspect ACAD/dynamic-block networks or prove solver validity.",
-            InputSchema = ModelVariablesSchema.Input(),
+            InputSchema = ModelVariablesSchema.FeatureInput(),
             OutputSchema = OutputSchemas.For(operation),
             Annotations = new() { ReadOnlyHint = true, DestructiveHint = false, IdempotentHint = true, OpenWorldHint = false }
         };

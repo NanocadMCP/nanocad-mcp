@@ -5,6 +5,13 @@ namespace NanoCAD.McpServer;
 
 internal static class ModelVariablesSchema
 {
+    public static JsonElement FeatureInput()
+    {
+        var input = JsonNode.Parse(Input().GetRawText())!.AsObject();
+        input["properties"]!["feature_id"] = ModelDatumPlaneSchema353.Id();
+        input["properties"]!["feature_id"]!["description"] = "Limit the variable network to variables owned by this current feature and their native upstream formula inputs. Returned expressions retain their units and current direct consumers.";
+        return JsonSerializer.SerializeToElement(input);
+    }
     public static JsonElement Input() => JsonSerializer.SerializeToElement(JsonNode.Parse("""
     {"type":"object","additionalProperties":false,
      "required":["bridge_instance_id","document_id","expected_revision","handle"],

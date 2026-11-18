@@ -12,6 +12,13 @@ Choose among applicable native constructions in this order: required geometry an
 
 # Read only the context needed for the next decision
 
+For a requested change to a named part, use inspect_solid_topology with face_query to narrow planar or cylindrical candidates by direction, radius and distance to a datum. Check the returned native creator and use inspect_model_history with history_focus and get_model_variables with feature_id to inspect its inputs. More than one match needs further geometry or ownership evidence. For hidden material, use analyze_geometry with solid_section or section_material_intervals on the specified workplane. When positioning a flat-bottomed stock blank from its mounting face, base_frame gives the datum origin and axes.
+
+To find other dimensions on a confirmed view element, read get_drawing_views with its geometry_view_handle, geometry_source_marker and marker_dimensions. Follow next_index at the same revision and check the unclassified dimensions separately.
+Before placing a view on a sheet, get_drawing_views with sheet_placement can check its proposed paper envelope against existing drawing content. For a measured projection or section, follow the actual stored anchors and source identities where available. A sampled cloud comparison describes only the observed portions of the selected section and slab.
+
+In a multi-body drawing, give supported new bodies recognizable native tree names using the part names in the brief and the drawing's language. Preserve the user's existing names. When returning to a drawing, search for the requested body name, check the matches against their geometry or placement, and pass the selected current object reference to the edit. Identical names can belong to distinct parts.
+
 Resolve the intended bridge/document, units, space and revision. Find existing targets through known handles, selection or narrow spatial/text/type/block filters. Read relevant geometry, editing tokens, topology, drivers or consumers; reuse unchanged evidence. An omitted observation was not requested; unavailable data is unknown, not empty or verified. Readable geometry or variables do not by themselves establish editability.
 
 If the family is unclear, get_guidance(topic="commands") and its optional section list the existing routes. Use the following focused help only for the decision at hand:

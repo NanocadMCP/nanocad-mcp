@@ -151,6 +151,91 @@ internal static class ReadPreparation433Tests
             return Task.CompletedTask;
         });
 
+        await test("drawing preparation binds original view indices, corners and edit tokens to exact read pointers", () =>
+        {
+            var layout = Ref("B0"); var view = Ref("C1");
+            object Line(int i, int[] end) => new
+            {
+                index = i,
+                view_marker = (i + 100).ToString(),
+                status = "read",
+                geometry = new { kind = "line", start = new[] { 0, 0, 0 }, end }
+            };
+            object Arc(int i, double angle) => new
+            {
+                index = i,
+                view_marker = (i + 100).ToString(),
+                status = "read",
+                geometry = new { kind = "circular_arc", start_angle = 0d, end_angle = angle, angle_unit = "radians" }
+            };
+            var data = Result.Ok("views", new
+            {
+                layout_ref = layout,
+                space = "paper",
+                items = new[] { new { @ref = view, name = "Right", model_scale = 2d, status = "Ok", suppressed = false, preview_mode = false, view_token = Token } },
+                selected_geometry = new { view_ref = view, items = new[] { Line(7, [2, 0, 0]), Line(9, [0, 3, 0]), Arc(13, Math.Tau), Arc(15, Math.PI / 2) } }
+            }, Context());
+            JsonObject Prep(string op, string kind)
+            {
+                var selection = Select("get_drawing_views", op, kind);
+                var observed = ReadPreparation433.Build("get_drawing_views", selection, data);
+                CheckSources(observed, data, selection);
+                return observed;
+            }
+            var angular = Prep("create_entities", "projected_angular");
+            Check(angular["candidate_count"]!.GetValue<int>() == 2 &&
+                Binding(angular, "line_indices/0")?["value"]!.GetValue<int>() == 7 &&
+                Binding(angular, "line_indices/1")?["value"]!.GetValue<int>() == 9 &&
+                Binding(angular, "arc_index")?["value"]!.GetValue<int>() == 15 && Binding(angular, "dimline_point") == null,
+                "A projected angular hint used a page offset, a full circle or an invented placement.");
+            var diameter = Prep("create_entities", "projected_diametric");
+            Check(diameter["candidate_count"]!.GetValue<int>() == 1 && Binding(diameter, "arc_index")?["value"]!.GetValue<int>() == 13,
+                "Projected diameter requires the observed full circle index.");
+            var arcs = Prep("create_entities", "projected_arc_length");
+            Check(arcs["candidate_count"]!.GetValue<int>() == 1 && Binding(arcs, "arc_index")?["value"]!.GetValue<int>() == 15, "Arc length accepted a full circle.");
+            Check(Prep("create_entities", "projected_radial")["candidate_count"]!.GetValue<int>() == 2 &&
+                Prep("create_entities", "projected_aligned")["candidate_count"]!.GetValue<int>() == 2, "Projected radius/line observations lost.");
+            var edit = Prep("modify_structure", "set_drawing_view_properties");
+            Check(Binding(edit, "/operations/0/expected_name")?["value"]!.GetValue<string>() == "Right" &&
+                Binding(edit, "/operations/0/layout_handle")?["value"]!.GetValue<string>() == "B0" && Binding(edit, "model_scale") == null, "Current scale was chosen as a new edit.");
+            var sources = Prep("modify_structure", "set_drawing_view_sources");
+            Check(Binding(sources, "/operations/0/targets/0/view_token")?["value"]!.GetValue<string>() == Token && Binding(sources, "source_handles") == null, "Source replacement invented a new selection or lost token.");
+            return Task.CompletedTask;
+        });
+        await test("projected angular preparation retains both measured corners at a three-ray junction", () =>
+        {
+            var layout = Ref("B0"); var view = Ref("C1");
+            object Line(int index, string marker, double[] start, double[] end) => new { index, view_marker = marker, status = "read", geometry = new { kind = "line", start, end } };
+            JsonObject Prepare(object[] lines)
+            {
+                var data = Result.Ok("junction", new
+                {
+                    layout_ref = layout,
+                    space = "paper",
+                    items = new[] { new { @ref = view, status = "Ok" } },
+                    selected_geometry = new { view_ref = view, items = lines }
+                }, Context());
+                var selection = Select("get_drawing_views", "create_entities", "projected_angular");
+                var hints = ReadPreparation433.Build("get_drawing_views", selection, data);
+                CheckSources(hints, data, selection);
+                return hints;
+            }
+            // Actual WCS end points, indices and markers from the 456 ordinary-view observation at (117,114).
+            var one = Line(0, "5", [120, 114, 0], [117, 114, 0]); var two = Line(2, "6", [80, 114, 0], [117, 114, 0]);
+            var three = Line(6, "10", [117, 114, 0], [117, 126, 0]);
+            var hints = Prepare([one, two, three]);
+            var pairs = hints["candidates"]!.AsArray().Select(c => (Binding(c!.AsObject(), "line_indices/0")!["value"]!.GetValue<int>(),
+                Binding(c.AsObject(), "line_indices/1")!["value"]!.GetValue<int>())).ToHashSet();
+            Check(pairs.SetEquals([(0, 6), (2, 6)]), "Both real right angles must remain available and the collinear pair must be excluded.");
+            var offset = Prepare([one, Line(6, "10", [117.00000004, 114, 0], [117, 126, 0])]);
+            Check(offset["candidate_count"]!.GetValue<int>() == 1, "A shared endpoint within the writer's tolerance was lost.");
+            var outside = Prepare([one, Line(6, "10", [117.0000004, 114, 0], [117, 126, 0])]);
+            Check(outside["candidate_count"]!.GetValue<int>() == 0, "A corner outside the native endpoint tolerance was invented.");
+            var four = Prepare([one, two, three, Line(9, "15", [117, 114, 0], [118, 115, 0])]);
+            Check(four["candidate_count"]!.GetValue<int>() == 1 && four["candidates"]![0]!["ray_options"]!.AsArray().Count == 4,
+                "A dense junction must expose its actual ray options without choosing a pair.");
+            return Task.CompletedTask;
+        });
         await test("block433: observed variable and topology facts retain exact source pointers and units", () =>
         {
             const string expression = "  Width + 2 * 3  ";

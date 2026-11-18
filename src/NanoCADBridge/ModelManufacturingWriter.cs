@@ -43,10 +43,11 @@ internal static class ModelManufacturingWriter
         return value;
     }
     sealed record Binding(Mc3dSolid Body, ObjectId Source, string Layer, McObjectId[] Contents, ModelViewFollowers.Snapshot Views,
-        McObjectId Feature, McObjectId Face, McObjectId Edge1, McObjectId Edge2, McObjectId Plane, McObjectId[] Sources, HashSet<ObjectId> Inventory, HashSet<string> ExternalSources, Dictionary<McObjectId, string> RetainedDriverExpressions, ModelDatumPlaneMirror353.Binding? Datum = null, ProfileBinding410[]? ProfileConsumers = null, Dictionary<McObjectId, bool>? Suppression = null, ModelHoleParameter412.NumericEdit? HoleOffsets = null, ThreadDrivers? Thread = null);
+        McObjectId Feature, McObjectId Face, McObjectId Edge1, McObjectId Edge2, McObjectId Plane, McObjectId[] Sources, HashSet<ObjectId> Inventory, HashSet<string> ExternalSources, Dictionary<McObjectId, string> RetainedDriverExpressions, ModelDatumPlaneMirror353.Binding? Datum = null, ProfileBinding410[]? ProfileConsumers = null, Dictionary<McObjectId, bool>? Suppression = null, ModelHoleParameter412.NumericEdit? HoleOffsets = null, ThreadDrivers? Thread = null, ModelConcentricHole.Source? Concentric = null);
     static ObjectId Space(Database db, Transaction tx) => ((BlockTable)tx.GetObject(db.BlockTableId, OpenMode.ForRead))[BlockTableRecord.ModelSpace];
     static HashSet<ObjectId> Inventory(Database db, Transaction tx) => ((BlockTableRecord)tx.GetObject(Space(db, tx), OpenMode.ForRead)).Cast<ObjectId>().ToHashSet();
-    static Binding Resolve(ModelManufacturingEdit edit, ModifyArguments args, DocumentState state, Transaction tx, Action? cancel = null)
+    static Binding Resolve(ModelManufacturingEdit edit, ModifyArguments args, DocumentState state, Transaction tx, Action? cancel = null,
+        bool prepareConcentricSource = true)
     {
         Need(args.Operations.Length == 1, "INVALID_ARGUMENT", "One native history operation per request.");
         var db = state.Document.Database; var active = McDocument.ActiveDocument;
@@ -118,12 +119,18 @@ internal static class ModelManufacturingWriter
             face = McObjectId.FromGsMarker(id, long.Parse(S(chosen, "marker"), System.Globalization.CultureInfo.InvariantCulture));
             Need(edit.Kind.EndsWith("_hole") ? chosen.GetProperty("plane").ValueKind == JsonValueKind.Object : chosen.TryGetProperty("cylinder", out var c) && c.ValueKind == JsonValueKind.Object, "UNSUPPORTED_FACE_TYPE", "Hole requires a planar support; thread requires a cylindrical face.");
         }
+        ModelConcentricHole.Source? concentric = null;
         if (add && d.TryGetProperty("edge_token", out _))
         {
             var edges = ModelEdgeReader.Capture(source, state, args.BridgeId, CancellationToken.None, cancel);
             Need(edges.edge_token == S(d, "edge_token"), "STALE_TOPOLOGY", "Read current native model edges.");
             McObjectId Edge(string key) { var found = edges.edges.SingleOrDefault(e => e.model_edge_id.Equals(S(d, key), StringComparison.OrdinalIgnoreCase)); Need(found != null, "SUBENTITY_NOT_FOUND", "Selected edge is not current."); return McObjectId.FromGsMarker(id, long.Parse(found!.marker, System.Globalization.CultureInfo.InvariantCulture)); }
-            if (edit.Kind.EndsWith("_hole"))
+            if (edit.Kind.EndsWith("_hole") && d.TryGetProperty("concentric_edge_id", out _))
+            {
+                edge1 = Edge("concentric_edge_id");
+                if (prepareConcentricSource) concentric = ModelConcentricHole.Capture(id, face, edge1);
+            }
+            else if (edit.Kind.EndsWith("_hole"))
             {
                 edge1 = Edge("first_edge_id"); edge2 = Edge("second_edge_id"); var onFace = Service.GetLinkedFEVsToObject(face, EntityGeomType.kLine);
                 Need(onFace != null && onFace.Contains(edge1) && onFace.Contains(edge2), "INVALID_ARGUMENT", "Both straight datum edges must belong to the support face.");
@@ -235,13 +242,16 @@ internal static class ModelManufacturingWriter
                     ModelNumericDriverEditor.ValidateChangeScope(owner, driver, driver == holeOffsets.FirstVariable ? holeOffsets.First : holeOffsets.Second, body, contents, views, cancel);
             }
         }
-        return new(body, source, entity.Layer, contents!, views, feature, face, edge1, edge2, plane, sources, Inventory(db, tx), external, retained, datum, profileConsumers.ToArray(), suppression, holeOffsets, threadDrivers);
+        return new(body, source, entity.Layer, contents!, views, feature, face, edge1, edge2, plane, sources, Inventory(db, tx), external, retained, datum, profileConsumers.ToArray(), suppression, holeOffsets, threadDrivers, concentric);
     }
     internal static void Preflight(ModifyArguments a, DocumentState s, Transaction t, Action? cancel = null)
     {
         if (((ModelManufacturingEdit)a.Operations.Single()).Kind.EndsWith("_circular_pattern", StringComparison.Ordinal))
             ModelPatternWriter.Preflight(ModelPatternRequest439.Translate(a), s, t, cancel);
-        else Resolve((ModelManufacturingEdit)a.Operations.Single(), a, s, t, cancel);
+        // Preparing a detached concentric placement on this host can advance
+        // the drawing revision. The bound command verifies the current FEV
+        // keys and prepares its one native placement before opening the write tracker.
+        else Resolve((ModelManufacturingEdit)a.Operations.Single(), a, s, t, cancel, prepareConcentricSource: false);
     }
     static void VerifyRetained410(Binding binding, McObjectId feature, bool add, Action cancel)
     {
@@ -250,14 +260,21 @@ internal static class ModelManufacturingWriter
         foreach (var profile in binding.ProfileConsumers ?? [])
             ModelProfileConsumers410.VerifyRetained(profile.Before, profile.Profile, profile.Owner, cancel, changingConsumer: add ? default : feature, addedConsumer: add ? feature : default);
     }
-    static void Hole(HoleFeature h, JsonElement d, bool updatePlacement, bool deferBlindDepth, ModelHoleParameter412.NumericEdit? offsets = null)
+    static void Hole(HoleFeature h, JsonElement d, bool updatePlacement, bool deferBlindDepth, ModelHoleParameter412.NumericEdit? offsets = null, bool retainThroughExtent = false)
     {
+        if (retainThroughExtent)
+        {
+            using var current = h.GetPlacement();
+            var actual = ModelManufacturingHistory.FixedPlacement(current!);
+            Need(actual.Center != null, "MODEL_STATE_UNAVAILABLE", "The existing through Hole has no readable fixed center.");
+            updatePlacement = !actual.Center!.SequenceEqual(d.GetProperty("center").EnumerateArray().Select(value => value.GetDouble()));
+        }
         if (updatePlacement && offsets != null) ModelHoleParameter412.ApplyNumeric(h, offsets);
         else if (updatePlacement)
         {
             var original = h.GetPlacement(); Need(original != null, "MODEL_STATE_UNAVAILABLE", "Hole placement is unavailable.");
             var fixedPosition = d.TryGetProperty("center", out _);
-            var placement = fixedPosition ? IppDefinition.Create(IppDefinitionType.Fixed) : (IppDefinition)original!.Clone();
+            var placement = fixedPosition && !retainThroughExtent ? IppDefinition.Create(IppDefinitionType.Fixed) : (IppDefinition)original!.Clone();
             if (fixedPosition) placement.TargetPlaneId = original!.TargetPlaneId;
             if (d.TryGetProperty("center", out var center))
             {
@@ -267,14 +284,17 @@ internal static class ModelManufacturingWriter
             else { Need(placement.DefType == IppDefinitionType.TwoEdges, "INVALID_ARGUMENT", "Edge-offset edits require TwoEdges placement."); placement.Param1 = N(d, "offset1"); placement.Param2 = N(d, "offset2"); placement.Sector = d.GetProperty("sector").GetInt32(); }
             Need(h.SetPlacement(placement), "MODEL_UPDATE_FAILED", "Hole placement was rejected.");
         }
-        h.Diameter = N(d, "diameter"); h.IsFullDepth = B(d, "through"); if (!h.IsFullDepth && !deferBlindDepth) h.Depth = N(d, "depth");
+        if (!retainThroughExtent || h.Diameter != N(d, "diameter")) h.Diameter = N(d, "diameter");
+        if (!retainThroughExtent) h.IsFullDepth = B(d, "through");
+        if (!h.IsFullDepth && !deferBlindDepth) h.Depth = N(d, "depth");
         var seat = RequestedSeat(d);
-        h.SeatType = seat;
+        if (!retainThroughExtent || h.SeatType != seat) h.SeatType = seat;
         Need(h.SeatType == seat, "MODEL_UPDATE_FAILED", "Native hole rejected the requested seat type.");
         if (seat != HoleSeatType.Flat) h.SeatDiameter = N(d, "seat_diameter");
         if (seat == HoleSeatType.Counterbore) h.SeatDepth = N(d, "seat_depth");
         if (seat == HoleSeatType.Countersink) h.SeatAngle = R(d, "seat_angle_degrees");
-        h.FlatBottom = B(d, "flat_bottom"); if (!B(d, "through") && !h.FlatBottom) h.BottomAngle = R(d, "bottom_angle_degrees");
+        if (!retainThroughExtent || h.FlatBottom != B(d, "flat_bottom")) h.FlatBottom = B(d, "flat_bottom");
+        if (!B(d, "through") && !h.FlatBottom) h.BottomAngle = R(d, "bottom_angle_degrees");
     }
     private static HoleSeatType RequestedSeat(JsonElement definition) => S(definition, "seat") switch
     {
@@ -297,7 +317,7 @@ internal static class ModelManufacturingWriter
             else if (add || Math.Abs(t.Length - length) > 1e-8) t.Length = length;
         }
     }
-    static void VerifyValues(McObjectId id, ModelManufacturingEdit edit)
+    static void VerifyValues(McObjectId id, ModelManufacturingEdit edit, ModelConcentricHole.Source? concentric)
     {
         var d = edit.Definition; bool Near(double x, double y) => Math.Abs(x - y) <= 1e-8 * Math.Max(1, Math.Max(Math.Abs(x), Math.Abs(y)));
         bool ok;
@@ -315,10 +335,11 @@ internal static class ModelManufacturingWriter
             ok = hole.SeatType == seat && Near(hole.Diameter, N(d, "diameter")) &&
                 hole.IsFullDepth == B(d, "through") && (hole.IsFullDepth || Near(hole.Depth, N(d, "depth"))) &&
                 hole.FlatBottom == B(d, "flat_bottom") && (hole.IsFullDepth || hole.FlatBottom || Near(hole.BottomAngle, R(d, "bottom_angle_degrees"))) &&
-                placement != null && (fixedCenter ? placement.DefType == IppDefinitionType.Fixed &&
+                placement != null && (concentric != null ? placement.DefType == IppDefinitionType.Concentric : fixedCenter ? placement.DefType == IppDefinitionType.Fixed &&
                     ModelManufacturingHistory.FixedPlacement(placement).Center is double[] actual && center.EnumerateArray().Select((v, i) => Near(actual[i], v.GetDouble())).All(m => m) :
                     placement.DefType == IppDefinitionType.TwoEdges && Near(placement.Param1, N(d, "offset1")) && Near(placement.Param2, N(d, "offset2")) &&
                     placement.Sector == d.GetProperty("sector").GetInt32());
+            if (concentric != null && placement != null) ModelConcentricHole.Verify(placement, hole.HostSolidID, concentric);
             if (ok && seat != HoleSeatType.Flat)
                 ok = Near(hole.SeatDiameter, N(d, "seat_diameter")) && (seat == HoleSeatType.Counterbore
                     ? Near(hole.SeatDepth, N(d, "seat_depth")) : Near(hole.SeatAngle, R(d, "seat_angle_degrees")));
@@ -332,14 +353,20 @@ internal static class ModelManufacturingWriter
     {
         if (((ModelManufacturingEdit)args.Operations.Single()).Kind.EndsWith("_circular_pattern", StringComparison.Ordinal))
             return ModelPatternWriter.Execute(ModelPatternRequest439.Translate(args), state, job, context, log);
-        Binding? b = null; McUndoPoint? tracker = null; bool started = false; McObjectId feature = McObjectId.Null; string stage = "preflight"; object? placementDiagnostic = null; var createdDatums = new HashSet<McObjectId>();
+        Binding? b = null; McUndoPoint? tracker = null; bool started = false; McObjectId feature = McObjectId.Null; string stage = "preflight"; var createdDatums = new HashSet<McObjectId>();
         void Close() { var t = tracker; tracker = null; if (t != null) try { t.Stop(); } finally { t.Dispose(); } }
         try
         {
             var e = (ModelManufacturingEdit)args.Operations.Single(); var d = e.Definition; bool add = e.Kind.StartsWith("add_");
             using (var tx = state.Document.Database.TransactionManager.StartTransaction()) b = Resolve(e, args, state, tx, job.CheckCancellation);
+            using var concentricPlacement = b.Concentric == null ? null : ModelConcentricHole.Prepare(b.Body.ID, b.Face, b.Edge1, b.Concentric);
             if (b.Datum != null) ModelDatumPlaneMirror353.PreWrite(b.Datum, args, state, job.CheckCancellation);
-            var setHoleExtent = e.Kind.EndsWith("_hole", StringComparison.Ordinal) &&
+            // A terminal Fixed through Hole already in All mode must be checked on
+            // the actual body. updateDepth() can count just the remaining stock.
+            var existingThroughHole = e.Kind == "set_model_hole" && B(d, "through") && d.TryGetProperty("center", out _) &&
+                b.Feature == b.Views.LastModelItem ? b.Feature.GetObjectOfType<HoleFeature>() : null;
+            var checkPhysicalBore = existingThroughHole is { IsFullDepth: true, IsSuppressed: false, HoleType: HoleFeatureType.Simple };
+            var setHoleExtent = !checkPhysicalBore && e.Kind.EndsWith("_hole", StringComparison.Ordinal) &&
                 (B(d, "through") || (!add && b.Feature.GetObjectOfType<HoleFeature>()!.IsFullDepth))
                 ? NativeModelHistory421.LoadHoleExtent() : null;
             job.CheckCancellation(); ModelViewFollowers.CheckStandalone(b.Body, b.Views, job.CheckCancellation); tracker = new McUndoPoint(false); tracker.Start(); started = true; stage = "native_write";
@@ -374,13 +401,18 @@ internal static class ModelManufacturingWriter
                 HoleFeature h;
                 if (add)
                 {
-                    var fixedPosition = d.TryGetProperty("center", out var center); var placement = IppDefinition.Create(fixedPosition ? IppDefinitionType.Fixed : IppDefinitionType.TwoEdges); placement.TargetPlaneId = b.Face;
-                    if (fixedPosition) Need(placement.SetFixedPosition(new Multicad.Geometry.Point3d(center[0].GetDouble(), center[1].GetDouble(), center[2].GetDouble())).IsSuccess(), "MODEL_UPDATE_FAILED", "Native fixed placement rejected its center.");
-                    else { placement.SetAssocParams(new McGeomParam { ID = b.Edge1 }, new McGeomParam { ID = b.Edge2 }); placement.Param1 = N(d, "offset1"); placement.Param2 = N(d, "offset2"); placement.Sector = d.GetProperty("sector").GetInt32(); }
+                    var fixedPosition = d.TryGetProperty("center", out var center);
+                    var placement = concentricPlacement ?? IppDefinition.Create(fixedPosition ? IppDefinitionType.Fixed : IppDefinitionType.TwoEdges);
+                    if (b.Concentric == null)
+                    {
+                        placement.TargetPlaneId = b.Face;
+                        if (fixedPosition) Need(placement.SetFixedPosition(new Multicad.Geometry.Point3d(center[0].GetDouble(), center[1].GetDouble(), center[2].GetDouble())).IsSuccess(), "MODEL_UPDATE_FAILED", "Native fixed placement rejected its center.");
+                        else { placement.SetAssocParams(new McGeomParam { ID = b.Edge1 }, new McGeomParam { ID = b.Edge2 }); placement.Param1 = N(d, "offset1"); placement.Param2 = N(d, "offset2"); placement.Sector = d.GetProperty("sector").GetInt32(); }
+                    }
                     h = b.Body.AddHoleFeature(HoleFeatureType.Simple, placement); Need(h != null, "MODEL_UPDATE_FAILED", "Native hole creation failed."); feature = h!.ID;
                 }
                 else h = feature.GetObjectOfType<HoleFeature>()!;
-                Hole(h, d, !add, setHoleExtent != null, b.HoleOffsets);
+                Hole(h, d, !add, setHoleExtent != null, b.HoleOffsets, checkPhysicalBore);
             }
             else if (e.Kind.EndsWith("_thread"))
             {
@@ -416,13 +448,18 @@ internal static class ModelManufacturingWriter
                 if (!through) feature.GetObjectOfType<HoleFeature>()!.Depth = N(d, "depth");
             }
             item.DbEntity.Update(); stage = "rebuild"; McObjectManager.UpdateAll(); if (!add) { Need(b.Body.RebuildPart(), "MODEL_UPDATE_FAILED", "Native model rebuild failed."); McObjectManager.UpdateAll(); }
+            if (checkPhysicalBore)
+            {
+                stage = "verify_through_passage";
+                ModelThroughHole.EnsureClear(b.Body, existingThroughHole!, state, job.CheckCancellation);
+            }
             job.CheckCancellation(); stage = "verify";
             var contents = ModelInventoryBudget.History(b.Body, job.CheckCancellation); Need(b.Contents.Where(x => !b.ExternalSources.Contains(x.ToString())).All(contents.Contains) && contents.Contains(feature), "MODEL_STATE_UNAVAILABLE", "Existing history was lost.");
             var currentPaths = NativePathSources.Read(contents!, job.CheckCancellation);
             currentPaths.UnionWith(createdDatums.Select(x => x.ToString()));
             using (var verification = state.Document.Database.TransactionManager.StartTransaction())
                 ProjectedHistorySources.Healthy(contents!.ToArray(), ProjectedHistorySources.Read(b.Body, contents.ToArray(), state, verification, job.CheckCancellation));
-            VerifyValues(feature, e);
+            VerifyValues(feature, e, b.Concentric);
             if (b.Thread is { } previous)
             {
                 var thread = feature.GetObjectOfType<ThreadFeature>()!;
@@ -495,7 +532,7 @@ internal static class ModelManufacturingWriter
             Exception? cleanup = null; try { Close(); } catch (Exception err) { cleanup = err; }
             bool unknown = started || cleanup != null; string cause = ex is DomainException d ? d.Error.code : ex is OperationCanceledException ? "CANCELLED" : "MODEL_MANUFACTURING_FAILED";
             log.Write(job.Operation, job.OriginalRequestId, "manufacturing_failure", transaction: stage, operationId: job.OperationId);
-            return job.Error(unknown ? "WRITE_OUTCOME_UNKNOWN" : cause, unknown ? "Native feature outcome is unverified. Inspect body/history before dependent work." : ex.Message, unknown ? "unknown" : "not_started", context, new { cause, stage, message = ex.Message, body_mc_id = b?.Body.ID.ToString(), feature_id = feature.ToString(), placement = placementDiagnostic, cleanup = cleanup?.Message }) with { warnings = [WriteRecovery.Warning] };
+            return job.Error(unknown ? "WRITE_OUTCOME_UNKNOWN" : cause, unknown ? "Native feature outcome is unverified. Inspect body/history before dependent work." : ex.Message, unknown ? "unknown" : "not_started", context, new { cause, stage, message = ex.Message, body_mc_id = b?.Body.ID.ToString(), feature_id = feature.ToString(), placement = (ex as DomainException)?.Error.details, cleanup = cleanup?.Message }) with { warnings = [WriteRecovery.Warning] };
         }
     }
 }

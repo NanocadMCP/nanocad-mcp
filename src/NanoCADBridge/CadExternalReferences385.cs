@@ -147,7 +147,18 @@ internal static class CadExternalReferences385
         Need(Live(def), "Reference definition is unavailable.", "OBJECT_READ_FAILED"); var item = tr.GetObject(def, OpenMode.ForRead);
         string? token = null; string? reason = null;
         try { RequireDefinition(def, kind, db, tr); RequireRoot(entity, db, tr); CadBlockSpace.RequireSpace(db, tr, entity.OwnerId); token = Token(Root(entity, tr, cancel)); } catch (DomainException e) { reason = e.Error.message; }
-        var result = new { reference_kind = kind, native_type = entity.GetType().Name, owner_ref = Ref(entity.OwnerId, context), definition_ref = Ref(def, context), placement = Pose(entity), definition = ReadDefinition(item, kind, context, db, tr, cancel), reference_token = token, editing_unavailable_reason = reason };
+        var result = new
+        {
+            reference_kind = kind,
+            native_type = entity.GetType().Name,
+            owner_ref = Ref(entity.OwnerId, context),
+            definition_ref = Ref(def, context),
+            placement = Pose(entity),
+            definition = ReadDefinition(item, kind, context, db, tr, cancel),
+            reference_token = token,
+            editing_unavailable_reason = reason,
+            raster_pixel_frame = entity is RasterImage raster ? CadRasterCalibration.Observe(raster) : null
+        };
         Element(result, cancel); return result;
     }
     static string StoredSource(DBObject definition) => definition switch

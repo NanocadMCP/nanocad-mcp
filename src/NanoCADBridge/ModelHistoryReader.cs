@@ -88,6 +88,7 @@ internal static class ModelHistoryReader
             Budget();
             if (contents == null) throw new DomainException("HISTORY_UNAVAILABLE", "MultiCAD did not return the part contents; no empty-history claim is made.");
             var nodes = new List<object>();
+            var focus = args.HistoryFocus == null ? null : new ModelHistoryFocus(contents, id.ToString(), args.HistoryFocus, Budget);
             var visibilitySketches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool complete = true;
             var nativeSources = NativePathSources.Inspect(contents, Budget);
@@ -99,6 +100,7 @@ internal static class ModelHistoryReader
             foreach (var nodeId in contents)
             {
                 Budget();
+                if (focus != null && !focus.Include(nodeId.ToString()) && !requestedSketches.Contains(nodeId.ToString())) continue;
                 var node = nodeId.GetObjectOfType<Multicad.Mc3D.HistoryItem>();
                 if (node == null)
                 {
@@ -256,16 +258,24 @@ internal static class ModelHistoryReader
                 });
                 byteBudget.Add(nodes[^1]);
             }
-            items.Add(new
+            var body = new
             {
                 @ref = new EntityRef(instance, state.Id, handle),
                 mc_id = id.ToString(),
                 mc_document_id = document.ID.ToString(),
+                body_name = CadModelBodyNames.ReadTreeName(solid),
                 last_item_id = Id(solid.LastPartItemID),
                 complete,
                 nodes,
-                edit_routes = ModelEditRoutes.Describe(nodes, id.ToString(), complete, visibilitySketches)
-            });
+                edit_routes = ModelEditRoutes.Describe(nodes, id.ToString(), complete && focus == null, visibilitySketches)
+            };
+            if (focus == null) items.Add(body);
+            else
+            {
+                var detail = System.Text.Json.JsonSerializer.SerializeToNode(body, Wire.Json)!.AsObject();
+                detail["dependency_trace"] = System.Text.Json.JsonSerializer.SerializeToNode(focus.Describe(args.HistoryFocus!, handle, nodes), Wire.Json);
+                items.Add(detail);
+            }
         }
         Budget();
         if (!requestedSketches.SetEquals(foundSketches))
@@ -291,12 +301,14 @@ internal static class ModelHistoryReader
             ? ModelFeatureDeletionReader378.Read(args, state, transaction, Budget) : null;
         var datumRevisions = includeProfileEditing && args.ModelDatumPlaneRevisionIds?.Length > 0
             ? ModelDatumPlaneRevisionReader354.Read(args.Handles!.Single(), args.ModelDatumPlaneRevisionIds, args, state, transaction, Budget) : null;
+        string graphScope = args.HistoryFocus == null ? "part_contents_and_direct_dependencies_no_recursive_closure_or_order_claim" :
+            "selected_part_upstream_dependencies_and_direct_consumers_with_external_references_as_leaves";
         if (discovery == null && sketches == null && elements == null && regions == null && extents == null && datums == null && datumRevisions == null && deletions == null && parameterEdits == null)
         {
             object plain = new
             {
                 identity_scope = "bridge_document_revision_no_persistent_face_identity",
-                graph_scope = "part_contents_and_direct_dependencies_no_recursive_closure_or_order_claim",
+                graph_scope = graphScope,
                 items
             };
             return includeProfileEditing ? new ModelSketchConstraintObservation353.HistoryOutcome(plain, historyNotices.ToArray()) : plain;
@@ -304,7 +316,7 @@ internal static class ModelHistoryReader
         object rich = new
         {
             identity_scope = "bridge_document_revision_no_persistent_face_identity",
-            graph_scope = "part_contents_and_direct_dependencies_no_recursive_closure_or_order_claim",
+            graph_scope = graphScope,
             items,
             document_sketch_inventory = sketches?.Inventory,
             document_sketches = sketches?.Sketches ?? [],

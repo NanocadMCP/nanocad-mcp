@@ -38,7 +38,7 @@ internal static class CadProjectedDimensionAssociationReader
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    internal static object? ReadLoaded(Db.Dimension source, EntitySummary summary, Action cancel)
+    internal static object? ReadLoaded(Db.Dimension source, EntitySummary summary, Action cancel, bool includeDesignSource = true)
     {
         bool recognized = false;
         bool storedAvailable = false;
@@ -210,16 +210,27 @@ internal static class CadProjectedDimensionAssociationReader
                 var sources = view.GetTop3dEntitiesInView();
                 Need(sources != null, "The referenced view's source inventory is unavailable.");
                 var sourceRefs = new List<EntityRef>(); var nativeSources = new HashSet<McObjectId>();
+                var sourceParts = new List<object>();
                 foreach (var body in sources!)
                 {
                     cancel(); Need(!body.IsNull && nativeSources.Add(body), "The view has an empty or repeated native source identity.");
                     var physical = Physical(body, model);
                     Need(physical.GetType() == typeof(Db.Solid3d), "A referenced view source is not a current top-level local Model solid.");
                     var reference = Ref(physical.ObjectId); budget.Add(reference); sourceRefs.Add(reference);
+                    if (!includeDesignSource) continue;
+                    var nativeBody = body.GetObjectOfType<Mc3dSolid>();
+                    sourceParts.Add(new
+                    {
+                        @ref = reference,
+                        mc_id = body.ToString(),
+                        body_name = nativeBody?.ID == body ? CadModelBodyNames.ReadTreeName(nativeBody) : null,
+                        dwg_material_handle = physical.MaterialId.IsNull ? null : physical.MaterialId.Handle.ToString()
+                    });
                 }
                 Need(sourceRefs.Count != 0, "The referenced view has no current local solid source.");
                 double scale = view.DbEntity.Scale, drawingScale = view.DbEntity.DScale;
                 Need(double.IsFinite(scale) && double.IsFinite(drawingScale), "The referenced view has unavailable scale metadata.");
+                double? observedDiameter = null;
                 if (sourceCounts.Count == 1)
                 {
                     // Only a fully identified local view supplies a scale/frame.
@@ -231,6 +242,8 @@ internal static class CadProjectedDimensionAssociationReader
                         double? expected = scale == 1 && drawingScale > 0 && sheet is { } s
                             ? (angular ? s : s * drawingScale) : null;
                         if (expected.HasValue && !double.IsFinite(expected.Value)) expected = null;
+                        if (source is Db.DiametricDimension && sourceMarkers[pair.Key].Count == 1)
+                            observedDiameter = expected;
                         double nominal = dimension.Value, factor = dimension.DimensionScale;
                         measurement = new
                         {
@@ -240,6 +253,9 @@ internal static class CadProjectedDimensionAssociationReader
                             view_scale_denominator = drawingScale,
                             native_measurement_factor = double.IsFinite(factor) ? (double?)factor : null,
                             native_nominal_length = !angular && double.IsFinite(nominal) && nominal != McDimension.UnknownValue ? (double?)nominal : null,
+                            dwg_text = source.DimensionText,
+                            native_text = dimension.Text,
+                            native_value_is_valid = dimension.Real,
                             unavailable_reason = reason,
                             text_mode = DimensionTextContent.DisplayMode(source.DimensionText, source.HasFields)
                         };
@@ -256,7 +272,9 @@ internal static class CadProjectedDimensionAssociationReader
                     native_anchor_count = pair.Value,
                     source_refs = sourceRefs.ToArray(),
                     source_mc_ids = nativeSources.Select(id => id.ToString()).ToArray(),
-                    marker_sources = DrawingViewsReader.ReadStoredMarkerSources(view, nativeSources, sourceRefs.ToArray(), sourceMarkers[pair.Key], cancel),
+                    source_parts = sourceParts,
+                    marker_sources = includeDesignSource ? DrawingViewsReader.ReadStoredMarkerSources(view, nativeSources, sourceRefs.ToArray(),
+                        sourceMarkers[pair.Key], observedDiameter, cancel) : [],
                     view_status = view.Status.ToString(),
                     is_suppressed = view.IsSuppressed,
                     auto_update_enabled = view.EnableAutoUpdate,

@@ -10,7 +10,7 @@ internal static class CadModifier
 {
     internal sealed record PropertyIds(ObjectId Layer, ObjectId Linetype);
     internal sealed record Resolved(ObjectId Model, Dictionary<string, ObjectId> Sources, Dictionary<int, PropertyIds> Properties,
-        Dictionary<string, CadBlockMover.Resolved> Blocks, HashSet<string> DocumentedSolids, HashSet<string> PointClouds)
+        Dictionary<string, CadBlockMover.Resolved> Blocks, HashSet<string> DocumentedSolids, HashSet<string> PointClouds, Dictionary<string, ObjectId> AssociatedDiameterLabels)
     {
         internal CadLegacyPolyline408.Plan? LegacyPolyline { get; init; }
         internal CadSolidReplacement409.Plan? SolidReplacement { get; init; }
@@ -28,6 +28,7 @@ internal static class CadModifier
         var solids = new HashSet<string>(StringComparer.Ordinal);
         var documentedSolids = new HashSet<string>(StringComparer.Ordinal);
         var pointClouds = new HashSet<string>(StringComparer.Ordinal);
+        var associatedLabels = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
         var legacyStates = new Dictionary<string, CadLegacyPolyline408.State>(StringComparer.Ordinal);
         foreach (var handle in args.Operations.SelectMany(EditReferences.All).Distinct(StringComparer.Ordinal))
         {
@@ -180,7 +181,9 @@ internal static class CadModifier
             if (polylineFrame != null) { CadPolylineWorkplane431.Check(entity, polylineFrame, cancel); CadIndependentCurve.Require(entity, db, tr, cancel); }
             if (curveFrame != null) CadIndependentCurve.Require(entity, db, tr, cancel);
             if (curveFrame == null && args.Operations.Any(op => op is CurveGeometrySpec && op.Handles.Contains(handle)) && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle)))
-                CadDimensionAssociation385.PreflightFollowers(entity, db, tr, cancel);
+                CadDimensionAssociation385.PreflightFollowers(entity, db, tr, cancel,
+                    entity.GetType() == typeof(Circle) && args.Operations.OfType<CurveGeometrySpec>().Any(op =>
+                        op.Handles.Contains(handle) && op.ExpectedGeometry != op.Geometry));
             if (args.Operations.Any(op => op is CurveGeometrySpec && op.Handles.Contains(handle)) && entity.GetType() != typeof(Line) && entity.GetType() != typeof(Circle) && entity.GetType() != typeof(Arc) && entity.GetType() != typeof(Ellipse) && entity.GetType() != typeof(Spline))
                 throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Geometry replacement requires an exact native Line, Circle, Arc, Ellipse or Spline.");
             if (args.Operations.Any(op => op.Handles.Contains(handle) && (CadPolylineTopologyEditor.Handles(op) || op is CurveGeometrySpec && (entity.GetType() == typeof(Arc) || entity.GetType() == typeof(Ellipse) || entity.GetType() == typeof(Spline)) || op is PolylineVerticesSpec p && PolylineEditFrames431.ChangesSegments(p))))
@@ -273,7 +276,12 @@ internal static class CadModifier
                 {
                     if (args.Operations.Any(op => op is not SetDimensionTextPositionSpec && op.Handles.Contains(handle)))
                         throw new DomainException("INVALID_OPERATION_ORDER", "Explicit label placement cannot share its target with other dimension edits in the same batch.");
-                    CadDimensionTextPositionEditor.CheckSource(entity);
+                    var association = CadDimensionTextPositionEditor.CheckResident((Dimension)entity, db, tr, cancel);
+                    if (!association.IsNull)
+                    {
+                        CadDimensionTextPositionEditor.PreviewPositions((Dimension)entity, sourceOperations.OfType<SetDimensionTextPositionSpec>());
+                        associatedLabels.Add(handle, association);
+                    }
                 }
                 else CadDimensionTextEditor.CheckSource(entity, allowCreatedLength: sourceOperations.All(op => op is ReplaceDimensionTextSpec));
                 if (args.Operations.Any(op => op is SetDimensionLineSpec && op.Handles.Contains(handle))) CadDimensionLineEditor.CheckSource(entity);
@@ -333,7 +341,7 @@ internal static class CadModifier
         }
         if (documentedSolids.Count > 0 && args.Operations.Any(op => op is CopySpec or EraseSpec && op.Handles.Any(documentedSolids.Contains)))
             throw new DomainException("UNSUPPORTED_SOLID_DEPENDENCIES", "A documented-body edit cannot copy or delete sources implicitly. Separate those ownership changes from in-place machining.");
-        var resolved = new Resolved(model, sources, properties, blockSources, documentedSolids, pointClouds);
+        var resolved = new Resolved(model, sources, properties, blockSources, documentedSolids, pointClouds, associatedLabels);
         if (args.Operations.OfType<SolidReplacement409>().SingleOrDefault() is { } replacement)
             resolved = resolved with { SolidReplacement = CadSolidReplacement409.Prepare(replacement, db, tr, sources[replacement.Handles[0]], sources[replacement.SourceHandle], cancel) };
         return legacyStates.Count == 0 ? resolved : resolved with { LegacyPolyline = CadLegacyPolyline408.Prepare(args, resolved, tr, cancel, legacyStates) };
@@ -473,6 +481,8 @@ internal static class CadModifier
             foreach (var source in resolved.Sources)
             {
                 cancel();
+                // A detached Dimension does not carry the source's resident DimAssoc.
+                if (resolved.AssociatedDiameterLabels.ContainsKey(source.Key)) continue;
                 // Placement needs the resident cloud insertion, never a detached clone.
                 if (resolved.PointClouds.Contains(source.Key)) continue;
                 // Resolve planned the resident Vertex2d graph. Detached child
@@ -505,6 +515,7 @@ internal static class CadModifier
                 var operation = args.Operations[i];
                 foreach (var handle in operation.Handles)
                 {
+                    if (resolved.AssociatedDiameterLabels.ContainsKey(handle)) continue;
                     if (resolved.PointClouds.Contains(handle)) continue;
                     if (resolved.LegacyPolyline?.Sources.ContainsKey(handle) == true) continue;
                     cancel();
@@ -856,7 +867,12 @@ internal static class CadModifier
                     else if (operation is WipeoutBoundaryEdit431 maskBoundary) CadWipeout431.SetBoundary((Wipeout)entity, maskBoundary, tr, job.CheckCancellation);
                     else if (operation is PointPositionEdit408 pointPosition) CadPointEditor408.SetPosition(entity, pointPosition, tr, job.CheckCancellation);
                     else if (operation is CurveGeometrySpec curve)
-                    { CadCurveGeometryEditor.Apply(entity, curve, job.CheckCancellation); if (curve.Workplane == null && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle))) { if (CadDimensionAssociation385.RefreshFollowers(entity, entity.Database, tr, job.CheckCancellation)) nativeFormatWarnings?.Add(CadDimensionAssociation385.Warning); } }
+                    {
+                        CadCurveGeometryEditor.Apply(entity, curve, job.CheckCancellation);
+                        if (curve.Workplane == null && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle)) &&
+                            CadDimensionAssociation385.RefreshFollowers(entity, entity.Database, tr, job.CheckCancellation,
+                                notice => nativeFormatWarnings?.Add(notice))) nativeFormatWarnings?.Add(CadDimensionAssociation385.Warning);
+                    }
                     else if (operation is PolylineVerticesSpec vertices) CadPolylineVertexEditor.Apply((Polyline)entity, vertices, job.CheckCancellation);
                     else if (CadPolylineTopologyEditor.Handles(operation)) CadPolylineTopologyEditor.Apply((Polyline)entity, operation, job.CheckCancellation);
                     else if (operation is ToleranceEdit356 tolerance) { toleranceChanges.Add(CadToleranceFrame356.Apply(i, (FeatureControlFrame)entity, tolerance, entity.Database, tr, Ref(handle), job.CheckCancellation)); nativeFormatWarnings?.Add(CadToleranceFrame356.Warning); }
@@ -907,7 +923,12 @@ internal static class CadModifier
                         }
                         else CadTableSizeEditor.Apply((Table)entity, tableSize, job.CheckCancellation, true);
                     }
-                    else if (operation is SetDimensionTextPositionSpec label) CadDimensionTextPositionEditor.Apply(entity, label, job.CheckCancellation, true);
+                    else if (operation is SetDimensionTextPositionSpec label)
+                    {
+                        if (resolved.AssociatedDiameterLabels.TryGetValue(handle, out var association))
+                            CadDimensionTextPositionEditor.MoveAssociated((Dimension)entity, label, association, tr, job.CheckCancellation);
+                        else CadDimensionTextPositionEditor.Apply(entity, label, job.CheckCancellation, true);
+                    }
                     else if (operation is SetDimensionLineSpec dimensionLine) CadDimensionLineEditor.Apply(entity, dimensionLine, job.CheckCancellation, true);
                     else if (operation is ReplaceDimensionTextSpec dimensionText) CadDimensionTextEditor.Apply(entity, dimensionText, job.CheckCancellation, true);
                     else if (operation is ReplaceTextSpec text) CadTextEditor407.Apply(entity, text, entity.Database, job.CheckCancellation);

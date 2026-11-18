@@ -26,6 +26,7 @@ public sealed record ProjectedCornerDimensionSpec(string ViewHandle, int FirstLi
 
 public sealed record ProjectedCornerGeometry(int FirstVertex, int SecondVertex, bool ReverseRays, double Sweep)
 {
+    public const double EndpointTolerance = 1e-7;
     public static ProjectedCornerGeometry Resolve(Point2 a, Point2 b, Point2 c, Point2 d, Point2 placement)
     {
         const string error = "INVALID_GEOMETRY";
@@ -34,7 +35,7 @@ public sealed record ProjectedCornerGeometry(int FirstVertex, int SecondVertex, 
             throw new DomainException(error, "Both projected rays must have nonzero length.");
         var shared = (from i in new[] { 0, 1 }
                       from j in new[] { 0, 1 }
-                      where AngularDimensionGeometry.Length(first[i], second[j]) <= 1e-7
+                      where AngularDimensionGeometry.Length(first[i], second[j]) <= EndpointTolerance
                       select (i, j)).ToArray();
         if (shared.Length != 1) throw new DomainException(error, "Select two projected lines with one shared native endpoint.");
         var (i1, i2) = shared[0]; var vertex = first[i1];

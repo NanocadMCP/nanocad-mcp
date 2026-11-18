@@ -6,17 +6,24 @@ public static class ModelVariablesValidation
 {
     public static Arguments Parse(JsonElement input)
     {
-        if (input.ValueKind != JsonValueKind.Object || input.EnumerateObject().Any(p => p.Name is not ("bridge_instance_id" or "document_id" or "expected_revision" or "handle")))
-            throw new DomainException("INVALID_ARGUMENT", "Model variables accepts bridge_instance_id, document_id, expected_revision and one body handle.");
+        if (input.ValueKind != JsonValueKind.Object || input.EnumerateObject().Any(p => p.Name is not ("bridge_instance_id" or "document_id" or "expected_revision" or "handle" or "feature_id")))
+            throw new DomainException("INVALID_ARGUMENT", "Model variables accepts bridge_instance_id, document_id, expected_revision, one body handle and an optional feature_id.");
         var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var p in input.EnumerateObject())
             if (!values.TryAdd(p.Name, p.Value)) throw new DomainException("INVALID_ARGUMENT", "Duplicate argument: " + p.Name);
         if (!values.Remove("handle", out var handle) || handle.ValueKind != JsonValueKind.String)
             throw new DomainException("INVALID_ARGUMENT", "A Mc3dSolid body handle is required.");
         values.Add("handles", Wire.Element(new[] { handle.GetString() }));
+        string? featureId = null;
+        if (values.Remove("feature_id", out var focus))
+        {
+            if (focus.ValueKind != JsonValueKind.String || !Guid.TryParseExact(focus.GetString(), "B", out var id) || id == Guid.Empty)
+                throw new DomainException("INVALID_ARGUMENT", "feature_id requires a current native feature ID in braces.");
+            featureId = id.ToString("B").ToUpperInvariant();
+        }
         var args = Validation.Parse("inspect_objects", Wire.Element(values));
         if (args.BridgeId == null || args.ExpectedRevision == null)
             throw new DomainException("INVALID_ARGUMENT", "Model variables requires explicit bridge/document/revision.");
-        return args;
+        return args with { VariableFeatureId = featureId };
     }
 }

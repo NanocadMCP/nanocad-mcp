@@ -5,6 +5,15 @@ namespace NanoCAD.McpServer;
 
 internal static class CreateSchema
 {
+    private static void AllowStockBase(JsonObject primitive)
+    {
+        var frame = WorkplaneSchema.Input();
+        frame["description"] = "WCS center of the stock base and its perpendicular local unit X/Y axes. Height increases in X cross Y. Supply this frame or the WCS mass center.";
+        primitive["properties"]!["base_frame"] = frame;
+        primitive["oneOf"] = new JsonArray(new JsonObject { ["required"] = new JsonArray("center") },
+            new JsonObject { ["required"] = new JsonArray("base_frame") });
+    }
+
     private static JsonObject Text(int max) => new() { ["type"] = "string", ["minLength"] = 1, ["maxLength"] = max };
     private static JsonObject Number(double min = -1e9, double max = 1e9) => new() { ["type"] = "number", ["minimum"] = min, ["maximum"] = max };
     private static JsonObject Point() => new() { ["type"] = "array", ["minItems"] = 2, ["maxItems"] = 2, ["items"] = Number(), ["description"] = "Coordinate pair in millimeters. WCSXY/Z0 by default; for Line/Circle/Arc/Ellipse/Spline/Polyline with workplane, coordinates are local to that frame." };
@@ -299,21 +308,25 @@ internal static class CreateSchema
             ("path", new JsonObject { ["oneOf"] = new JsonArray(linePath, arcPath) }, true)));
         foreach (string kind in new[] { "box", "sphere", "cylinder" })
         {
-            var fields = new List<(string, JsonObject, bool)> { ("kind", new JsonObject { ["const"] = kind }, true), ("center", Triple(), true) };
+            var fields = new List<(string, JsonObject, bool)> { ("kind", new JsonObject { ["const"] = kind }, true), ("center", Triple(), kind == "sphere") };
             if (kind == "box") fields.Add(("size", Triple(true), true)); else fields.Add(("radius", Number(1e-3, 1e6), true));
             if (kind == "cylinder") fields.Add(("height", Number(1e-3, 1e6), true));
-            entities.Add(Entity("Solid3d", fields.ToArray()));
+            var primitive = Entity("Solid3d", fields.ToArray());
+            if (kind is "box" or "cylinder") AllowStockBase(primitive);
+            entities.Add(primitive);
         }
         var frustum = Entity("Solid3d", ("kind", new JsonObject { ["const"] = "frustum" }, true),
-            ("center", Triple(), true), ("base_radius", Number(1e-3, 1e6), true), ("top_radius", Number(1e-3, 1e6), true), ("height", Number(1e-3, 1e6), true));
-        frustum["description"] = "Create circular tapered stock or a reducer as one direct native Solid3d in Model Space. base_radius and top_radius are positive circular end radii; height is the native axial length, all in millimeters. center is the WCS native center of volume, as for the other solid primitives, not the base center or half-height midpoint. It retains the native cylinder orientation without an extra rotation; use the existing native transform operations for another pose. Both radii must be positive; a pointed apex is outside this branch. No retained feature graph is created. Read the returned body and review its useful engineering shape.";
+            ("center", Triple(), false), ("base_radius", Number(1e-3, 1e6), true), ("top_radius", Number(1e-3, 1e6), true), ("height", Number(1e-3, 1e6), true));
+        frustum["description"] = "Creates direct circular stock with the given positive base and top radii and axial height in millimeters.";
+        AllowStockBase(frustum);
         entities.Add(frustum);
         var torus = Entity("Solid3d", ("kind", new JsonObject { ["const"] = "torus" }, true),
             ("center", Triple(), true), ("major_radius", Number(1e-3, 1e6), true), ("minor_radius", Number(1e-3, 1e6), true));
         torus["description"] = "Create one direct native ring torus in Model Space. major_radius is the ring radius and minor_radius is the circular tube radius, in millimeters; require 0 < minor_radius < major_radius. center is the WCS native center of volume. The native initial orientation is retained without a workplane or extra rotation; use existing native transforms for another pose. No self-intersecting spindle/horn torus or retained feature graph is requested. Inspect the actual body and useful view for the intended radii, placement and orientation.";
         entities.Add(torus);
-        var wedge = Entity("Solid3d", ("kind", new JsonObject { ["const"] = "wedge" }, true), ("center", Triple(), true), ("size", Triple(true), true));
-        wedge["description"] = "Create one direct native wedge stock in Model Space. size gives its native X/Y/Z lengths in millimeters. center is the WCS native center of volume, not the enclosing box midpoint. The native slope and orientation are retained without an extra rotation; use existing native transforms for another pose. No retained feature graph is created. Inspect the native faces and useful view for the intended taper direction, dimensions and placement.";
+        var wedge = Entity("Solid3d", ("kind", new JsonObject { ["const"] = "wedge" }, true), ("center", Triple(), false), ("size", Triple(true), true));
+        wedge["description"] = "Creates a direct wedge of the requested native X/Y/Z dimensions. The stock frame carries its native slope direction into WCS.";
+        AllowStockBase(wedge);
         entities.Add(wedge);
         var topRadius = new JsonObject
         {
@@ -327,9 +340,10 @@ internal static class CreateSchema
             ["maximum"] = int.MaxValue,
             ["description"] = "Polygon side count. At least three; maximum is the actual native Int32 parameter representation, not a model-size ceiling."
         };
-        var pyramid = Entity("Solid3d", ("kind", new JsonObject { ["const"] = "pyramid" }, true), ("center", Triple(), true),
+        var pyramid = Entity("Solid3d", ("kind", new JsonObject { ["const"] = "pyramid" }, true), ("center", Triple(), false),
             ("base_radius", Number(1e-3, 1e6), true), ("top_radius", topRadius, true), ("height", Number(1e-3, 1e6), true), ("sides", sides, true));
-        pyramid["description"] = "Create one direct native regular pyramid or truncated pyramid stock in Model Space. base_radius and top_radius are the native polygon radii, height is the native axial length, all in millimeters; sides gives the polygon side count. top_radius=0 requests an apex; positive top_radius requests truncation. center is the WCS native center of volume, not the base center or half-height point. The native polygon starting orientation is retained without an extra rotation. Use existing native transforms for another pose; no retained feature graph is created. Inspect the actual end geometry, placement and useful view.";
+        pyramid["description"] = "Creates a regular polygonal pyramid with the specified native polygon radii and axial height. A zero top radius gives a pointed apex.";
+        AllowStockBase(pyramid);
         entities.Add(pyramid);
         var table = Entity("Table", ("position", Point(), true), ("row_height", Number(1e-6), true), ("column_width", Number(1e-6), true), ("table_style", Text(255), true),
             ("cells", new JsonObject { ["type"] = "array", ["minItems"] = 1, ["items"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["items"] = new JsonObject { ["type"] = "string", ["maxLength"] = 4096 } } }, true));

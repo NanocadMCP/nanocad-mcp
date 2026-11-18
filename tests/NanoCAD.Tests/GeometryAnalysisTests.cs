@@ -20,6 +20,61 @@ internal static class GeometryAnalysisTests
             catch (DomainException) { return; }
             throw new Exception("Unsafe analysis arguments accepted.");
         }
+        await test("selected contours retain reversed source handles, nearest gaps, junctions and ambiguous endpoint clusters", () =>
+        {
+            var input = Input(SelectedContours.Mode, "DA", "FA");
+            if (GeometryAnalysisValidation.Parse(Wire.Element(input)).Workplane != DrawingWorkplane.XY) throw new Exception("Default contour plane missing.");
+            input["point"] = new[] { 0, 0, 0 }; Reject(input);
+            SelectedContours.Source Edge(string h, double x, double y, double xx, double yy) => new(h, new(x, y), new(xx, yy), false);
+            var square = new[] { Edge("A", 0, 0, 1, 0), Edge("B", 1, 1, 1, 0), Edge("C", 1, 1, 0, 1), Edge("D", 0, 0, 0, 1) };
+            var result = SelectedContours.Build(square.Reverse(), 1e-7, () => { });
+            var order = result.Components.Single().order!;
+            if (!order.Select(s => s.handle).SequenceEqual(new[] { "A", "B", "C", "D" }) || !order.Select(s => s.reverse).SequenceEqual(new[] { false, true, false, true }))
+                throw new Exception("Unordered sources lost their actual identities or traversal direction.");
+            result = SelectedContours.Build(square.Take(3), 1e-7, () => { });
+            if (result.Components.Single().status != "open" || result.Gaps.Length != 2 || result.Gaps.Any(g => g.distance != 1)) throw new Exception("Missing nearest gap.");
+            result = SelectedContours.Build([.. square.Take(3), Edge("D", 0, .2, 0, 1)], 1e-7, () => { });
+            if (result.Components.Single().status != "open" || result.Gaps.Any(g => Math.Abs(g.distance - .2) > 1e-12) ||
+                result.Gaps.Length != 2) throw new Exception("A 0.2 drawing-unit gap was healed or measured between the wrong endpoints.");
+            result = SelectedContours.Build(square.Append(Edge("E", 1, 0, 2, 0)), 1e-7, () => { });
+            if (result.Components.Single().status != "branched" || result.Components.Single().order != null) throw new Exception("A branch acquired a guessed loop.");
+            result = SelectedContours.Build([Edge("A", 0, 0, 0, 2), Edge("B", .8, 0, 3, 3), Edge("C", 1.6, 0, 4, 4)], 1, () => { });
+            if (result.Components.Single().status != "ambiguous_coincidence") throw new Exception("A transitive coincidence chain was treated as one junction.");
+            return Task.CompletedTask;
+        });
+        await test("smooth junction measurement distinguishes path continuation, a right angle and a cusp", () =>
+        {
+            var edge = new SketchConstraintCurve("first", "line", new(0, 0), new(2, 0));
+            var next = new SketchConstraintCurve("second", "line", new(2, 0), new(5, 0));
+            double Angle(SketchConstraintCurve b, string role) => SplineConstraintGeometry445.ContinuationAngle(edge, "end", b, role);
+            if (Angle(next, "start") != 0 || Math.Abs(Angle(next, "end") - Math.PI) > 1e-12 ||
+                Math.Abs(Angle(next with { End = new(2, 4) }, "start") - Math.PI / 2) > 1e-12) throw new Exception("Continuation angle differs from the oriented endpoint tangents.");
+            var input = Input(); input.Remove("handles"); input.Remove("mode"); input["handle"] = "AB"; input["sketch_id"] = Guid.NewGuid().ToString("B");
+            input["measure_smooth"] = true; input["sketch_scope"] = "document"; var args = SketchConstraintsValidation.Parse(Wire.Element(input));
+            if (!args.MeasureSmooth || !args.DocumentSketchScope) throw new Exception("Selected relation measurements lost their scope.");
+            input["measure_smooth"] = "yes";
+            try { SketchConstraintsValidation.Parse(Wire.Element(input)); } catch (DomainException) { return Task.CompletedTask; }
+            throw new Exception("A non-boolean measurement selector was accepted.");
+        });
+        await test("planar section modes preserve the selected frame, local window and segment direction", () =>
+        {
+            var input = Input(SolidSectionAnalysis.Section);
+            input["workplane"] = new { origin = new[] { 5, 6, 7 }, x_axis = new[] { 0, 1, 0 }, y_axis = new[] { 0, 0, 1 } };
+            var pair = new[] { new[] { -3, 0 }, new[] { 4, 2 } };
+            input["window"] = pair;
+            var parsed = GeometryAnalysisValidation.Parse(Wire.Element(input)).Section!;
+            if (parsed.Window![0] != new Point2(-3, 0) || parsed.Plane.Origin != new Point3(5, 6, 7)) throw new Exception("Wrong local frame.");
+            input["mode"] = SolidSectionAnalysis.Intervals;
+            Reject(input);
+            input.Remove("window");
+            input["segment"] = pair.Reverse().ToArray();
+            if (GeometryAnalysisValidation.Parse(Wire.Element(input)).Section!.Segment![0] != new Point2(4, 2)) throw new Exception("Segment order was lost.");
+            input["segment"] = new[] { pair[0], pair[0] };
+            Reject(input);
+            input["mode"] = SolidSectionAnalysis.Section;
+            Reject(input);
+            return Task.CompletedTask;
+        });
         await test("geometry analysis validates native read modes identity and bounded input", () =>
         {
             var input = Input(); input["point"] = new[] { 1d, 2d, 3d };
