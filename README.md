@@ -27,20 +27,20 @@ Each operation has its own requirements. Read [capabilities and limits](docs/en/
 
 The release includes the MCP server runtime. You do not need Python, a compiler or the nanoCAD SDK to use the packaged application. The integration runs locally; your AI client may send drawing information and images to its provider. Read [data and privacy](docs/en/privacy.md).
 
-## What's new in 459
+## What's new in 460
 
-Fixed a bug that prevented moving or editing an imported solid after it was named. [Release notes](RELEASE-NOTES.md#build-459)
+Updated the assistant's drawing instructions to check each sheet in nanoCAD after placing views and dimensions. [Release notes](RELEASE-NOTES.md#build-460)
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 459](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/459).
+Get the installer or ready-to-run ZIP from [release 460](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/460).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-459.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-459.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-460.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-460.zip` | Manual setup, or installation from an extracted folder |
 
-Checksums are listed in `SHA256SUMS-459.txt` on the release page.
+Checksums are listed in `SHA256SUMS-460.txt` on the release page.
 
 ## Get started
 

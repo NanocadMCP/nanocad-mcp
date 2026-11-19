@@ -2,6 +2,11 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 460
+
+- Revised drawing review instructions to check view placement before dimensioning, inspect annotations at a readable scale, and review every changed DWG sheet before delivery.
+- Updated capture guidance for unavailable or stale images. The assistant is instructed to flag sheets it could not inspect.
+
 ## Build 459
 
 Fixed a regression in 458 that prevented move and edit operations on imported 3D solids with DWG group labels.

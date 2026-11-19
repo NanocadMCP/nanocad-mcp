@@ -234,7 +234,7 @@ Frame relevant content for a design decision or result review. Use top with disp
 
 # capture_view
 
-Visually inspect the actual drawing or part at meaningful checkpoints and after relevant corrections. Inspect the returned image; successful capture alone is not engineering review.
+Inspect the actual DWG image after a design stage and after correcting a visible defect. For a drawing, review view placement on each changed sheet before dimensioning and inspect the resulting annotation groups. Review the final whole sheet before delivery. Use the documentation topic for the drawing checks.
 
 A fresh frame and matching camera metadata do not prove that the model has rendered. After computer sleep/wake, an image may visibly retain an earlier view or omit an already verified change. Recapture once without repeating model or view writes; if it remains stale, report the visual limitation and use the actual document/operation state to choose the next action. Background capture remains available.
 

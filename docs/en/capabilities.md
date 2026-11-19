@@ -18,7 +18,7 @@ A planar section shows the cut profile of a solid. A measurement line through th
 
 On a sheet, you can check whether a proposed view overlaps other views or annotations and find the dimensions attached to a particular projected edge or circle. A dimension attached to two projected hole centers follows their spacing. A dimension placed using paper coordinates needs a separate edit when its defining points move. Associative diameter labels can be repositioned with `DIMTMOVE` set to 2.
 
-Drawing captures can show the open drawing, including unsaved edits, or the last saved DWG. On sheets where capturing the open drawing could change a dimension, save the drawing and use `saved_drawing`. The drawing renderer can display an attached raster upside down. When tracing, use the original image and the attachment's pixel origin and axis vectors to locate points in drawing coordinates.
+The assistant is instructed to inspect each changed DWG sheet after placing views, after adding dimensions and before delivery. Drawing captures can show the open drawing, including unsaved edits, or the last saved DWG. If the drawing renderer cannot capture the current sheet, the full nanoCAD window can show the current edits. Use `saved_drawing` to review a version already saved to disk. The drawing renderer can display an attached raster upside down. When tracing, use the original image and the attachment's pixel origin and axis vectors to locate points in drawing coordinates.
 
 ## Drawings
 
