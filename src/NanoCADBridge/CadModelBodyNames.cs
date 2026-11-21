@@ -9,64 +9,85 @@ namespace NanoCADBridge;
 
 internal sealed class CadModelBodyNames
 {
-    internal sealed record Observation(string? Name, string? Source, string? Native, ModelBodyNameGroup? Group);
-    private Func<Entity, (string? Name, bool? Imported)>? _read;
+    internal sealed record Observation(string? Name, string? Source, string? Part, string? Native, ModelBodyNameGroup? Group, bool AmbiguousGroup);
+    private Func<Entity, (string? Part, string? Item, bool? Alien)>? _read;
 
     internal EntitySummary Observe(Entity entity, EntitySummary summary, Transaction tx, Action cancel)
     {
         if (entity is not Solid3d || summary.space != "model") return summary;
         _read ??= Reader();
-        var (name, imported) = _read(entity);
-        var observation = Inspect(entity, tx, summary.@ref, name, imported, cancel);
+        var (part, item, alien) = _read(entity);
+        var observation = Inspect(entity, tx, summary.@ref, part, item, alien, cancel);
         return summary with
         {
             body_name = observation.Name,
             body_name_source = observation.Source,
+            part_name = observation.Part,
             native_tree_name = observation.Native,
-            body_name_group = observation.Group
+            body_name_group = observation.Group,
+            body_name_group_ambiguous = observation.AmbiguousGroup
         };
     }
 
-    internal static Observation Inspect(Entity entity, Transaction tx, EntityRef reference, string? native, bool? imported, Action cancel)
+    internal static Observation Inspect(Entity entity, Transaction tx, EntityRef reference, string? part, string? native, bool? alien, Action cancel)
     {
-        if (imported != false)
+        string? name = native;
+        string? source = native == null ? null : "native_tree";
+        ModelBodyNameGroup? group = null;
+        bool ambiguous = false;
+        if (alien != false)
         {
             try
             {
                 var found = DwgBodyNameGroup.Find(entity, tx, cancel);
-                if (found.Ambiguous) return new(null, "ambiguous_dwg_group", native, null);
-                if (found.Group != null) return new(found.Group.Description, "dwg_group_description", native, found.Group.Reference(reference));
+                ambiguous = found.Ambiguous;
+                if (ambiguous) (name, source) = (null, "ambiguous_dwg_group");
+                if (found.Group != null)
+                {
+                    group = found.Group.Reference(reference);
+                    (name, source) = (found.Group.Description, "dwg_group_description");
+                }
             }
-            catch (Teigha.Runtime.Exception) { return new(null, null, native, null); }
+            catch (Teigha.Runtime.Exception) { (name, source) = (null, null); }
         }
-        return new(native, native == null ? null : "native_tree", native, null);
+        if (!string.IsNullOrWhiteSpace(part)) (name, source) = (part, "native_part_name");
+        return new(name, source, part, native, group, ambiguous);
     }
 
     // Keep the optional mixed-mode assemblies outside the ordinary query JIT path.
-    private static Func<Entity, (string?, bool?)> Reader()
+    private static Func<Entity, (string?, string?, bool?)> Reader()
     {
         var loaded = AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetName().Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return loaded.Contains("mapimgd") && loaded.Contains("MapiBaseTypes") ? ReadNativeName : static _ => (null, null);
+        return loaded.Contains("mapimgd") && loaded.Contains("MapiBaseTypes") ? ReadNativeName : static _ => (null, null, null);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (string?, bool?) ReadNativeName(Entity entity)
+    private static (string?, string?, bool?) ReadNativeName(Entity entity)
     {
         try
         {
             var document = McDocument.ActiveDocument;
             var body = document == null ? null : Resolve(entity, document);
-            return body == null ? (null, null) : (ReadTreeName(body), IsImported(body));
+            return body == null ? (null, null, null) : (ReadPartName(body), ReadTreeName(body), IsAlienSolid(body));
         }
         catch (Exception error) when (error is not (OperationCanceledException or OutOfMemoryException or AccessViolationException))
         {
             // The basic DWG identity remains observable even if optional MultiCAD
             // metadata is unavailable. Name-filtered results disclose exclusions.
-            return (null, null);
+            return (null, null, null);
         }
     }
 
-    internal static bool IsImported(Mc3dSolid solid) => solid.ID.QueryObjectType() == typeof(Mc3dAlienSolid);
+    internal static bool IsAlienSolid(Mc3dSolid solid) => solid.ID.QueryObjectType() == typeof(Mc3dAlienSolid);
+
+    internal static string? ReadPartName(Mc3dSolid solid)
+    {
+        try { return solid.PartName; }
+        catch (Exception error) when (error is not (OperationCanceledException or OutOfMemoryException or AccessViolationException))
+        {
+            return null;
+        }
+    }
 
     internal static string? ReadTreeName(Mc3dSolid solid)
     {

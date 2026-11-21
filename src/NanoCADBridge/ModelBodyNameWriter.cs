@@ -11,9 +11,9 @@ namespace NanoCADBridge;
 internal static class ModelBodyNameWriter
 {
     private sealed record Target(ModelBodyNameEdit Edit, Db.ObjectId Representation, Mc3dSolid Root,
-        McObjectId RootId, McObjectId OwnerDocument, bool Imported, DwgBodyNameGroup.Label? Group, string PreviousName)
+        McObjectId RootId, McObjectId OwnerDocument, string? PartName, string PreviousName)
     {
-        internal bool Changes => PreviousName != Edit.Name || (Imported && Group == null);
+        internal bool Changes => PartName != Edit.Name;
     }
 
     internal static bool Handles(ModifyArguments args) => args.Operations.Any(edit => edit is ModelBodyNameEdit);
@@ -51,14 +51,15 @@ internal static class ModelBodyNameWriter
                 throw new DomainException("BODY_NAME_UNAVAILABLE", "The selected solid has no addressable local native body owner.");
             if (!roots.Add(body.ID))
                 throw new DomainException("INVALID_ARGUMENT", "Choose each native body only once in a naming group.");
-            bool imported = CadModelBodyNames.IsImported(body);
-            var label = imported ? DwgBodyNameGroup.Find(solid, tx, cancel) : default;
-            if (label.Ambiguous)
-                throw new DomainException("AMBIGUOUS_BODY_NAME_GROUP", "Inspect this body's marked DWG groups and their membership before renaming it.");
-            string previous = label.Group?.Description ?? body.Name ?? "";
+            if (CadModelBodyNames.IsAlienSolid(body))
+                throw new DomainException("BODY_NAME_PERSISTENCE_UNAVAILABLE",
+                    "nanoCAD 26 resets the 3D History caption of this nonparametric solid when the DWG is reopened.",
+                    false, new { handle = edit.Handles.Single() });
+            string? partName = body.PartName;
+            string previous = !string.IsNullOrWhiteSpace(partName) ? partName : body.Name ?? "";
             if (edit.ExpectedName != null && !string.Equals(edit.ExpectedName, previous, StringComparison.Ordinal))
                 throw new DomainException("PRECONDITION_FAILED", "The effective body name changed. Read the current name before renaming.");
-            targets.Add(new(edit, raw, body, body.ID, body.DbEntity.Document.ID, imported, label.Group, previous));
+            targets.Add(new(edit, raw, body, body.ID, body.DbEntity.Document.ID, partName, previous));
         }
         return targets.ToArray();
     }
@@ -67,7 +68,7 @@ internal static class ModelBodyNameWriter
     {
         McUndoPoint? undo = null;
         Db.Transaction? tx = null;
-        bool nativeStarted = false, groupStarted = false, commitAttempted = false;
+        bool nativeStarted = false;
         string? currentHandle = null;
         Result Receipt(List<ModelBodyNameChange> changes, List<EntityRef> modified) =>
             Result.Ok(job.OriginalRequestId, new ModifiedEntities(args.OperationId, "committed", false,
@@ -92,17 +93,12 @@ internal static class ModelBodyNameWriter
             {
                 var reference = new EntityRef(args.BridgeId, args.DocumentId, target.Edit.Handles.Single());
                 if (target.Changes) modified.Add(reference);
-                // A new DWG Group can receive any 64-bit handle. Its generated key can
-                // occupy at most 31 JSON-escaped UTF-16 characters.
-                var group = target.Imported && target.Changes
-                    ? new ModelBodyNameGroup(new string('\uFFFF', 31), reference with { handle = "FFFFFFFFFFFFFFFF" })
-                    : target.Group?.Reference(reference);
-                changes.Add(new(reference, target.PreviousName, target.Edit.Name, target.Imported ? "dwg_group_description" : "native_tree",
-                    target.Imported ? target.Root.Name : target.Edit.Name, group));
+                changes.Add(new(reference, target.PreviousName, target.Edit.Name, "native_part_name",
+                    target.Root.Name, null, target.Edit.Name));
             }
             SerializedCapacity357.Check(Receipt(changes, modified), Wire.PayloadBudget - 16384, job.CheckCancellation);
             changes.Clear();
-            foreach (var target in targets.Where(t => !t.Imported && t.Changes))
+            foreach (var target in targets.Where(t => t.Changes))
             {
                 job.CheckCancellation();
                 currentHandle = target.Edit.Handles.Single();
@@ -111,9 +107,11 @@ internal static class ModelBodyNameWriter
                     undo = new McUndoPoint(false);
                     undo.Start();
                 }
+                if (target.Root.PartName != target.PartName)
+                    throw new DomainException("PRECONDITION_FAILED", "The native part name changed before the edit.");
                 nativeStarted = true;
                 target.Root.TryModify((uint)McDbObject.ObjChangesType.Geom);
-                target.Root.Name = target.Edit.Name;
+                target.Root.PartName = target.Edit.Name;
                 target.Root.DbEntity.Update();
             }
             CloseUndo();
@@ -130,32 +128,18 @@ internal static class ModelBodyNameWriter
                     throw new DomainException("OBJECT_IDENTITY_MISMATCH", "The selected physical body changed during naming.");
                 var current = CadModelBodyNames.Resolve(solid, drawing);
                 if (current == null || current.ID != target.RootId || current.DbEntity.Document.ID != target.OwnerDocument ||
-                    CadModelBodyNames.IsImported(current) != target.Imported)
+                    CadModelBodyNames.IsAlienSolid(current))
                     throw new DomainException("OBJECT_IDENTITY_MISMATCH", "The native owner of the selected physical body changed during naming.");
-                var tree = current.Name;
-                DwgBodyNameGroup.Label? group = null;
-                if (target.Imported)
-                {
-                    var actual = DwgBodyNameGroup.Find(solid, tx, job.CheckCancellation);
-                    if (actual.Ambiguous || actual.Group != target.Group || (actual.Group?.Description ?? tree ?? "") != target.PreviousName)
-                        throw new DomainException("PRECONDITION_FAILED", "The selected body's name or DWG group changed before the edit.");
-                    group = actual.Group;
-                    if (target.Changes)
-                    {
-                        groupStarted = true;
-                        group = DwgBodyNameGroup.Write(solid, group, target.Edit.Name, tx, job.CheckCancellation);
-                    }
-                }
-                if ((group?.Description ?? tree ?? "") != target.Edit.Name)
-                    throw new DomainException("MODEL_UPDATE_FAILED", "The selected body did not retain the requested name.");
-                changes.Add(new(reference, target.PreviousName, target.Edit.Name, group == null ? "native_tree" : "dwg_group_description",
-                    tree, group?.Reference(reference)));
+                var partName = current.PartName;
+                if (!string.Equals(partName, target.Edit.Name, StringComparison.Ordinal))
+                    throw new DomainException("MODEL_UPDATE_FAILED", "The native body did not retain the requested part name.");
+                changes.Add(new(reference, target.PreviousName, target.Edit.Name, "native_part_name",
+                    current.Name, null, partName));
             }
             var result = Receipt(changes, modified);
             SerializedCapacity357.Check(result, Wire.PayloadBudget - 16384, job.CheckCancellation);
             job.CheckCancellation();
             job.BeginCommit();
-            commitAttempted = groupStarted;
             tx.Commit();
             job.RecordCommit(result);
             var completed = tx;
@@ -171,11 +155,11 @@ internal static class ModelBodyNameWriter
             try { CloseUndo(); } catch (Exception caught) { cleanup = caught; }
             try { tx?.Abort(); } catch (Exception caught) { cleanup ??= caught; }
             try { tx?.Dispose(); } catch (Exception caught) { cleanup ??= caught; }
-            bool unknown = nativeStarted || commitAttempted || cleanup != null;
+            bool unknown = nativeStarted || cleanup != null;
             string cause = error is DomainException domain ? domain.Error.code : error is OperationCanceledException ? "CANCELLED" : "MODEL_UPDATE_FAILED";
             return job.Error(unknown ? "WRITE_OUTCOME_UNKNOWN" : cause, unknown
                     ? "Body naming was not fully verified. Read the current names for the selected handles before further edits." : error.Message,
-                unknown ? "unknown" : groupStarted ? "rolled_back" : "not_started", context,
+                unknown ? "unknown" : "not_started", context,
                 new { cause, handle = currentHandle, message = error.Message, cleanup_error = cleanup?.GetType().Name }) with
             { warnings = [WriteRecovery.Warning] };
         }

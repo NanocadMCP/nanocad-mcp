@@ -26,12 +26,14 @@ internal static class OutputSchemas
     private static JsonObject Array(JsonObject schema) => new() { ["type"] = "array", ["items"] = schema };
     private static void AddBodyNameProvenance(JsonNode properties, bool committed = false)
     {
-        var sources = new JsonArray("native_tree", "dwg_group_description");
+        var sources = new JsonArray("native_part_name", "native_tree", "dwg_group_description");
         if (!committed) sources.Add("ambiguous_dwg_group");
         var source = new JsonObject { ["type"] = "string", ["enum"] = sources };
         properties["body_name_source"] = committed ? source : Nullable(source);
+        properties["part_name"] = Nullable(Text());
         properties["native_tree_name"] = Nullable(Text());
         properties["body_name_group"] = Nullable(Ref("body_name_group"));
+        if (!committed) properties["body_name_group_ambiguous"] = Bool();
     }
     private static JsonObject Point(int dimensions = 3) => new() { ["type"] = "array", ["minItems"] = dimensions, ["maxItems"] = dimensions, ["items"] = Number() };
     private static JsonObject Object(params (string Name, JsonObject Schema)[] fields)
@@ -571,12 +573,14 @@ internal static class OutputSchemas
     public static JsonElement For(string operation)
     {
         if (operation == "get_operation_result") return OperationResultSchema432.Output();
+        var nameGroup = Object(("name", Text()), ("ref", Ref("ref")));
+        nameGroup["properties"]!["description"] = Text();
         var definitions = new JsonObject
         {
             ["error"] = Object(("code", Text()), ("message", Text()), ("retryable", Bool()), ("details", Nullable(AnyObject()))),
             ["context"] = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("revision", Text()), ("captured_at_utc", Text())),
             ["ref"] = Object(("bridge_instance_id", Text()), ("document_id", Text()), ("handle", Text())),
-            ["body_name_group"] = Object(("name", Text()), ("ref", Ref("ref"))),
+            ["body_name_group"] = nameGroup,
             ["projected_design_source"] = ProjectedDesignSource(),
             ["projected_feature"] = ProjectedFeature(),
             ["original_marker_topology"] = Object(("original_marker", Text()), ("native_subelement_id", Text()),
@@ -692,6 +696,10 @@ internal static class OutputSchemas
         definitions["summary"]!["properties"]!["body_name"] = Text();
         definitions["entity"]!["properties"]!["body_name"] = Text();
         AddBodyNameProvenance(definitions["summary"]!["properties"]!);
+        definitions["summary"]!["properties"]!["body_name_match_source"] = new JsonObject
+        {
+            ["type"] = "string", ["enum"] = new JsonArray("native_part_name", "native_tree", "dwg_group_description")
+        };
         AddBodyNameProvenance(definitions["entity"]!["properties"]!);
         if (operation == "inspect_objects")
         {

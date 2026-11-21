@@ -261,7 +261,7 @@ internal static class ModelHistoryReader
             var reference = new EntityRef(instance, state.Id, handle);
             var physical = (Entity)transaction.GetObject(CadStructureWriter.Find(state.Document.Database, handle), OpenMode.ForRead);
             var naming = CadModelBodyNames.Inspect(physical, transaction, reference,
-                CadModelBodyNames.ReadTreeName(solid), CadModelBodyNames.IsImported(solid), Budget);
+                CadModelBodyNames.ReadPartName(solid), CadModelBodyNames.ReadTreeName(solid), CadModelBodyNames.IsAlienSolid(solid), Budget);
             var body = new
             {
                 @ref = reference,
@@ -269,8 +269,10 @@ internal static class ModelHistoryReader
                 mc_document_id = document.ID.ToString(),
                 body_name = naming.Name,
                 body_name_source = naming.Source,
+                part_name = naming.Part,
                 native_tree_name = naming.Native,
                 body_name_group = naming.Group,
+                body_name_group_ambiguous = naming.AmbiguousGroup,
                 last_item_id = Id(solid.LastPartItemID),
                 complete,
                 nodes,

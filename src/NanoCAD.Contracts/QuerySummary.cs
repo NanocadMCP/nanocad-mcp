@@ -30,12 +30,13 @@ public sealed class QuerySummary
 {
     private readonly SortedDictionary<string, long> _types = new(StringComparer.Ordinal);
     private readonly SortedDictionary<string, long> _layers = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SortedDictionary<string, long> _nameMatches = new(StringComparer.Ordinal);
     private QueryEnvelope? _bounds;
     private long _total;
     private long _unavailable;
     private long _spatiallyExcluded;
 
-    public void Add(string type, string layer, QueryEnvelope? envelope, QueryBounds407? filter)
+    public void Add(string type, string layer, QueryEnvelope? envelope, QueryBounds407? filter, string? nameMatchSource = null)
     {
         if (filter != null)
         {
@@ -45,6 +46,7 @@ public sealed class QuerySummary
         _total++;
         _types[type] = _types.GetValueOrDefault(type) + 1;
         _layers[layer] = _layers.GetValueOrDefault(layer) + 1;
+        if (nameMatchSource != null) _nameMatches[nameMatchSource] = _nameMatches.GetValueOrDefault(nameMatchSource) + 1;
         if (envelope is { IsFiniteXYZ: true } finite) _bounds = _bounds?.Union(finite) ?? finite;
         else _unavailable++;
     }
@@ -53,7 +55,8 @@ public sealed class QuerySummary
         object? bounds, long bounds_unavailable_count, long spatial_excluded_unavailable_bounds_count,
         bool complete, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? next_cursor,
         string aggregation_scope, string space,
-        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? page_solids_excluded_unavailable_name);
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? page_solids_excluded_unavailable_name,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] object? by_body_name_match_source);
 
     public object Result(string space, string? nextCursor = null, bool continuation = false, int? unavailableBodyNames = null) => new Page(
         true, _total, _types.Select(count => new { type = count.Key, count = count.Value }).ToArray(),
@@ -65,5 +68,6 @@ public sealed class QuerySummary
             coordinate_system = "WCS",
             kind = "combined_candidate_envelope"
         } : null, _unavailable, _spatiallyExcluded, nextCursor == null, nextCursor,
-        nextCursor == null && !continuation ? "entire_query" : "this_page", space, unavailableBodyNames);
+        nextCursor == null && !continuation ? "entire_query" : "this_page", space, unavailableBodyNames,
+        unavailableBodyNames == null ? null : _nameMatches.Select(pair => new { source = pair.Key, count = pair.Value }).ToArray());
 }

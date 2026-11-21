@@ -213,7 +213,7 @@ internal static class ModifySchema
         var bodyName = Operation("name_model_body", ("name", new JsonObject { ["type"] = "string", ["minLength"] = 1, ["pattern"] = @"\S" }));
         bodyName["properties"]!["handles"]!["maxItems"] = 1;
         bodyName["properties"]!["expected_name"] = new JsonObject { ["type"] = "string", ["description"] = "Optional exact effective body name before renaming. Use an empty string for an unnamed solid." };
-        bodyName["description"] = "Name one local Model Space solid by its current body handle. Modeled bodies use the native construction tree. Imported solids can store their name in a native DWG group's Description. Names may repeat and may contain spaces or Unicode. A batch can name distinct bodies. model_body_names reports the retained name and its source.";
+        bodyName["description"] = "Set the top-level 3D History caption of a parametric Model Space body. Select one body handle per name. A direct nonparametric DWG solid causes BODY_NAME_PERSISTENCE_UNAVAILABLE before the group is edited. The result includes part_name and the underlying history item name.";
         operations.Add(bodyName);
         operations.Add(cloudPlacement);
         operations.Add(DimensionFormatSchema.Edit());

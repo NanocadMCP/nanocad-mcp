@@ -17,7 +17,7 @@ internal sealed class CadReader
     private readonly DocumentRegistry _documents;
     private readonly JsonLog _log;
     private readonly HandlePages<EntitySummary> _snapshots = new();
-    private sealed record SummaryItem(string Type, string Layer, QueryEnvelope? Bounds);
+    private sealed record SummaryItem(string Type, string Layer, QueryEnvelope? Bounds, string? NameMatchSource);
     private readonly HandlePages<SummaryItem> _summaryPages = new();
     private readonly StructureReader _structure;
     private readonly int _uiThread = Environment.CurrentManagedThreadId;
@@ -239,8 +239,16 @@ internal sealed class CadReader
             if (!CadTargetedRead407.MatchBlock(entity, args.QueryBlock, transaction, cancellationToken.ThrowIfCancellationRequested)) return null;
             if (!CadTargetedRead407.MatchText(entity, args.QueryText, cancellationToken.ThrowIfCancellationRequested)) return null;
             if (!args.SummaryOnly || args.BodyName != null) summary = bodyNames.Observe(entity, summary, transaction, cancellationToken.ThrowIfCancellationRequested);
-            if (args.BodyName != null && entity is Solid3d && entity.OwnerId == modelId && summary.body_name == null) unavailableBodyNames++;
-            if (args.BodyName != null && !string.Equals(summary.body_name, args.BodyName, StringComparison.OrdinalIgnoreCase)) return null;
+            if (args.BodyName != null)
+            {
+                string? matchedBy = summary.BodyNameMatchSource(args.BodyName);
+                if (matchedBy == null)
+                {
+                    if (entity is Solid3d && entity.OwnerId == modelId && summary.body_name == null) unavailableBodyNames++;
+                    return null;
+                }
+                summary = summary with { body_name_match_source = matchedBy };
+            }
             return (entity, summary);
         }
         EntitySummary? Read(ulong handle)
@@ -290,14 +298,14 @@ internal sealed class CadReader
         if (args.SummaryOnly)
         {
             SummaryItem? ReadSummary(ulong handle) => ReadMatch(handle) is { } match
-                ? new(match.summary.type, match.summary.layer!.name, CadTargetedRead407.ReadBounds(match.entity, cancellationToken.ThrowIfCancellationRequested))
+                ? new(match.summary.type, match.summary.layer!.name, CadTargetedRead407.ReadBounds(match.entity, cancellationToken.ThrowIfCancellationRequested), match.summary.body_name_match_source)
                 : null;
             var key = args.FilterKey(operation);
             var page = args.Cursor == null
                 ? _summaryPages.First(state.Id, state.Revision, null, key, Identities(), args.PageSize, ReadSummary, Yield)
                 : _summaryPages.Next(args.Cursor, state.Id, state.Revision, null, key, args.PageSize, ReadSummary, Yield);
             var summary = new QuerySummary();
-            foreach (var item in page.items) summary.Add(item.Type, item.Layer, item.Bounds, args.QueryBounds);
+            foreach (var item in page.items) summary.Add(item.Type, item.Layer, item.Bounds, args.QueryBounds, item.NameMatchSource);
             return summary.Result(args.ReadSpace, page.next_cursor, args.Cursor != null, args.BodyName == null ? null : unavailableBodyNames);
         }
         if (args.Cursor != null) return Convert(_snapshots.Next(args.Cursor, state.Id, state.Revision, selectionRevision, args.FilterKey(operation), args.PageSize, Read, Yield));
