@@ -316,9 +316,7 @@ internal static class ProjectedDimensionWriter
         };
         double expected = sheetLength * binding.ViewScaleDenominator;
         double nominal = dimension.Value;
-        Need(double.IsFinite(expected) && expected > 0 && double.IsFinite(nominal) &&
-            dimension.DimensionScale == binding.ViewScaleDenominator &&
-            Math.Abs(nominal - expected) <= Math.Max(1e-7, Math.Abs(expected) * 1e-9),
+        Need(dimension.DimensionScale == binding.ViewScaleDenominator && ModelParameterDimensionBinding.NominalMatches(nominal, expected),
             "NATIVE_DIMENSION_SCALE_MISMATCH", $"The native dimension's nominal measurement {nominal} does not match the physical length {expected} at sheet scale 1:{binding.ViewScaleDenominator}.");
     }
 

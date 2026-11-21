@@ -655,6 +655,8 @@ internal sealed class CadWriter
                     var precedingPlaneVerification = verifyAfterCommit;
                     verifyAfterCommit = () => { precedingPlaneVerification?.Invoke(); CadPlaneCurveTransforms394.VerifyCommitted(planeChecks, state.Document.Database, job.CheckCancellation); };
                 }
+                if (resolved.CurveHatches.Any)
+                    createdAssociationChecks.Add(() => resolved.CurveHatches.VerifyCommitted(state.Document.Database, job.CheckCancellation));
                 if (((ModifiedEntities)data).tolerance_changes is { Length: > 0 } toleranceChanges)
                 { rollbackNotGuaranteed = true; var toleranceCheck = CadToleranceFrame356.CaptureCommitted(toleranceChanges, state.Document.Database, tr, job.CheckCancellation); var priorVerification = verifyAfterCommit; verifyAfterCommit = () => { priorVerification?.Invoke(); CadToleranceFrame356.VerifyCommitted(toleranceCheck, state.Document.Database, job.CheckCancellation); }; }
                 documentationAdditions = ((ModifiedEntities)data).created.Select(reference => reference.handle).ToArray();

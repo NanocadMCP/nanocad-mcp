@@ -152,7 +152,7 @@ internal static class CadHatchAssociationGeometry362
         return result.ToArray();
     }
     static string Key(IEnumerable<string> handles)=>string.Join(",",handles.OrderBy(value=>value,StringComparer.Ordinal));
-    internal static void Verify(Hatch hatch,Boundary[] expected,Action cancel)
+    internal static void Verify(Hatch hatch,Boundary[] expected,Action cancel,bool verifyGeometry=true)
     {
         Need(hatch.NumberOfLoops==expected.Length,"NATIVE_HATCH_ASSOCIATION_MISMATCH","Native loop count differs from the explicit outer and holes.");
         var wanted=expected.ToDictionary(value=>Key(value.SourceHandles),StringComparer.Ordinal);var seen=new HashSet<string>(StringComparer.Ordinal);
@@ -167,6 +167,7 @@ internal static class CadHatchAssociationGeometry362
             var loop=hatch.GetLoopAt(index);
             Need((loop.LoopType&(HatchLoopTypes.NotClosed|HatchLoopTypes.SelfIntersecting|HatchLoopTypes.Duplicate))==0&&
                 ((loop.LoopType&HatchLoopTypes.External)!=0)==(key==Key(expected[0].SourceHandles)),"NATIVE_HATCH_ASSOCIATION_MISMATCH","Native loop validity/outer-hole role differs from the request.");
+            if(!verifyGeometry)continue;
             bool match;
             if(source!.Spline443 is {} spline)
             {

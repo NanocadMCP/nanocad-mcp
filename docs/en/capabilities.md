@@ -36,6 +36,8 @@ The assistant is instructed to inspect each changed DWG sheet after placing view
 
 Existing-object edits aim to preserve useful source geometry, identities and supported dependencies. Objects with foreign ownership, opaque custom data or unsupported relationships can require a different route or be refused. Read access does not guarantee edit access.
 
+For a hatched XY outline made from Lines and Arcs, submit the endpoint and arc changes together with `set_curve_geometry`. The bridge checks the proposed closed outline and holes before editing the resident curves, then checks the Hatch loops and supported dimension attachments against the edited geometry. A circular hole can retain its own boundary and associated diameter.
+
 Snaps resolve observed points once; a retained dimension relationship requires
 an actual association. Native projected radius, circular-arc length and arc-angle
 dimensions can follow selected visible circular sources in ordinary auto-updating
@@ -71,7 +73,11 @@ The assistant reads eligibility before writing and checks the actual result.
 
 Direct modeling includes supported primitives, extrusion, revolution, Sweep, Loft, Boolean operations, splitting, fillets, chamfers, shells and selected face edits.
 
+For a guided Loft, `loft_guide_contacts` reports finite 3D intersection points between one guide and each ordered section. A guide that misses a section, or a section the kernel cannot inspect, is identified individually. Use a cut through the resulting solid to check the shape between the input sections. A Loft can also request normals at the first section, last section, both ends or all sections.
+
 Parametric modeling can retain native sketches, geometric relations, dimensional controls, named variables, expressions, profiles and feature history. Supported features can be repeated with native rectangular or circular patterns and mirrored within one part. The assistant can change supported drivers and check the dependent geometry.
+
+When changing a driver, `include_downstream_history` identifies the downstream history items reported by nanoCAD. On a parameter write, `observe_dimension_handles` records selected associated sheet dimensions before and after the rebuild. Use their retained anchors, view scale and measured values to check whether the drawing follows the edited part. A missing post-edit reading is reported separately from the parameter write.
 
 A selected native control of an eligible fixed Simple Hole can use a named
 User formula. The assessed diameter change retained the formula and dependency,

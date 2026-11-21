@@ -244,6 +244,7 @@ internal static class SchemaCompactor
         switch (operation)
         {
             case "inspect_model_history":
+                Hint("include_downstream_history", "Include direct and indirect consumers inside the part for the selected native history ID.");
                 Hint("history_focus", "One part. Request its issues or a current feature ID and its dependencies, consumers and controls.");
                 Hint("sketch_geometry_ids", "Read selected PlanarSketch elements in WCS.");
                 Hint("profile_ids", "Read selected native SketchProfile definitions in their owning document.");
@@ -260,6 +261,7 @@ internal static class SchemaCompactor
                 Hint("expected_expression", "Exact current stored expression from get_model_variables.");
                 Hint("value", "Updates a literal in the owning control's verified units. Counts must be positive integers.");
                 Hint("expression", "Use known variable names, numbers, parentheses and + - * /. This can replace a formula.");
+                Hint("observe_dimension_handles", "Compare stored anchors and before/after measurements for selected paper dimensions on views of affected parts.");
                 Hint("scope_handles", "Include the selected body and every affected or referenced part in the same native MCS network.");
                 Hint("propagate", "Allow changes to supported downstream variables in the explicitly selected scope.");
                 break;

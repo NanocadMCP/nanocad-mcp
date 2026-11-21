@@ -1,0 +1,29 @@
+# Native acceptance for the three design workflows
+
+These cases are pending a joint nanoCAD run. Use a disposable DWG for each case and record the candidate server and bridge hashes. Capture the actual drawing through MCP and inspect the returned images at the stated milestones. Record handles, revisions, exact readings and any unavailable evidence alongside the images. Use the original operation ID to reconcile a pending write.
+
+## 1. Lengthen an existing hatched outline
+
+Use millimetres in Model Space. Draw a bottom Line from (0,-10) to (40,-10), a counterclockwise semicircle centred at (40,0) from (40,-10) through (50,0) to (40,10), a top Line back to (0,10), and the closing left Line. Add a circular hole centred at (15,0), radius 3. Create one associative Hatch with an outer loop and the hole. Attach an ordinary horizontal dimension to the two ends of the top edge and a diameter dimension to the hole. Read back the native associations and capture the starting view.
+
+1. Through `set_curve_geometry`, move the arc centre to (50,0) and extend the bottom and top Lines to x=50 in the same request. Keep the original curve, Hatch and dimension handles.
+2. Inspect the drawing. The semicircular end should meet both Lines, the hole should remain empty and the horizontal dimension should read 50 instead of 40. Verify the hole diameter stays 6. Read the Hatch loops, source handles and dimension roles. The expected filled area increases by 200 mm², from 800 + 41π to 1000 + 41π.
+3. From the new revision, propose a single endpoint change that would open the outline. Check that it is refused before a resident change and reread the endpoint. On a copy, attach a dimension between an edited contour entity and a separate Line. Attempt to erase that second source in the same request as the contour edit. Verify both sources and the original association survive the refusal.
+
+## 2. Build and cut a mixed-section guided Loft
+
+Use parallel XY planes and millimetres. At z=0 use a Circle centred at (0,0), radius 10. At z=20 use an Ellipse centred at (2,0) with semiaxes 15 along X and 12 along Y. At z=40 use a closed rectangular Polyline with corners (-16,-14), (24,-14), (24,14), (-16,14). Keep all three section handles. For an additional Region case, convert a copy of one section into a single planar Region.
+
+1. Use a straight guide from (10,0,0) to (24,0,40). Its expected finite contacts in section order are (10,0,0), (17,0,20) and (24,0,40). Check each with `analyze_geometry` mode `loft_guide_contacts`. Repeat with an open fit Spline through (0,10,0), (0.4,11.2,8), (2,12,20), (3.2,14.5,32), (4,14,40). Inspect the actual points for all three sections. A Line on the first guide stopped at z=39 should report no point on the last section.
+2. Build a smooth solid Loft from the original ordered sections and both full guides. Inspect a shaded-with-edges model image, source identities and the new solid. A section contact is evidence about one guide only; record any subsequent kernel rejection separately.
+3. Cut the resulting solid at z=10 with `solid_section`. Check for a closed section of positive area. With `section_material_intervals`, inspect the finite X segment from (-35,0,10) to (35,0,10). At the straight guide, verify the section boundary passes through (13.5,0,10) within drawing tolerance. Inspect an intermediate section image as well as the original solid.
+4. On a separate copy, create an unguided smooth Loft with `normal_option=ends`. Inspect the end conditions on the geometry. A successful options readback alone does not establish the solid's shape.
+
+## 3. Drive a feature chain and its sheet dimension
+
+Use one parametric plate with its left side fixed at x=0. Give the base sketch a driving length of 80 mm. Place a Ø6 hole 10 mm inboard of the right end using a retained native dependency, and chamfer an edge that moves with that end. Place a 1:2 projected view on a sheet and attach a native horizontal dimension to the two projected ends. Add a second associated dimension for an unchanged width. Read the real sketch driver, downstream feature IDs, hole/edge geometry, view source, anchor slots, view scale and dimension readings. If the starting fixture lacks one of these relationships, record that before testing.
+
+1. Request `include_downstream_history` on the selected driver history item and check the hole and chamfer paths against actual native dependencies. Save the initial shaded model and sheet images. A display name can help locate an item; it cannot establish its identity.
+2. Change the base length from 80 to 100 with `set_model_parameter`, supplying both sheet dimension handles in `observe_dimension_handles`. Verify the physical right end moves to x=100, the hole centre moves from x=70 to x=90 while its bore remains Ø6, and the chamfer still cuts the intended edge at its original size.
+3. On the sheet, verify the span on paper changes from 40 to 50 mm and the nominal dimension from 80 to 100 mm. Check both persisted anchor slots and the unchanged width. Inspect the changed sheet at annotation scale. Treat a stale nominal, lost anchor, missing reading or unresolved geometry as a separate finding even if the parameter was accepted.
+4. In an independent copy, select an observation dimension from a different body. Verify that the observation request is rejected before the model is written. For a dimension with overridden text, distinguish that text from the measured nominal. If an after-reading is unavailable, retain the write result and verify the current model before deciding on any further edit.

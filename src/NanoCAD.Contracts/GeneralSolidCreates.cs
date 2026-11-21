@@ -5,6 +5,8 @@ public sealed record CurveSolidSpec(string Kind,string[] Profiles,string? PathHa
  // An omitted option preserves the legacy sweep/loft operation fingerprint.
  [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
  public bool? Closed { get; init; }
+ [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+ public string? NormalOption { get; init; }
 }
 public sealed record HelixSpec(Point3 Origin,Point3 Axis,Point3 Radial,double BaseRadius,double TopRadius,double Height,double Turns,bool RightHanded,string LayerName):EntitySpec("Helix",LayerName);
 public static partial class CreateValidation
@@ -18,7 +20,7 @@ public static partial class CreateValidation
    bool Flag(string n){var v=Required(item,n,path);if(v.ValueKind is not(JsonValueKind.True or JsonValueKind.False))throw Invalid(path,"Expected boolean.");return v.GetBoolean();}
    return new CurveSolidSpec(kind,new[]{CurveHandle(item,"profile_handle",path)},CurveHandle(item,"path_handle",path),Array.Empty<string>(),TripleValue(item,"base_point",path),Flag("align"),Flag("bank"),Number(Required(item,"twist_angle",path),path),Number(Required(item,"scale_factor",path),path,1e-9,1e9),false,layer);
   }
-  Shape(item,path,"type","kind","layer","section_handles","guide_handles","path_handle","interpolation","closed");
+  Shape(item,path,"type","kind","layer","section_handles","guide_handles","path_handle","interpolation","closed","normal_option");
   string interpolation=Text(item,"interpolation",path,16);if(interpolation is not "smooth" and not "ruled")throw Invalid(path,"Expected smooth or ruled.");
   var profiles=Handles("section_handles",2);var guides=Handles("guide_handles",0);
   string? trajectory=item.TryGetProperty("path_handle",out var v)&&v.ValueKind!=JsonValueKind.Null?CurveHandle(item,"path_handle",path):null;
@@ -29,7 +31,14 @@ public static partial class CreateValidation
    if(closedValue.ValueKind is not(JsonValueKind.True or JsonValueKind.False))throw Invalid(path+".closed","Expected boolean.");
    closed=closedValue.GetBoolean();
   }
-  return new CurveSolidSpec(kind,profiles,trajectory,guides,null,false,false,0,1,interpolation=="ruled",layer){Closed=closed};
+  string? normal = null;
+  if (item.TryGetProperty("normal_option", out _))
+  {
+   normal = Text(item, "normal_option", path, 16);
+   if (normal is not ("none" or "first" or "last" or "ends" or "all"))
+    throw Invalid(path+".normal_option", "Expected none, first, last, ends or all.");
+  }
+  return new CurveSolidSpec(kind,profiles,trajectory,guides,null,false,false,0,1,interpolation=="ruled",layer){Closed=closed,NormalOption=normal};
  }
  private static EntitySpec ParseHelix(JsonElement item,string path,string layer){
   Shape(item,path,"type","layer","axis_origin","axis_direction","radial_direction","base_radius","top_radius","height","turns","right_handed");

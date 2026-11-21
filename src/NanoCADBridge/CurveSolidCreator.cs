@@ -73,12 +73,25 @@ internal static class CurveSolidCreator
             else
             {
                 stage = "build_loft_options"; var b = new LoftOptionsBuilder { Closed = s.Closed ?? false, NoTwist = false, AlignDirection = true, Simplify = false, Ruled = s.Ruled };
+                LoftOptionsNormalOption? normal = s.NormalOption switch
+                {
+                    null => null,
+                    "none" => LoftOptionsNormalOption.NoNormal,
+                    "first" => LoftOptionsNormalOption.FirstNormal,
+                    "last" => LoftOptionsNormalOption.LastNormal,
+                    "ends" => LoftOptionsNormalOption.EndsNormal,
+                    "all" => LoftOptionsNormalOption.AllNormal,
+                    _ => throw new DomainException("INVALID_ARGUMENT", "Unknown loft normal option.")
+                };
+                if (normal.HasValue) b.NormalOption = normal.Value;
                 stage = "to_loft_options"; using var options = b.ToLoftOptions();
                 // Interpolation is an explicit requested geometric mode. Optional closure
                 // is verified when supplied; omitted closure keeps its established default.
                 stage = "verify_loft_options";
                 if (options.Ruled != s.Ruled || s.Closed.HasValue && options.Closed != s.Closed.Value)
                     throw new DomainException("NATIVE_OPTIONS_MISMATCH", "Native loft options did not retain the requested closure or interpolation.");
+                if (normal.HasValue && options.NormalOption != normal.Value)
+                    throw new DomainException("NATIVE_OPTIONS_MISMATCH", "Native loft options did not retain the requested section normal condition.");
                 check();
                 stage = "create_lofted_solid"; body.CreateLoftedSolid(copies.Take(s.Profiles.Length).ToArray(), copies.Skip(s.Profiles.Length).Take(s.Guides.Length).ToArray(), s.PathHandle == null ? null : copies[^1], options); stage = "dispose_loft_options";
             }

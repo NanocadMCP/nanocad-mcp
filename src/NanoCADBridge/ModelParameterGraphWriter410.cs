@@ -23,6 +23,7 @@ internal static class ModelParameterGraphWriter410
         Dictionary<string, McObjectId> Variables, Dictionary<string, Bound> Controls,
         Dictionary<string, HashSet<string>> Affected, HashSet<Db.ObjectId> Inventory, HashSet<Db.ObjectId> OriginalBodies, Dictionary<string, string> Layers)
     {
+        internal ModelParameterDimensionBinding.Snapshot[]? Dimensions { get; init; }
         internal string[] SketchWarnings { get; set; } = [];
         internal Dictionary<string, ModelThroughHole.Support> ThroughHoles { get; } = new(StringComparer.OrdinalIgnoreCase);
     }
@@ -172,7 +173,11 @@ internal static class ModelParameterGraphWriter410
         }
         var layers = bodies.ToDictionary(b => b.Handle, b => ((Db.Entity)tx.GetObject(CadStructureWriter.Find(state.Document.Database, b.Handle), Db.OpenMode.ForRead)).Layer, StringComparer.OrdinalIgnoreCase);
         var originalBodies = bodies.Select(b => CadStructureWriter.Find(state.Document.Database, b.Handle)).ToHashSet();
-        return new Binding(bodies, primary, plan, ids, controls, affected, Inventory(state, tx, cancel), originalBodies, layers);
+        return new Binding(bodies, primary, plan, ids, controls, affected, Inventory(state, tx, cancel), originalBodies, layers)
+        {
+            Dimensions = ModelParameterDrawingDimensions.Before(args, state, tx,
+                bodies.Where(body => affected[body.Handle].Count != 0).Select(body => body.Body.ID.ToString()), cancel)
+        };
     }
 
     private static void ObserveThroughHoles(Binding binding, DocumentState state, Action cancel)
@@ -358,11 +363,25 @@ internal static class ModelParameterGraphWriter410
                 var data = new ModelParameterResult(args.OperationId, "committed", false, Reference(primary.Handle), target.feature_id, args.VariableId, args.ExpectedExpression, target.expression, target.value, target.value_unit!, primary.State.GetProperty("native").GetProperty("volume").GetDouble(), "not_guaranteed", changes, binding.Bodies.Where(body => binding.Affected[body.Handle].Count > 0).Select(body => Reference(observed[body.Handle].Handle)).ToArray(), owner_kind: target.owner_kind, sketch_id: target.sketch_id, constraint_id: target.constraint_id)
                 {
                     model_healthy = true,
+                    observed_dimensions = ModelParameterDrawingDimensions.After(binding.Dimensions, args, state, job.CheckCancellation),
                     downstream_values_changed = changes.Any(change => !change.variable_id.Equals(target.variable_id, StringComparison.OrdinalIgnoreCase) &&
                         !ModelParameterSnapshot.Near(change.previous_value, change.value))
                 };
                 var result = Result.Ok(job.OriginalRequestId, data, context, WriteRecovery.Warning, "MODEL_PARAMETERS_REBUILT: Requested controls, retained formulas, native dependencies and healthy stored suppression were verified; inspect the affected geometry and a visual checkpoint for the engineering result.");
-                result = ModelViewFollowers.WithWarnings(result, binding.Bodies.Select(body => body.Views).ToArray()); if (binding.SketchWarnings.Length > 0) result = result with { warnings = (result.warnings ?? []).Concat(binding.SketchWarnings).Distinct(StringComparer.Ordinal).ToArray() }; job.RecordCommit(result); return result;
+                result = ModelViewFollowers.WithWarnings(result, binding.Bodies.Select(body => body.Views).ToArray());
+                if (binding.SketchWarnings.Length > 0)
+                    result = result with { warnings = (result.warnings ?? []).Concat(binding.SketchWarnings).Distinct(StringComparer.Ordinal).ToArray() };
+                if (data.observed_dimensions != null)
+                {
+                    if (data.observed_dimensions.Any(item => item.association_status != "same_stored_anchors"))
+                        result = result with { warnings = [.. result.warnings, "DRAWING_DIMENSION_CHECK: One or more requested stored associations changed or could not be read after the model edit. Inspect the indicated dimensions."] };
+                    if (data.observed_dimensions.Any(item => item.current is { } reading &&
+                        (reading.nominal_vs_projected_model != "match" || reading.factor_vs_view_scale != "match")))
+                        result = result with { warnings = [.. result.warnings, "DRAWING_DIMENSION_MEASUREMENT: A native nominal or measurement factor disagrees with the projection or could not be verified. Inspect the dimension readings."] };
+                    result = ModelParameterDimensionReceipt.Fit(result, Wire.PayloadBudget - 8192);
+                }
+                job.RecordCommit(result);
+                return result;
             }, Failure);
         }
         catch (Exception error) { return Failure(error); }

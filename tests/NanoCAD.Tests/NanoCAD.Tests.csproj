@@ -7,4 +7,7 @@
   <ItemGroup><Compile Include="../../src/NanoCADBridge/CadCurveCopyGeometry417.cs" Link="CadCurveCopyGeometry417.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelPatternAxisOrder439.cs" Link="ModelPatternAxisOrder439.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/NanoCADBridge/NativeSolidReplacement409.cs" Link="NativeSolidReplacement409.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelParameterDimensionBinding.cs" Link="ModelParameterDimensionBinding.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelHolePlacementSlots.cs" Link="ModelHolePlacementSlots.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelParameterDimensionReceipt.cs" Link="ModelParameterDimensionReceipt.cs" /></ItemGroup>
 </Project>

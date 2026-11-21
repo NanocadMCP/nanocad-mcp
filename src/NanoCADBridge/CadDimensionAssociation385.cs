@@ -903,8 +903,8 @@ internal static class CadDimensionAssociation385
                 if (field.Name != first && field.Name != second && field.Name != "dimline_point") Need(field.Value.GetRawText() == after.Dimension.GetProperty("definition").GetProperty(field.Name).GetRawText(), "Native update changed an unrequested dimension definition field.", "NATIVE_DIMENSION_ASSOCIATION_MISMATCH");
         }
     }
-    sealed record Follower434(ObjectId Dimension, Snapshot Before);
-    static Follower434[] Followers(Entity source, Database db, Transaction tr, Action cancel)
+    internal sealed record Follower434(ObjectId Dimension, Snapshot Before);
+    internal static Follower434[] Followers(Entity source, Database db, Transaction tr, Action cancel, bool circleGeometryChanges = false)
     {
         var result = new Dictionary<ObjectId, Snapshot>(); using var reactors = source.GetPersistentReactorIds();
         foreach (ObjectId id in reactors)
@@ -916,20 +916,16 @@ internal static class CadDimensionAssociation385
             var snapshot = Capture(dimension!, db, tr, cancel); Need(snapshot.Association == id, "The source reactor does not identify this dimension's current supported native association.");
             if (snapshot.Flags == 0) continue;
             Need(snapshot.Active && snapshot.Points.Any(point => point.Source == source.ObjectId),
-                "The source reactor is not this dimension's complete current supported source binding."); result.TryAdd(dimension!.ObjectId, snapshot);
+                "The source reactor is not this dimension's complete current supported source binding.");
+            if (circleGeometryChanges && snapshot.CircleChordOnly)
+                RequireCircleDiameterMovement((DiametricDimension)dimension!, source.ObjectId);
+            result.TryAdd(dimension!.ObjectId, snapshot);
         }
         return result.Select(item => new Follower434(item.Key, item.Value)).ToArray();
     }
     internal static void PreflightFollowers(Entity source, Database db, Transaction tr, Action cancel, bool circleGeometryChanges = false)
     {
-        var followers = Followers(source, db, tr, cancel);
-        if (!circleGeometryChanges) return;
-        foreach (var follower in followers.Where(follower => follower.Before.CircleChordOnly))
-        {
-            cancel();
-            var diameter = (DiametricDimension)tr.GetObject(follower.Dimension, OpenMode.ForRead);
-            RequireCircleDiameterMovement(diameter, source.ObjectId);
-        }
+        _ = Followers(source, db, tr, cancel, circleGeometryChanges);
     }
     internal static bool RefreshFollowers(Entity source, Database db, Transaction tr, Action cancel, Action<string>? notice = null)
     {

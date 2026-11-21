@@ -11,6 +11,27 @@ internal static class CurveShapeEditingTests
         object Arc(double start, double sweep, double radius = 10) => new { type = "Arc", center = new[] { 0d, 0 }, radius, start_angle = start, sweep_angle = sweep };
         object Edit(object before, object after) => new { operation = "set_curve_geometry", handles = new[] { "A" }, expected_geometry = before, geometry = after };
         object Vertex(params object[] vertices) => new { operation = "set_polyline_vertices", handles = new[] { "B" }, vertices };
+        await test("profile revision submits both tangent endpoints and the retained semicircle in one WCS batch", () =>
+        {
+            object Segment(double x0, double y0, double x1, double y1) =>
+                new { type = "Line", start = new[] { x0, y0 }, end = new[] { x1, y1 } };
+            object RoundEnd(double x) =>
+                new { type = "Arc", center = new[] { x, 10d }, radius = 10d, start_angle = -Math.PI / 2, sweep_angle = Math.PI };
+            object Change(string handle, object expected, object replacement) =>
+                new { operation = "set_curve_geometry", handles = new[] { handle }, expected_geometry = expected, geometry = replacement };
+            var edits = new[] { Change("A", Segment(0, 0, 40, 0), Segment(0, 0, 50, 0)),
+                Change("B", RoundEnd(40), RoundEnd(50)), Change("C", Segment(40, 20, 0, 20), Segment(50, 20, 0, 20)) };
+            var request = ModifyValidation.Parse(Wire.Element(new { bridge_instance_id = id, document_id = id, operation_id = id,
+                expected_revision = "1", units = "Millimeters", operations = edits }));
+            var curves = request.Operations.Cast<CurveGeometrySpec>().ToArray();
+            if (!curves.Select(op => op.Handles.Single()).SequenceEqual(new[] { "A", "B", "C" }) ||
+                curves.Any(op => op.Workplane != null) ||
+                curves[0].Geometry.End != new Point2(50, 0) || curves[2].Geometry.Start != new Point2(50, 20) ||
+                curves[1].Geometry.Center != new Point2(50, 10) || curves[1].ExpectedGeometry.Center != new Point2(40, 10) ||
+                Math.Abs(curves[1].Geometry.SweepAngle - Math.PI) > 1e-12)
+                throw new Exception("The public batch lost a retained source handle, junction, or semicircle.");
+            return Task.CompletedTask;
+        });
         await test("curve shape edits retain arc sweep and canonical angular expectations", () =>
         {
             var a = Parse(Edit(Arc(0, Math.PI), Arc(-Math.PI / 2, 1.5 * Math.PI, 12)));

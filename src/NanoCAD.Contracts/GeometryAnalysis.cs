@@ -7,6 +7,7 @@ public sealed record GeometryAnalysisArguments(Arguments Read, string Mode, doub
     public BoundaryTrace408? BoundaryTrace { get; init; }
     public SolidMeasurement409? SolidMeasurement { get; init; }
     public SolidSectionRequest? Section { get; init; }
+    public string? GuideHandle { get; init; }
 }
 
 public static class GeometryAnalysisValidation
@@ -15,10 +16,12 @@ public static class GeometryAnalysisValidation
     public const string TraceBoundaryMode = "trace_boundary";
     public static IReadOnlyList<string> Modes { get; } = CurveModes.Concat(SolidGeometryAnalysisValidation.Modes)
         .Append(TraceBoundaryMode).Concat(SolidMeasurementValidation409.Modes)
-        .Concat([SolidSectionAnalysis.Section, SolidSectionAnalysis.Intervals, SelectedContours.Mode]).ToArray();
+        .Concat([SolidSectionAnalysis.Section, SolidSectionAnalysis.Intervals, SelectedContours.Mode, LoftGuideContacts.Mode]).ToArray();
     public static GeometryAnalysisArguments Parse(JsonElement input)
     {
         if (input.ValueKind != JsonValueKind.Object) throw new DomainException("INVALID_ARGUMENT", "Arguments must be an object.");
+        if (input.TryGetProperty("mode", out var guideMode) && guideMode.ValueKind == JsonValueKind.String && guideMode.GetString() == LoftGuideContacts.Mode)
+            return LoftGuideContacts.Parse(input);
         if (input.TryGetProperty("mode", out var section) && section.ValueKind == JsonValueKind.String && SolidSectionAnalysis.Handles(section.GetString()))
             return SolidSectionAnalysis.Parse(input);
         if (input.TryGetProperty("mode", out var boundaryMode) && boundaryMode.ValueKind == JsonValueKind.String && boundaryMode.GetString() == TraceBoundaryMode)

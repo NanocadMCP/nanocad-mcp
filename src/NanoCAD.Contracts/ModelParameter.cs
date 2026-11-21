@@ -9,11 +9,17 @@ public sealed record ModelParameterArguments(string BridgeId, string DocumentId,
     string Units, string Handle, string VariableId, string ExpectedExpression, double Value,
     string? RequestedExpression = null, bool Propagate = false, string[]? ScopeHandles = null) : IWriteArguments
 {
+    public string[]? ObserveDimensionHandles { get; init; }
     public string Operation => "set_model_parameter";
     public string Expression => RequestedExpression ?? Value.ToString("R", CultureInfo.InvariantCulture);
     public bool UsesExpressionPlan => RequestedExpression != null || Propagate || ScopeHandles != null;
-    public string Fingerprint() => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new
-    { Operation, BridgeId, DocumentId, ExpectedRevision, Units, Handle, VariableId, ExpectedExpression, Value, RequestedExpression, Propagate, ScopeHandles }, Wire.Json)));
+    public string Fingerprint()
+    {
+        var write = new { Operation, BridgeId, DocumentId, ExpectedRevision, Units, Handle, VariableId, ExpectedExpression, Value, RequestedExpression, Propagate, ScopeHandles };
+        byte[] bytes = ObserveDimensionHandles == null ? JsonSerializer.SerializeToUtf8Bytes(write, Wire.Json)
+            : JsonSerializer.SerializeToUtf8Bytes(new { write, ObserveDimensionHandles }, Wire.Json);
+        return Convert.ToHexString(SHA256.HashData(bytes));
+    }
 }
 public sealed record ModelParameterResult(string operation_id, string status, bool replayed, EntityRef body_ref,
     string? feature_id, string variable_id, string previous_expression, string expression, double value,
@@ -29,7 +35,16 @@ public sealed record ModelParameterResult(string operation_id, string status, bo
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? downstream_values_changed { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ParameterDimensionObservation[]? observed_dimensions { get; init; }
 }
+public sealed record ParameterDimensionReading(string layout_record_handle, string view_handle, string source_body_handle,
+    double? sheet_length, string? sheet_length_unavailable_reason, double? projected_model_length,
+    double? view_scale_denominator, double? native_measurement_factor, double? native_nominal_length,
+    bool? native_value_is_valid, string nominal_vs_projected_model, string factor_vs_view_scale, string text_mode);
+public sealed record ParameterDimensionObservation(string dimension_handle, string association_status,
+    ParameterDimensionReading previous, ParameterDimensionReading? current, string? unavailable_code);
 public sealed record ModelParameterChange(string variable_id, string? feature_id, string previous_expression,
     string expression, double previous_value, double value,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? value_unit = null,
@@ -54,7 +69,7 @@ public static class ModelParameterValidation
         Need(input.ValueKind == JsonValueKind.Object, "Expected object.");
         var fields = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var p in input.EnumerateObject())
-            Need(p.Name is "bridge_instance_id" or "document_id" or "expected_revision" or "operation_id" or "units" or "handle" or "variable_id" or "expected_expression" or "value" or "expression" or "propagate" or "scope_handles" && fields.TryAdd(p.Name, p.Value), "Unknown or duplicate field.");
+            Need(p.Name is "bridge_instance_id" or "document_id" or "expected_revision" or "operation_id" or "units" or "handle" or "variable_id" or "expected_expression" or "value" or "expression" or "propagate" or "scope_handles" or "observe_dimension_handles" && fields.TryAdd(p.Name, p.Value), "Unknown or duplicate field.");
         string Text(string name, int? max = null)
         {
             Need(fields.TryGetValue(name, out var value) && value.ValueKind == JsonValueKind.String, "Missing string: " + name);
@@ -87,7 +102,18 @@ public static class ModelParameterValidation
         bool propagate = false;
         if (fields.TryGetValue("propagate", out var propagation))
         { Need(propagation.ValueKind is JsonValueKind.True or JsonValueKind.False, "propagate must be boolean."); propagate = propagation.GetBoolean(); }
+        string[]? dimensions = null;
+        if (fields.TryGetValue("observe_dimension_handles", out var observed))
+        {
+            Need(observed.ValueKind == JsonValueKind.Array && observed.GetArrayLength() > 0, "Expected a nonempty dimension handle array.");
+            dimensions = observed.EnumerateArray().Select(item =>
+            {
+                Need(item.ValueKind == JsonValueKind.String, "Expected a dimension handle.");
+                return Validation.NormalizeHandle(item.GetString()!);
+            }).ToArray();
+            Need(dimensions.Distinct(StringComparer.Ordinal).Count() == dimensions.Length, "Duplicate dimension handle.");
+        }
         return new(bridge, document, ulong.Parse(revision, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture), operation,
-            units, handle.ToString("X", CultureInfo.InvariantCulture), variable.ToString("B").ToUpperInvariant(), expected, value, expression, propagate, ModelParameterScope.Parse(input, handle.ToString("X", CultureInfo.InvariantCulture)));
+            units, handle.ToString("X", CultureInfo.InvariantCulture), variable.ToString("B").ToUpperInvariant(), expected, value, expression, propagate, ModelParameterScope.Parse(input, handle.ToString("X", CultureInfo.InvariantCulture))) { ObserveDimensionHandles = dimensions };
     }
 }

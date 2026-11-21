@@ -114,18 +114,24 @@ internal sealed class CadPlanarSection : IDisposable
     {
         if (_curves != null) return _curves;
         if (Region == null) return Array.Empty<Curve>();
+        (_curves, _edges) = ReadBoundaries(Region, _cancel);
+        return _curves;
+    }
+
+    internal static (Curve[] Curves, DBObjectCollection Owned) ReadBoundaries(Region source, Action cancel)
+    {
         var collection = new DBObjectCollection();
         try
         {
-            Region.Explode(collection);
-            _cancel();
+            source.Explode(collection);
+            cancel();
             var roots = collection.Cast<DBObject>().ToArray();
             var flattened = new List<Curve>();
             var pending = new Queue<(DBObject Item, int? ParentFaces)>(roots.Select(item => (item, (int?)null)));
             int FaceCount(Region region)
             {
                 using var brep = new Brep(region); int count = 0;
-                foreach (Face face in brep.Faces) using (face) { _cancel(); count++; }
+                foreach (Face face in brep.Faces) using (face) { cancel(); count++; }
                 return count;
             }
             void Failure(string reason)
@@ -140,19 +146,19 @@ internal sealed class CadPlanarSection : IDisposable
             // Read exact B-rep trims directly for linear components, even when
             // Explode groups or omits their curves at the first level.
             if (roots.Any(item => !item.ObjectId.IsNull)) Failure("Native section explosion returned a resident object.");
-            if ((roots.Length == 0 || roots.Any(item => item is not Curve)) && TryLinearTrims(Region, out var lines))
+            if ((roots.Length == 0 || roots.Any(item => item is not Curve)) && TryLinearTrims(source, cancel, out var lines))
             {
                 foreach (var (start, end) in lines)
                 {
-                    _cancel();
+                    cancel();
                     var edge = new Line(start, end); collection.Add(edge); flattened.Add(edge);
                 }
                 pending.Clear();
             }
-            int rootFaces = pending.Count > 0 && roots.Any(item => item is Region) ? FaceCount(Region) : 0;
+            int rootFaces = pending.Count > 0 && roots.Any(item => item is Region) ? FaceCount(source) : 0;
             while (pending.TryDequeue(out var next))
             {
-                _cancel();
+                cancel();
                 if (!next.Item.ObjectId.IsNull) Failure("Native section explosion returned a resident object.");
                 if (next.Item is Curve curve) { flattened.Add(curve); continue; }
                 if (next.Item is not Region piece) { Failure("The native section returned an unsupported boundary object."); continue; }
@@ -166,27 +172,24 @@ internal sealed class CadPlanarSection : IDisposable
                 foreach (DBObject child in fragments) pending.Enqueue((child, faces));
             }
             if (flattened.Count == 0) Failure("The native section returned no finite boundary curves.");
-            _curves = flattened.ToArray();
-            _edges = collection;
-            return _curves;
+            return (flattened.ToArray(), collection);
         }
         catch
         {
-            try { foreach (DBObject item in collection) item.Dispose(); }
-            finally { collection.Dispose(); }
+            DisposeBoundaryObjects(collection);
             throw;
         }
     }
 
-    private bool TryLinearTrims(Region region, out List<(Point3d, Point3d)> segments)
+    private static bool TryLinearTrims(Region region, Action cancel, out List<(Point3d, Point3d)> segments)
     {
         segments = [];
-        var faces = CadRegionBooleanEditor.SectionFaces(region, _cancel);
+        var faces = CadRegionBooleanEditor.SectionFaces(region, cancel);
         foreach (var face in faces.EnumerateArray())
             foreach (var loop in face.GetProperty("loops").EnumerateArray())
                 foreach (var edge in loop.GetProperty("edges").EnumerateArray())
                 {
-                    _cancel();
+                    cancel();
                     var def = edge.GetProperty("geometry"); var nodes = def.GetProperty("nodes");
                     var node = nodes[def.GetProperty("root").GetInt32()];
                     while (node.GetProperty("geometry").TryGetProperty("native_curve", out var next)) node = nodes[next.GetInt32()];
@@ -199,6 +202,16 @@ internal sealed class CadPlanarSection : IDisposable
                     segments.Add((start, end));
                 }
         return segments.Count > 0;
+    }
+
+    internal static void DisposeBoundaryObjects(DBObjectCollection items)
+    {
+        try
+        {
+            foreach (DBObject item in items)
+                if (item.ObjectId.IsNull && item.OwnerId.IsNull) item.Dispose();
+        }
+        finally { items.Dispose(); }
     }
 
     internal string Classify(Point3d point)
@@ -231,10 +244,7 @@ internal sealed class CadPlanarSection : IDisposable
         try
         {
             if (_edges != null)
-            {
-                try { foreach (DBObject edge in _edges) edge.Dispose(); }
-                finally { _edges.Dispose(); }
-            }
+                DisposeBoundaryObjects(_edges);
         }
         finally { Region?.Dispose(); }
     }

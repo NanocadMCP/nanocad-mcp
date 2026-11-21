@@ -11,7 +11,7 @@ internal static class CadModifier
     internal sealed record PropertyIds(ObjectId Layer, ObjectId Linetype);
     internal sealed record Resolved(ObjectId Model, Dictionary<string, ObjectId> Sources, Dictionary<int, PropertyIds> Properties,
         Dictionary<string, CadBlockMover.Resolved> Blocks, HashSet<string> DocumentedSolids, HashSet<string> PointClouds, Dictionary<string, ObjectId> AssociatedDiameterLabels,
-        CadSolidGroupMembership SolidGroups)
+        CadSolidGroupMembership SolidGroups, CadCurveHatchFollowers CurveHatches)
     {
         internal CadLegacyPolyline408.Plan? LegacyPolyline { get; init; }
         internal CadSolidReplacement409.Plan? SolidReplacement { get; init; }
@@ -32,6 +32,7 @@ internal static class CadModifier
         var documentedSolids = new HashSet<string>(StringComparer.Ordinal);
         var pointClouds = new HashSet<string>(StringComparer.Ordinal);
         var associatedLabels = new Dictionary<string, ObjectId>(StringComparer.Ordinal);
+        var curveHatches = new CadCurveHatchFollowers();
         var legacyStates = new Dictionary<string, CadLegacyPolyline408.State>(StringComparer.Ordinal);
         foreach (var handle in args.Operations.SelectMany(EditReferences.All).Distinct(StringComparer.Ordinal))
         {
@@ -179,17 +180,18 @@ internal static class CadModifier
                 throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Direct solid edits require an exact native Solid3d and compatible operations.");
             if (args.Operations.Any(op => (op is PolylineVerticesSpec || CadPolylineTopologyEditor.Handles(op)) && op.Handles.Contains(handle)) && entity.GetType() != typeof(Polyline))
                 throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Vertex edits require an exact native Polyline.");
+            bool hatchBoundaryEdit = curveHatches.Collect(entity, sourceOperations, tr, cancel);
             var curveFrame = CadExplicitCurveGeometry388.Frame(args.Operations, handle);
             var polylineFrame = PolylineEditFrames431.Frame(args.Operations, handle);
             if (polylineFrame != null) { CadPolylineWorkplane431.Check(entity, polylineFrame, cancel); CadIndependentCurve.Require(entity, db, tr, cancel); }
             if (curveFrame != null) CadIndependentCurve.Require(entity, db, tr, cancel);
-            if (curveFrame == null && args.Operations.Any(op => op is CurveGeometrySpec && op.Handles.Contains(handle)) && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle)))
+            if (!hatchBoundaryEdit && curveFrame == null && sourceOperations.Any(op => op is CurveGeometrySpec) && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle)))
                 CadDimensionAssociation385.PreflightFollowers(entity, db, tr, cancel,
                     entity.GetType() == typeof(Circle) && args.Operations.OfType<CurveGeometrySpec>().Any(op =>
                         op.Handles.Contains(handle) && op.ExpectedGeometry != op.Geometry));
             if (args.Operations.Any(op => op is CurveGeometrySpec && op.Handles.Contains(handle)) && entity.GetType() != typeof(Line) && entity.GetType() != typeof(Circle) && entity.GetType() != typeof(Arc) && entity.GetType() != typeof(Ellipse) && entity.GetType() != typeof(Spline))
                 throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Geometry replacement requires an exact native Line, Circle, Arc, Ellipse or Spline.");
-            if (args.Operations.Any(op => op.Handles.Contains(handle) && (CadPolylineTopologyEditor.Handles(op) || op is CurveGeometrySpec && (entity.GetType() == typeof(Arc) || entity.GetType() == typeof(Ellipse) || entity.GetType() == typeof(Spline)) || op is PolylineVerticesSpec p && PolylineEditFrames431.ChangesSegments(p))))
+            if (args.Operations.Any(op => op.Handles.Contains(handle) && (CadPolylineTopologyEditor.Handles(op) || op is CurveGeometrySpec && (entity.GetType() == typeof(Arc) && !hatchBoundaryEdit || entity.GetType() == typeof(Ellipse) || entity.GetType() == typeof(Spline)) || op is PolylineVerticesSpec p && PolylineEditFrames431.ChangesSegments(p))))
                 CadIndependentCurve.Require(entity, db, tr, cancel);
             if (args.Operations.Any(op => op is SetHatchPatternSpec && op.Handles.Contains(handle)) && !hatchOnly)
                 throw new DomainException("UNSUPPORTED_HATCH_CONTENT", "Pattern edits require only dedicated operations on an exact native Hatch.");
@@ -346,7 +348,8 @@ internal static class CadModifier
         }
         if (documentedSolids.Count > 0 && args.Operations.Any(op => op is CopySpec or EraseSpec && op.Handles.Any(documentedSolids.Contains)))
             throw new DomainException("UNSUPPORTED_SOLID_DEPENDENCIES", "A documented-body edit cannot copy or delete sources implicitly. Separate those ownership changes from in-place machining.");
-        var resolved = new Resolved(model, sources, properties, blockSources, documentedSolids, pointClouds, associatedLabels, solidGroups);
+        var resolved = new Resolved(model, sources, properties, blockSources, documentedSolids, pointClouds, associatedLabels, solidGroups, curveHatches);
+        curveHatches.CheckBatch(args, tr, cancel);
         if (args.Operations.OfType<SolidReplacement409>().SingleOrDefault() is { } replacement)
             resolved = resolved with { SolidReplacement = CadSolidReplacement409.Prepare(replacement, db, tr, sources[replacement.Handles[0]], sources[replacement.SourceHandle], cancel) };
         return legacyStates.Count == 0 ? resolved : resolved with { LegacyPolyline = CadLegacyPolyline408.Prepare(args, resolved, tr, cancel, legacyStates) };
@@ -598,6 +601,7 @@ internal static class CadModifier
                     }
                 }
             }
+            resolved.CurveHatches.CheckPlanned(clones, tr, cancel);
             CadContourBudget344.BatchOutput(args, contourCounts, projectedFormats.ToArray(), cancel, tolerancePreview.ToArray());
             if (resolved.LegacyPolyline is { } legacy) CadLegacyPolyline408.VerifyInitial(legacy, tr, cancel);
         }
@@ -875,7 +879,7 @@ internal static class CadModifier
                     else if (operation is CurveGeometrySpec curve)
                     {
                         CadCurveGeometryEditor.Apply(entity, curve, job.CheckCancellation);
-                        if (curve.Workplane == null && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle)) &&
+                        if (!resolved.CurveHatches.Contains(entity.ObjectId) && curve.Workplane == null && (entity.GetType() == typeof(Line) || entity.GetType() == typeof(Circle)) &&
                             CadDimensionAssociation385.RefreshFollowers(entity, entity.Database, tr, job.CheckCancellation,
                                 notice => nativeFormatWarnings?.Add(notice))) nativeFormatWarnings?.Add(CadDimensionAssociation385.Warning);
                     }
@@ -946,6 +950,7 @@ internal static class CadModifier
                 }
             }
         }
+        resolved.CurveHatches.Complete(tr, job.CheckCancellation, nativeFormatWarnings);
         resolved.SolidGroups.Verify(tr, job.CheckCancellation);
         if (resolved.LegacyPolyline is { } legacyPlan) CadLegacyPolyline408.Complete(legacyPlan, tr, job.CheckCancellation, nativeFormatWarnings);
         var repetitions = args.Operations.Select((op, index) => (op, index)).Where(pair => CopyTransforms2d407.Handles(pair.op))

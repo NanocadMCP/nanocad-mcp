@@ -29,6 +29,11 @@ internal static class ModelHistorySchema
             ["pattern"] = @"^(issues|\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\})$",
             ["description"] = "For one part, select a current native feature ID or issues. Return the selected nodes, upstream part dependencies, direct consumers and observed parameter identities. Issues includes active Error, Warn and NeedUpdate records. Unresolved references and unknown statuses are reported separately."
         };
+        schema["properties"]!["include_downstream_history"] = new JsonObject
+        {
+            ["type"] = "boolean",
+            ["description"] = "With history_focus set to a current sketch or feature ID, include direct and transitive consumers reported by the native GetAllDependent inventory and direct references within this part. For TwoEdges holes read the ordered geometric reference slots (managed object ID, GS marker, parameter and data) and the evaluated center and support-plane normal in WCS. The slot read omits complex paths and viewport references. Nodes and downstream_ids describe recorded dependencies, without assuming recompute order."
+        };
         schema["properties"]!["profile_element_ids"] = ModelProfileElementsSchema358.HistoryInput();
         schema["properties"]!["extrusion_extent_ids"] = ModelExtrusionExtentsSchema351.HistoryInput();
         schema["properties"]!["feature_deletion_ids"] = ModelFeatureDeletionSchema378.HistoryInput();

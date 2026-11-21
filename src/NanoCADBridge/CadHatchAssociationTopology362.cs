@@ -43,22 +43,23 @@ internal static class CadHatchAssociationTopology362
         double length=curve.GetLength(interval.LowerBound,interval.UpperBound,Tolerance.Global.EqualPoint);
         Need(double.IsFinite(length)&&length>Tolerance.Global.EqualPoint,"INVALID_GEOMETRY","Native boundary segment has no finite physical length.");
     }
+    static Entity SourceIdentity(Entity observation,Hatch hatch,IReadOnlyDictionary<Entity,Entity>? originals)
+    {
+        if(originals==null||!originals.TryGetValue(observation,out var source))return observation;
+        var kind=observation.GetType();
+        bool legacy=kind==typeof(Polyline)&&source.GetType()==typeof(Polyline2d);
+        bool primitive=kind==source.GetType()&&(kind==typeof(Line)||kind==typeof(Arc)||kind==typeof(Circle));
+        Need((legacy||primitive)&&observation.ObjectId.IsNull&&observation.OwnerId.IsNull&&observation.Database==null&&
+            observation.UnmanagedObject!=source.UnmanagedObject&&!source.ObjectId.IsNull&&source.ObjectId.IsValid&&
+            !source.ObjectId.IsErased&&!source.ObjectId.IsEffectivelyErased&&source.Database==hatch.Database&&source.OwnerId==hatch.OwnerId,
+            "INVALID_SOURCE_PROVENANCE","The planned curve must be a detached observation of the exact local boundary source.");
+        return source;
+    }
     static Boundary Capture(Entity entity,Hatch hatch,Action cancel,ModelInventoryBudget budget,IReadOnlyDictionary<Entity,Entity>? observationSources=null)
     {
         Need(entity is Curve&&!entity.HasFields,"UNSUPPORTED_HATCH_BOUNDARY","Native curve fields require their owning adapter.");
-        var source=(Curve)entity;Entity identity=source;
-        if(observationSources!=null&&observationSources.TryGetValue(entity,out var original))
-        {
-            // The proxy represents a planned exact line/arc observation. It
-            // never receives a resident ObjectId/handle; provenance is the
-            // caller's actual borrowed source, checked in this Hatch context.
-            Need(entity.GetType()==typeof(Polyline)&&entity.ObjectId.IsNull&&entity.OwnerId.IsNull&&entity.Database==null&&
-                original.GetType()==typeof(Polyline2d)&&!original.ObjectId.IsNull&&original.ObjectId.IsValid&&
-                !original.ObjectId.IsErased&&!original.ObjectId.IsEffectivelyErased&&original.Database==hatch.Database&&original.OwnerId==hatch.OwnerId&&
-                original.UnmanagedObject!=entity.UnmanagedObject,
-                "INVALID_SOURCE_PROVENANCE","Only a detached exact Polyline observation of an actual same-space native Polyline2d may supply provenance.");
-            identity=original;
-        }
+        var source=(Curve)entity;
+        var identity=SourceIdentity(source,hatch,observationSources);
         string handle=Validation.NormalizeHandle(identity.Handle.ToString());var transform=Matrix3d.WorldToPlane(hatch.Normal);
         Boundary? result=null;
         try
@@ -140,7 +141,7 @@ internal static class CadHatchAssociationTopology362
             foreach(var entity in sources)
             {
                 cancel();Need(entity is Curve&&!entity.HasFields,"UNSUPPORTED_HATCH_BOUNDARY","Boundary groups require ordinary native curves without fields.");
-                var curve=(Curve)entity;curves.Add(curve);handles.Add(Validation.NormalizeHandle(curve.Handle.ToString()));
+                var curve=(Curve)entity;curves.Add(curve);handles.Add(Validation.NormalizeHandle(SourceIdentity(curve,hatch,observationSources).Handle.ToString()));
             }
             result=new(curves.ToArray(),new(handles[0],"Line_Arc_chain",[],[],handles.ToArray()),curves[0].StartPoint);
             foreach(var source in curves)

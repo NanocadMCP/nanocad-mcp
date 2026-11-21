@@ -18,6 +18,15 @@ public static class ModelHistoryValidation
                 focus = focusId.ToString("B").ToUpperInvariant();
             else throw new DomainException("INVALID_ARGUMENT", "history_focus requires a current native history ID in braces or issues.");
         }
+        bool includeDownstream = false;
+        if (values.Remove("include_downstream_history", out var downstream))
+        {
+            if (downstream.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new DomainException("INVALID_ARGUMENT", "include_downstream_history must be boolean.");
+            includeDownstream = downstream.GetBoolean();
+            if (includeDownstream && (focus == null || focus == "issues"))
+                throw new DomainException("INVALID_ARGUMENT", "Tracing downstream history requires one current history_focus feature or sketch ID.");
+        }
         string[]? nativeSketchIds = null; bool includeSketches = false; string? sketchCursor = null;
         if (values.Remove("sketch_ids", out var nativeSketches)) nativeSketchIds = ModelSketchLifecycleValidation362.Ids(nativeSketches, "sketch_ids");
         if (values.Remove("include_document_sketches", out var sketchInventory))
@@ -129,7 +138,7 @@ public static class ModelHistoryValidation
         var args = Validation.Parse("inspect_objects", Wire.Element(values));
         if (focus != null && args.Handles?.Length != 1)
             throw new DomainException("INVALID_ARGUMENT", "history_focus selects the history of one identified part.");
-        args = args with { HistoryFocus = focus };
+        args = args with { HistoryFocus = focus, IncludeDownstreamHistory = includeDownstream };
         if (args.BridgeId == null || args.ExpectedRevision == null)
             throw new DomainException("INVALID_ARGUMENT", "Model history requires explicit bridge/document/revision and distinct handles.");
         if (parameterIds != null && (args.Handles!.Length != 1 || nativeSketchIds?.Length != 1))

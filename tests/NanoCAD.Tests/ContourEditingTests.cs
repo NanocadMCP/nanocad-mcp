@@ -12,6 +12,20 @@ internal static class ContourEditingTests
         void Reject(Action work,string code){try{work();}catch(DomainException e)when(e.Error.code==code){return;}throw new Exception("Expected "+code);}
         var id=Guid.NewGuid().ToString("D");
         ModifyArguments Parse(params object[] operations)=>ModifyValidation.Parse(Wire.Element(new{bridge_instance_id=id,document_id=id,operation_id=id,expected_revision="7",units="Millimeters",operations}));
+        await test("contour edits preserve the second dimension source across mixed requests", () =>
+        {
+            var dimensionSources = new HashSet<string>(StringComparer.Ordinal) { "A", "B" };
+            object LineGeometry(int length) => new { type = "Line", start = new[] { 0, 0 }, end = new[] { length, 0 } };
+            var edit = new { operation = "set_curve_geometry", handles = new[] { "A" }, expected_geometry = LineGeometry(10), geometry = LineGeometry(12) };
+            object Erase(string source) => new { operation = "erase", handles = new[] { source } };
+            object Trim(string source, string boundary) => new { operation = "trim_curve", handles = new[] { source }, boundary_handles = new[] { boundary }, pick_point = new[] { 5, 0 } };
+            void Check(params object[] operations) => DimensionAssociationValidation385.CheckSourceRemovals(Parse(operations).Operations, dimensionSources);
+            Reject(() => Check(edit, Erase("0b")), "INVALID_OPERATION_ORDER");
+            Reject(() => Check(Trim("b", "C"), edit), "INVALID_OPERATION_ORDER");
+            Check(edit, Erase("D"));
+            Check(edit, Trim("D", "B"));
+            return Task.CompletedTask;
+        });
         await test("contour trim removes picked line interval and respects finite boundaries",()=>{
             var line=Line(0,0,30,0);var left=Line(10,-5,10,5);var right=Line(20,-5,20,5);
             var result=ContourGeometry.Trim(line,new[]{left,right},new(15,0));

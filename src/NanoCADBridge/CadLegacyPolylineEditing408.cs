@@ -17,7 +17,7 @@ internal static class CadLegacyPolyline408
     internal sealed record Shape(string Kind,bool Closed,double Elevation,Vector3d Normal,double Thickness,
         double DefaultStartWidth,double DefaultEndWidth,Vertex[] Vertices);
     internal sealed record State(Shape Geometry,JsonElement Root,Dictionary<string,JsonElement> Children,string Token);
-    internal sealed record HatchState(ObjectId Id,ObjectId[][] Groups,CadHatchEditingReader.StoredValue Before);
+    internal sealed record HatchState(ObjectId Id,ObjectId[][] Groups,HatchLoopTypes[] LoopTypes,CadHatchEditingReader.StoredValue Before);
     internal sealed record Endpoint(string Role,ObjectId Source,string VertexHandle);
     internal sealed record DimensionState(ObjectId Id,CadDimensionAssociation385.Snapshot Before,Endpoint[] Endpoints);
     internal sealed record Source(ObjectId Id,State Before,Shape Planned,bool Erased);
@@ -162,13 +162,13 @@ internal static class CadLegacyPolyline408
         {cancel();Need(original.ContainsKey(handle),"Removed vertex does not belong to this root.","VERTEX_NOT_FOUND");vertices.RemoveAll(vertex=>vertex.Handle==handle);}
         var result=shape with{Closed=edit.Closed??shape.Closed,Vertices=vertices.ToArray()};CheckGeometry(result,cancel);return result;
     }
-    private static HatchState CaptureHatch(Hatch hatch,Polyline2d source,Transaction tr,Action cancel)
+    internal static HatchState CaptureHatch(Hatch hatch,Entity source,Transaction tr,Action cancel)
     {
         Need(hatch.GetType()==typeof(Hatch)&&hatch.Database==source.Database&&hatch.OwnerId==source.OwnerId&&hatch.Associative&&
-            !hatch.HasFields&&hatch.Annotative!=AnnotativeStates.True,"The legacy contour's Hatch relationship needs its owning context.","UNSUPPORTED_CURVE_DEPENDENCIES");
+            !hatch.HasFields&&hatch.Annotative!=AnnotativeStates.True,"The contour's Hatch relationship needs its owning context.","UNSUPPORTED_CURVE_DEPENDENCIES");
         var layer=(LayerTableRecord)tr.GetObject(hatch.LayerId,OpenMode.ForRead);
         Need(!layer.IsLocked&&!layer.IsDependent,"Dependent Hatch must have an unlocked local layer.","LAYER_UNAVAILABLE");
-        var groups=new List<(ObjectId[] Ids,bool Outer)>();bool found=false;
+        var groups=new List<(ObjectId[] Ids,HatchLoopTypes Type)>();bool found=false;
         for(int index=0;index<hatch.NumberOfLoops;index++)
         {
             cancel();using var ids=hatch.GetAssociatedObjectIdsAt(index);var group=ids.Cast<ObjectId>().ToArray();
@@ -176,11 +176,12 @@ internal static class CadLegacyPolyline408
                 "Each retained Hatch loop needs its complete live source group.","UNSUPPORTED_CURVE_DEPENDENCIES");
             var loop=hatch.GetLoopAt(index);Need((loop.LoopType&(HatchLoopTypes.NotClosed|HatchLoopTypes.SelfIntersecting|HatchLoopTypes.Duplicate))==0,
                 "The retained Hatch has an invalid or duplicate loop requiring its owning edit.","UNSUPPORTED_CURVE_DEPENDENCIES");
-            found|=group.Contains(source.ObjectId);groups.Add((group,(loop.LoopType&HatchLoopTypes.External)!=0));
+            found|=group.Contains(source.ObjectId);groups.Add((group,loop.LoopType));
         }
         Need(found,"Hatch reverse dependency lacks its matching native forward source ID.","UNSUPPORTED_CURVE_DEPENDENCIES");
-        Need(groups.Count(group=>group.Outer)==1,"Retained Hatch needs one classified native outer loop and its separate holes.","UNSUPPORTED_CURVE_DEPENDENCIES");
-        return new(hatch.ObjectId,groups.OrderByDescending(group=>group.Outer).Select(group=>group.Ids).ToArray(),CadHatchEditingReader.Stored(hatch,cancel,tr));
+        var ordered=groups.OrderByDescending(group=>(group.Type&HatchLoopTypes.External)!=0).ToArray();
+        Need(ordered.Count(group=>(group.Type&HatchLoopTypes.External)!=0)==1,"Retained Hatch needs one classified native outer loop and its separate holes.","UNSUPPORTED_CURVE_DEPENDENCIES");
+        return new(hatch.ObjectId,ordered.Select(group=>group.Ids).ToArray(),ordered.Select(group=>group.Type).ToArray(),CadHatchEditingReader.Stored(hatch,cancel,tr));
     }
     internal static State CheckSource(Polyline2d source,IReadOnlyCollection<EditSpec> operations,Database db,Transaction tr,Action cancel)
     {
@@ -448,29 +449,53 @@ internal static class CadLegacyPolyline408
         }
         Transform(source,edit,tr,cancel);return [];
     }
-    internal static void Complete(Plan plan,Transaction tr,Action cancel,List<string>? warnings=null)
+    internal static void RefreshHatch(HatchState saved,CadHatchAssociationGeometry362.Boundary[] expected,Transaction tr,Action cancel,bool preserveLoopFlags=false)
     {
-        foreach(var saved in plan.Hatches)
+        var hatch=(Hatch)tr.GetObject(saved.Id,OpenMode.ForWrite);
+        string mismatch=preserveLoopFlags?"NATIVE_HATCH_ASSOCIATION_MISMATCH":"NATIVE_LEGACY_POLYLINE_MISMATCH";
+        bool rebuild=true;
+        if(preserveLoopFlags)
         {
-            cancel();var expected=HatchGeometry(saved,plan,tr,cancel,true);var hatch=(Hatch)tr.GetObject(saved.Id,OpenMode.ForWrite);
+            try { CadHatchAssociationGeometry362.Verify(hatch,expected,cancel);rebuild=false; }
+            catch(DomainException ex) when(ex.Error.code=="NATIVE_HATCH_ASSOCIATION_MISMATCH")
+            {
+                // Only stored edge geometry can be rebuilt here. An unexpected
+                // link or a reclassified island needs its own reconciliation.
+                CadHatchAssociationGeometry362.Verify(hatch,expected,cancel,verifyGeometry:false);
+            }
+        }
+        if(rebuild)
+        {
             for(int index=hatch.NumberOfLoops-1;index>=0;index--){cancel();hatch.RemoveLoopAt(index);}
             for(int index=0;index<saved.Groups.Length;index++)
             {
-                cancel();using var ids=new ObjectIdCollection(saved.Groups[index]);hatch.AppendLoop(index==0?HatchLoopTypes.External:HatchLoopTypes.Default,ids);
+                cancel();using var ids=new ObjectIdCollection(saved.Groups[index]);
+                var role=preserveLoopFlags?saved.LoopTypes[index]&(HatchLoopTypes.External|HatchLoopTypes.Outermost):
+                    index==0?HatchLoopTypes.External:HatchLoopTypes.Default;
+                hatch.AppendLoop(role,ids);
                 foreach(ObjectId id in saved.Groups[index])
                 {
                     var source=(Entity)tr.GetObject(id,OpenMode.ForWrite);using var links=source.GetPersistentReactorIds();
-                    int count=links.Cast<ObjectId>().Count(link=>link==hatch.ObjectId);Need(count<=1,"Native Hatch refresh duplicated a source reverse link.","NATIVE_LEGACY_POLYLINE_MISMATCH");
+                    int count=links.Cast<ObjectId>().Count(link=>link==hatch.ObjectId);Need(count<=1,"Native Hatch refresh duplicated a source reverse link.",mismatch);
                     if(count==0)source.AddPersistentReactor(hatch.ObjectId);
                 }
             }
-            hatch.EvaluateHatch(true);hatch.RecordGraphicsModified(true);cancel();CadHatchAssociationGeometry362.Verify(hatch,expected,cancel);
-            var after=CadHatchEditingReader.Stored(hatch,cancel,tr);
-            Need(Exact(saved.Before.Pattern,after.Pattern)&&Exact(saved.Before.Definitions,after.Definitions)&&saved.Before.SourceHandles.SequenceEqual(after.SourceHandles),
-                "Native contour update changed the retained Hatch pattern, definitions or source IDs.","NATIVE_LEGACY_POLYLINE_MISMATCH");
-            foreach(var field in saved.Before.Preserved.EnumerateObject())
-                if(field.Name!="loops")Need(Exact(field.Value,after.Preserved.GetProperty(field.Name)),"Native contour update changed unrequested Hatch metadata/plane/associativity.","NATIVE_LEGACY_POLYLINE_MISMATCH");
         }
+        hatch.EvaluateHatch(true);hatch.RecordGraphicsModified(true);cancel();CadHatchAssociationGeometry362.Verify(hatch,expected,cancel);
+        if(!preserveLoopFlags)VerifyHatchProperties(saved,hatch,tr,cancel,mismatch);
+    }
+    internal static void VerifyHatchProperties(HatchState saved,Hatch hatch,Transaction tr,Action cancel,string mismatch)
+    {
+        var after=CadHatchEditingReader.Stored(hatch,cancel,tr);
+        Need(Exact(saved.Before.Pattern,after.Pattern)&&Exact(saved.Before.Definitions,after.Definitions)&&saved.Before.SourceHandles.SequenceEqual(after.SourceHandles),
+            "Native contour update changed the retained Hatch pattern, definitions or source IDs.",mismatch);
+        foreach(var field in saved.Before.Preserved.EnumerateObject())
+            if(field.Name!="loops")Need(Exact(field.Value,after.Preserved.GetProperty(field.Name)),"Native contour update changed unrequested Hatch metadata/plane/associativity.",mismatch);
+    }
+    internal static void Complete(Plan plan,Transaction tr,Action cancel,List<string>? warnings=null)
+    {
+        foreach(var saved in plan.Hatches)
+            RefreshHatch(saved,HatchGeometry(saved,plan,tr,cancel,true),tr,cancel);
         foreach(var source in plan.Sources.Values)
         {
             cancel();if(source.Erased)continue;var current=(Polyline2d)tr.GetObject(source.Id,OpenMode.ForRead);VerifyShape(source.Planned,Read(current,tr,cancel),cancel);

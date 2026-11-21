@@ -104,6 +104,7 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     public ModelFaceQuery? FaceQuery { get; init; }
     public ModelEdgeQuery? EdgeQuery { get; init; }
     public string? HistoryFocus { get; init; }
+    public bool IncludeDownstreamHistory { get; init; }
     public string? VariableFeatureId { get; init; }
     public QueryBlock407? QueryBlock { get; init; }
     public string[]? DetailSections { get; init; }

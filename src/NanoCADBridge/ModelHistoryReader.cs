@@ -88,7 +88,7 @@ internal static class ModelHistoryReader
             Budget();
             if (contents == null) throw new DomainException("HISTORY_UNAVAILABLE", "MultiCAD did not return the part contents; no empty-history claim is made.");
             var nodes = new List<object>();
-            var focus = args.HistoryFocus == null ? null : new ModelHistoryFocus(contents, id.ToString(), args.HistoryFocus, Budget);
+            var focus = args.HistoryFocus == null ? null : new ModelHistoryFocus(contents, id.ToString(), args.HistoryFocus, args.IncludeDownstreamHistory, Budget);
             var visibilitySketches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool complete = true;
             var nativeSources = NativePathSources.Inspect(contents, Budget);
@@ -239,7 +239,7 @@ internal static class ModelHistoryReader
                             angle2_variable_id = Id(revolution.RotationAngle2ParamVarID)
                         } : projection != null
                         ? new { kind = "projection", source_object_id = Id(projection.SrcObjectID), host_sketch_id = Id(projection.HostSketchID), planar_object_id = Id(projection.PlanarObjectID) }
-                        : ModelManufacturingHistory.Parameters(nodeId, Budget) ?? ModelEdgeFeatureHistory.Parameters(nodeId) ?? ModelPlacementHistory.Parameters(nodeId) ?? SheetMetalHistory.Read(nodeId, id);
+                        : ModelManufacturingHistory.Parameters(nodeId, Budget, readTwoEdgePlacement: args.IncludeDownstreamHistory) ?? ModelEdgeFeatureHistory.Parameters(nodeId) ?? ModelPlacementHistory.Parameters(nodeId) ?? SheetMetalHistory.Read(nodeId, id);
                 }
                 string? nativeReferenceFailure = nativeSources.Failures.TryGetValue(nodeId.ToString(), out var referenceFailure) ? referenceFailure : null;
                 if (nativeReferenceFailure != null) complete = false;
@@ -309,6 +309,7 @@ internal static class ModelHistoryReader
         var datumRevisions = includeProfileEditing && args.ModelDatumPlaneRevisionIds?.Length > 0
             ? ModelDatumPlaneRevisionReader354.Read(args.Handles!.Single(), args.ModelDatumPlaneRevisionIds, args, state, transaction, Budget) : null;
         string graphScope = args.HistoryFocus == null ? "part_contents_and_direct_dependencies_no_recursive_closure_or_order_claim" :
+            args.IncludeDownstreamHistory ? "selected_part_upstream_dependencies_and_transitive_consumers_with_external_references_as_leaves" :
             "selected_part_upstream_dependencies_and_direct_consumers_with_external_references_as_leaves";
         if (discovery == null && sketches == null && elements == null && regions == null && extents == null && datums == null && datumRevisions == null && deletions == null && parameterEdits == null)
         {

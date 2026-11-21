@@ -51,4 +51,17 @@ public static class DimensionAssociationValidation385
         if(edits.Any(edit=>edit is not DimensionAssociationEdit385)||edits.SelectMany(edit=>edit.Handles).Distinct(StringComparer.Ordinal).Count()!=edits.Count)
             throw new DomainException("INVALID_OPERATION_ORDER","Use a dedicated association batch with distinct dimension targets; source geometry is retained.");
     }
+
+    public static void CheckSourceRemovals(IEnumerable<EditSpec> edits, IReadOnlySet<string> retainedSources)
+    {
+        foreach (var edit in edits)
+        {
+            if (edit is not (EraseSpec or TrimCurveSpec or NativeContourFinishingSpec342 { EraseSource: true } or
+                ContourAssemblySpec { EraseSources: true } or NativeExplode386 { SourceMode: "replace" })) continue;
+            foreach (string handle in edit.Handles)
+                if (retainedSources.Contains(handle))
+                    throw new DomainException("INVALID_OPERATION_ORDER", "This edit would remove a source required by a dimension on the edited contour.",
+                        false, new { operation = edit.Operation, source_handle = handle });
+        }
+    }
 }

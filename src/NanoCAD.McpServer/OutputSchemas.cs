@@ -99,6 +99,13 @@ internal static class OutputSchemas
             ["type"] = "boolean",
             ["description"] = "True when post-command verification observed healthy native history for the checked bodies, including intentional suppression. Omitted when this verification is unavailable."
         };
+        JsonObject ComparisonStatus() => new() { ["enum"] = new JsonArray("match", "mismatch", "unavailable") };
+        JsonObject DimensionReading() => Object(("layout_record_handle", Text()), ("view_handle", Text()), ("source_body_handle", Text()),
+            ("sheet_length", Nullable(Number())), ("sheet_length_unavailable_reason", Nullable(Text())), ("projected_model_length", Nullable(Number())),
+            ("view_scale_denominator", Nullable(Number())), ("native_measurement_factor", Nullable(Number())), ("native_nominal_length", Nullable(Number())),
+            ("native_value_is_valid", Nullable(Bool())), ("nominal_vs_projected_model", ComparisonStatus()), ("factor_vs_view_scale", ComparisonStatus()), ("text_mode", Text()));
+        data["properties"]!["observed_dimensions"] = Array(Object(("dimension_handle", Text()), ("association_status", new JsonObject { ["enum"] = new JsonArray("same_stored_anchors", "stored_anchors_changed", "unavailable") }),
+            ("previous", DimensionReading()), ("current", Nullable(DimensionReading())), ("unavailable_code", Nullable(Text()))));
         data["properties"]!["downstream_values_changed"] = new JsonObject
         {
             ["type"] = "boolean",
@@ -461,6 +468,13 @@ internal static class OutputSchemas
         result["oneOf"]!.AsArray().Add(SolidMeasurementSchema409.Output());
         result["oneOf"]!.AsArray().Add(SolidSectionSchema.Output(false));
         result["oneOf"]!.AsArray().Add(SolidSectionSchema.Output(true));
+        var guideContacts = Common(NanoCAD.Contracts.LoftGuideContacts.Mode);
+        Add(guideContacts, "guide", Ref("ref"));
+        var contactStatus = new JsonObject { ["enum"] = new JsonArray("points_reported", "no_points_reported", "unavailable") };
+        Add(guideContacts, "sections", Array(Object(("section", Ref("ref")), ("status", contactStatus),
+            ("points", Array(Point())), ("reason", Nullable(Text())))));
+        Add(guideContacts, "overlap_evaluated", new JsonObject { ["const"] = false });
+        result["oneOf"]!.AsArray().Add(guideContacts);
         result["oneOf"]!.AsArray().Add(JsonNode.Parse("""
             {"type":"object","required":["mode","workplane","units","endpoint_tolerance","components","nearest_gaps","contacts","confirmed_hole_count","classification_complete"],
              "properties":{"mode":{"const":"selected_contours"},"components":{"type":"array"},"nearest_gaps":{"type":"array"},"contacts":{"type":"array"},"confirmed_hole_count":{"type":"integer"},"classification_complete":{"type":"boolean"}}}

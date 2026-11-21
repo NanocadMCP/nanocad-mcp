@@ -29,12 +29,18 @@ internal static class GeometryAnalysisSchema
         contours["properties"]!.AsObject().Remove("point");
         contours["properties"]!["mode"] = new JsonObject { ["const"] = NanoCAD.Contracts.SelectedContours.Mode };
         contours["properties"]!["workplane"] = WorkplaneSchema.Input();
+        var guideContacts = (JsonObject)contours.DeepClone();
+        guideContacts["properties"]!.AsObject().Remove("workplane");
+        guideContacts["properties"]!["mode"] = new JsonObject { ["const"] = NanoCAD.Contracts.LoftGuideContacts.Mode };
+        guideContacts["properties"]!["guide_handle"] = BasicModelingSchema.Handle();
+        guideContacts["required"]!.AsArray().Add("guide_handle");
+        guideContacts["description"] = "Inspect point contacts in WCS between one finite spatial guide and each selected closed curve or Region boundary, in handles order. Repeat with each guide of a proposed loft. An empty point list leaves coincident spans unresolved. The solid kernel decides whether the loft can be built.";
         SolidGeometryAnalysisSchema.Extend(root);
         return JsonSerializer.SerializeToElement(new JsonObject
         {
             ["type"] = "object",
             ["oneOf"] = new JsonArray(root, BoundaryTraceSchema408.Input(), SolidMeasurementSchema409.Input(),
-            SolidSectionSchema.Input(false), SolidSectionSchema.Input(true), contours)
+            SolidSectionSchema.Input(false), SolidSectionSchema.Input(true), contours, guideContacts)
         });
     }
 }

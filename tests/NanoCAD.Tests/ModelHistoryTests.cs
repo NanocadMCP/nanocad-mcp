@@ -14,6 +14,26 @@ internal static class ModelHistoryTests
             catch (DomainException) { return; }
             throw new Exception("Invalid history request accepted.");
         }
+        await test("part chain two stored hole slots can use the same parent with distinct markers", () =>
+        {
+            var first = NanoCADBridge.ModelHolePlacementSlots.Observe(0, false, "A", 12, 0.25, 3);
+            var second = NanoCADBridge.ModelHolePlacementSlots.Observe(1, false, "A", 17, 0.75, 20000000001L);
+            if (first is not { slot: 0, object_id: "A", gs_marker: 12, parameter: 0.25 } ||
+                second is not { slot: 1, object_id: "A", gs_marker: 17, data: "20000000001" })
+                throw new Exception("Geometric placement slots were collapsed or did not preserve order.");
+            return Task.CompletedTask;
+        });
+        await test("part chain follows only a selected native history ID in one part", () =>
+        {
+            var sketchId = Guid.NewGuid().ToString("B");
+            object Request(string? focus, string[] handles) => new { bridge_instance_id = bridge, document_id = doc,
+                expected_revision = "9", handles, history_focus = focus, include_downstream_history = true };
+            var args = Validation.Parse("inspect_model_history", Wire.Element(Request(sketchId, ["A"])));
+            if (!args.IncludeDownstreamHistory || args.HistoryFocus != sketchId.ToUpperInvariant()) throw new Exception("Lost the selected native source.");
+            if (Validation.Parse("inspect_model_history", Wire.Element(Input(["A"]))).IncludeDownstreamHistory) throw new Exception("Unexpected traversal.");
+            Reject(Request("issues", ["A"])); Reject(Request(sketchId, ["A", "B"])); Reject(Request(null, ["A"]));
+            return Task.CompletedTask;
+        });
         await test("model history requires explicit context and bounded canonical handles", () =>
         {
             var args = Validation.Parse("inspect_model_history", Wire.Element(Input(new[] { "00af", "B0" })));

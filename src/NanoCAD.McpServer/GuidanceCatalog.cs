@@ -111,7 +111,7 @@ internal static class GuidanceCatalog
         string? field = operation == "create_entities" ? "entities" : operation is "modify_entities" or "modify_structure" ? "operations" : null;
         if (field is null)
         {
-            if (operation == "analyze_geometry" && (NanoCAD.Contracts.SolidSectionAnalysis.Handles(variant) || variant == NanoCAD.Contracts.SelectedContours.Mode))
+            if (operation == "analyze_geometry" && (NanoCAD.Contracts.SolidSectionAnalysis.Handles(variant) || variant is NanoCAD.Contracts.SelectedContours.Mode or NanoCAD.Contracts.LoftGuideContacts.Mode))
                 return schema["oneOf"]!.AsArray().Single(branch =>
                     branch?["properties"]?["mode"]?["const"]?.GetValue<string>() == variant)!.ToJsonString();
             if (variant is not null) throw new McpProtocolException("This tool has no selectable schema branches.", McpErrorCode.InvalidParams);

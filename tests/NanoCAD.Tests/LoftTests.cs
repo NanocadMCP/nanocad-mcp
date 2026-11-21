@@ -11,6 +11,68 @@ internal static class LoftTests
         object Loft(params object[] sections) => new { type = "Solid3d", kind = "loft", interpolation = "smooth", sections };
         CreateArguments Parse(params object[] entities) => CreateValidation.Parse(Wire.Element(new { bridge_instance_id = bridge, document_id = doc, operation_id = op, expected_revision = "1", units = "Millimeters", entities }));
         void Reject(object item) { try { Parse(item); } catch (DomainException) { return; } throw new Exception("Invalid loft accepted."); }
+        await test("direct loft section normal conditions survive parsing and operation replay identity", () =>
+        {
+            var input = new Dictionary<string, object?>
+            {
+                ["type"] = "Solid3d", ["kind"] = "loft", ["interpolation"] = "smooth", ["section_handles"] = new[] { "A", "B" },
+                ["guide_handles"] = new[] { "C", "D" }, ["path_handle"] = null
+            };
+            var original = Parse(input);
+            if (Wire.Element((CurveSolidSpec)original.Entities.Single()).TryGetProperty("NormalOption", out _))
+                throw new Exception("An omitted option must keep its previous serialized intent.");
+            var fingerprints = new HashSet<string> { original.Fingerprint() };
+            foreach (var option in new[] { "none", "first", "last", "ends", "all" })
+            {
+                input["normal_option"] = option;
+                var parsed = Parse(input);
+                var spec = (CurveSolidSpec)parsed.Entities.Single();
+                if (spec.NormalOption != option || !spec.Guides.SequenceEqual(new[] { "C", "D" }) ||
+                    !fingerprints.Add(parsed.Fingerprint()))
+                    throw new Exception("Loft guide order or section normal intent was lost.");
+            }
+            input["normal_option"] = "tangent_to_guide";
+            Reject(input);
+            return Task.CompletedTask;
+        });
+        await test("loft guide inspection preserves source order and requires distinct current finite-curve references", () =>
+        {
+            var input = new Dictionary<string, object?>
+            {
+                ["bridge_instance_id"] = bridge, ["document_id"] = doc, ["expected_revision"] = "2",
+                ["mode"] = LoftGuideContacts.Mode, ["guide_handle"] = "0f", ["handles"] = new[] {"b", "a"}
+            };
+            GeometryAnalysisArguments Read() => GeometryAnalysisValidation.Parse(Wire.Element(input));
+            void InvalidRead()
+            {
+                try { Read(); } catch (DomainException) { return; }
+                throw new Exception("Invalid loft guide inspection accepted.");
+            }
+            var parsed = Read();
+            if (parsed.GuideHandle != "F" || !parsed.Read.Handles!.SequenceEqual(new[] { "B", "A" }) || parsed.Workplane != null)
+                throw new Exception("Expected ordered WCS profile handles and one separate guide.");
+            input["workplane"] = "XY"; InvalidRead(); input.Remove("workplane");
+            input["handles"] = new[] { "a", "0A" }; InvalidRead();
+            input["handles"] = new[] { "F" }; InvalidRead();
+            input["handles"] = Array.Empty<string>(); InvalidRead();
+            input["handles"] = new[] { "B" }; input.Remove("guide_handle"); InvalidRead();
+            input["guide_handle"] = "F"; input.Remove("document_id"); InvalidRead();
+            var inputSchema = AuditServerContractSupport.Input("analyze_geometry", LoftGuideContacts.Mode);
+            if (inputSchema.GetProperty("properties").GetProperty("mode").GetProperty("const").GetString() != LoftGuideContacts.Mode ||
+                !inputSchema.GetProperty("required").EnumerateArray().Any(p => p.GetString() == "guide_handle"))
+                throw new Exception("Guide comparison is missing from the published analysis schema.");
+            var outputBranches = AuditServerContractSupport.Output("analyze_geometry").GetProperty("properties")
+                .GetProperty("data").GetProperty("anyOf")[0].GetProperty("oneOf").EnumerateArray();
+            var output = outputBranches.Single(node => node.TryGetProperty("properties", out var properties) &&
+                properties.TryGetProperty("mode", out var mode) && mode.TryGetProperty("const", out var value) &&
+                value.GetString() == LoftGuideContacts.Mode).GetProperty("properties");
+            var statuses = output.GetProperty("sections").GetProperty("items").GetProperty("properties")
+                .GetProperty("status").GetProperty("enum").EnumerateArray().Select(e => e.GetString()).ToHashSet();
+            if (output.GetProperty("overlap_evaluated").GetProperty("const").GetBoolean() ||
+                !statuses.SetEquals(new[] { "points_reported", "no_points_reported", "unavailable" }))
+                throw new Exception("The published contact output loses native uncertainty.");
+            return Task.CompletedTask;
+        });
         await test("solid loft preserves all circular sections in ledger intent", () =>
         {
             var value = Parse(Loft(Section(-3), Section(5, 4, 7)));

@@ -76,6 +76,8 @@ internal static class DimensionMeasurementReader
         };
         if (sheetLength is { } length)
             return double.IsFinite(length) ? (length, null) : (null, "nonfinite_sheet_geometry");
+        // This fallback may read a cached physical nominal. It cannot supply the sheet length for an oblique OCS.
+        if (source is RotatedDimension) return (null, "tilted_rotated_dimension_sheet_geometry_unavailable");
         return MeasureDetached(source, Wire.Element(DimensionGeometryReader.Definition(source)), check);
     }
 

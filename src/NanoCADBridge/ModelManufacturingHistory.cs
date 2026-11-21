@@ -1,3 +1,4 @@
+using NanoCAD.Contracts;
 using Multicad;
 using Multicad.Mc3D;
 namespace NanoCADBridge;
@@ -18,7 +19,16 @@ internal static class ModelManufacturingHistory
         return center.All(double.IsFinite) && axis.All(double.IsFinite) && axis.Any(v => v != 0)
             ? new(center, axis, null) : new(null, null, "nonfinite_or_degenerate_placement");
     }
-    static object? Placement(IppDefinition? p, HoleFeature hole, Action? cancel)
+    private static ModelHolePlacementSlots.Reference[] TwoEdgeReferences(IppDefinition placement)
+    {
+        var stored = placement.GetAssocParams();
+        if (stored == null || stored.Count != 2 || stored.Any(reference => reference == null))
+            throw new DomainException("HISTORY_UNAVAILABLE", "The two managed placement reference slots are unavailable.");
+        return stored.Select((reference, slot) => ModelHolePlacementSlots.Observe(slot, reference.IsNull,
+            reference.ID.IsNull ? null : reference.ID.ToString(), reference.GSMarker, reference.Param, reference.Data)).ToArray();
+    }
+
+    static object? Placement(IppDefinition? p, HoleFeature hole, Action? cancel, bool readTwoEdgePlacement)
     {
         if (p == null) return null;
         string placement_type = p.DefType.ToString(), support_face_id = p.TargetPlaneId.ToString();
@@ -28,10 +38,28 @@ internal static class ModelManufacturingHistory
             var actual = FixedPlacement(p);
             return new { placement_type, support_face_id, center = actual.Center, support_normal_wcs = actual.Normal, position_unavailable_reason = actual.Unavailable };
         }
-        if (p.DefType == IppDefinitionType.TwoEdges) return new { placement_type, support_face_id, offset1 = p.Param1, offset2 = p.Param2, sector = p.Sector };
+        if (p.DefType == IppDefinitionType.TwoEdges)
+        {
+            if (!readTwoEdgePlacement) return new { placement_type, support_face_id, offset1 = p.Param1, offset2 = p.Param2, sector = p.Sector };
+            cancel?.Invoke();
+            var frame = FixedPlacement(p);
+            ModelHolePlacementSlots.Reference[]? references = null;
+            string? referenceFailure = null;
+            try { references = TwoEdgeReferences(p); }
+            catch (DomainException error) { referenceFailure = error.Error.code + ": " + error.Error.message; }
+            catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException or Teigha.Runtime.Exception)
+            { referenceFailure = error.GetType().Name; }
+            return new
+            {
+                placement_type, support_face_id, offset1 = p.Param1, offset2 = p.Param2, sector = p.Sector,
+                reference_slots = references, reference_slots_unavailable_reason = referenceFailure,
+                complex_path_and_viewport_observed = false,
+                center_wcs = frame.Center, support_normal_wcs = frame.Normal, position_unavailable_reason = frame.Unavailable
+            };
+        }
         return new { placement_type, support_face_id };
     }
-    internal static object? Parameters(McObjectId id, Action? cancel = null)
+    internal static object? Parameters(McObjectId id, Action? cancel = null, bool readTwoEdgePlacement = false)
     {
         var budget = new ModelInventoryBudget(cancel);
         string? Ref(McObjectId reference) { var value = reference.IsNull ? null : reference.ToString(); budget.Add(value); return value; }
@@ -93,7 +121,7 @@ internal static class ModelManufacturingHistory
             };
         }
         var h = id.GetObjectOfType<HoleFeature>();
-        if (h != null) { using var p = h.GetPlacement(); bool angleActive = !h.IsFullDepth && !h.FlatBottom; return new { kind = "hole", diameter = h.Diameter, through = h.IsFullDepth, depth = h.Depth, seat = h.SeatType.ToString(), seat_diameter = h.SeatDiameter, seat_depth = h.SeatDepth, seat_angle_degrees = h.SeatAngle * 180 / Math.PI, flat_bottom = h.FlatBottom, bottom_angle_applicable = angleActive, bottom_angle_degrees = angleActive ? (double?)(h.BottomAngle * 180 / Math.PI) : null, face_id = h.FaceId.ToString(), terminal_face_id = h.TerminalFaceId.ToString(), placement = Placement(p, h, cancel), thread_id = h.GetThread()?.ID.ToString() }; }
+        if (h != null) { using var p = h.GetPlacement(); bool angleActive = !h.IsFullDepth && !h.FlatBottom; return new { kind = "hole", diameter = h.Diameter, through = h.IsFullDepth, depth = h.Depth, seat = h.SeatType.ToString(), seat_diameter = h.SeatDiameter, seat_depth = h.SeatDepth, seat_angle_degrees = h.SeatAngle * 180 / Math.PI, flat_bottom = h.FlatBottom, bottom_angle_applicable = angleActive, bottom_angle_degrees = angleActive ? (double?)(h.BottomAngle * 180 / Math.PI) : null, face_id = h.FaceId.ToString(), terminal_face_id = h.TerminalFaceId.ToString(), placement = Placement(p, h, cancel, readTwoEdgePlacement), thread_id = h.GetThread()?.ID.ToString() }; }
         var t = id.GetObjectOfType<ThreadFeature>();
         if (t != null) return new { kind = "thread", pitch = t.Pitch, right_handed = t.IsRight, @internal = t.IsInternal, full_length = t.IsFullLength, length_applicable = !t.IsFullLength, length = t.Length, minimum_diameter = t.MinDiameter, maximum_diameter = t.MaxDiameter, designation = t.Designation, face_id = t.ThreadFaceId.ToString(), front_edge_id = t.FrontEdgeId.ToString(), pitch_variable_id = t.PitchVarID.ToString(), length_variable_id = t.LengthVarID.ToString(), representation = "native_thread_feature_helical_brep_unverified" };
         var c = id.GetObjectOfType<CircularPatternFeature>();
