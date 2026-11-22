@@ -105,7 +105,10 @@ internal static class CurveSolidCreator
             // and transaction state. Preserve its existing native failure code here.
             var normalized = copyWarnings.Skip(warningStart).Where(value => value.StartsWith("NATIVE_SPLINE_COPY_METADATA_NORMALIZED:", StringComparison.Ordinal)).ToArray();
             var observed = normalized.Take(4).Select(value => value.Length <= 4096 ? value : value[..4096] + "…").ToArray();
-            body.Dispose(); throw new DomainException("TRANSACTION_FAILED", "nanoCAD rejected the write operation.", false,
+            string message = stage == "create_lofted_solid" && s.NormalOption is not (null or "none")
+                ? $"nanoCAD rejected the loft with the requested '{s.NormalOption}' section normal condition ({error.ErrorStatus})."
+                : "nanoCAD rejected the write operation.";
+            body.Dispose(); throw new DomainException("TRANSACTION_FAILED", message, false,
              new
              {
                  stage,
@@ -114,6 +117,7 @@ internal static class CurveSolidCreator
                  section_count = s.Profiles.Length,
                  guide_count = s.Guides.Length,
                  interpolation = s.Kind == "loft" ? (s.Ruled ? "ruled" : "smooth") : null,
+                 normal_option = s.NormalOption,
                  has_center_path = s.PathHandle != null,
                  source_handle = inputIndex is int index ? (index < s.Profiles.Length ? s.Profiles[index] : index < s.Profiles.Length + s.Guides.Length ? s.Guides[index - s.Profiles.Length] : s.PathHandle) : null,
                  copy_normalization_warnings = observed,

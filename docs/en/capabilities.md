@@ -73,7 +73,9 @@ The assistant reads eligibility before writing and checks the actual result.
 
 Direct modeling includes supported primitives, extrusion, revolution, Sweep, Loft, Boolean operations, splitting, fillets, chamfers, shells and selected face edits.
 
-For a guided Loft, `loft_guide_contacts` reports finite 3D intersection points between one guide and each ordered section. A guide that misses a section, or a section the kernel cannot inspect, is identified individually. Use a cut through the resulting solid to check the shape between the input sections. The optional `normal_option` passes a section-normal request to nanoCAD. On nanoCAD 26 the kernel rejected `ends` for two smooth, unguided Lofts, one through mixed profiles and one through three circles. The same mixed profiles formed a solid with the default settings. Other explicit normal conditions still need native verification.
+For a guided Loft, `loft_guide_contacts` reports finite 3D intersection points between one guide and each ordered section. A guide that misses a section, or a section the kernel cannot inspect, is identified individually. Use a cut through the resulting solid to check the shape between the input sections.
+
+The optional `normal_option` requests that the side wall leave a section in the direction of its plane normal. For smooth unguided Lofts through three circles and through mixed profiles, nanoCAD 26.0.7476 rejected `first`, `last`, `ends` and `all` during solid creation. The same sections formed solids with the default settings. In an axial cut through the circular control, the side wall inclined about 10° from the section normal at the first end and 18° at the last. The bridge preserves the requested condition when reporting a failure.
 
 Parametric modeling can retain native sketches, geometric relations, dimensional controls, named variables, expressions, profiles and feature history. Supported features can be repeated with native rectangular or circular patterns and mirrored within one part. The assistant can change supported drivers and check the dependent geometry.
 
