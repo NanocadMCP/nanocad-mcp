@@ -13,7 +13,8 @@ public sealed record WriteReceipt432(string operation,string? operation_id,strin
 // replaces the bridge-owned ledger Result, its fingerprint or its phase.
 public static class WriteResponseBudget432
 {
-    public const string MassWarning="NATIVE_MASS_PROPERTIES_MAY_BE_STALE: After slicing or separating imported solids, nanoCAD may retain the original volume and centroid on both pieces. The split geometry is available; do not use those native mass values for engineering calculations without independent verification.";
+    public const string SplitMassGuidance = "After slicing or separating a solid, nanoCAD 26 may report the original solid's volume and centroid for a piece, even after reopening the DWG. Continue modeling with the resulting pieces. Verify these values independently if the task requires them.";
+    public const string MassWarning = "NATIVE_MASS_PROPERTIES_MAY_BE_STALE: " + SplitMassGuidance;
     public const string PagedWarning="RESPONSE_DETAILS_PAGED: Preserve this recorded outcome and operation_id. Full returned references and original warning text are available through get_operation_result in this bridge lifetime. Do not infer rollback, atomicity or permission to repeat a write from omitted details.";
 
     static object? Field(object? value,string name)

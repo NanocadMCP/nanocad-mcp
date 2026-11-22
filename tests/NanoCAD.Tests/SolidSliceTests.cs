@@ -5,6 +5,22 @@ internal static class SolidSliceTests
 {
     public static async Task Run(Func<string,Func<Task>,Task> test)
     {
+        await test("successful solid splits keep their pieces and report the native mass limitation", () =>
+        {
+            foreach (string field in new[] { "solid_slice_results", "solid_separation_results" })
+            {
+                var data = new Dictionary<string, object> { [field] = new[] { "543", "545" } };
+                var completed = Result.Ok("split", data);
+                var presented = WriteResponseBudget432.WithPresentationWarnings(completed);
+                if (!presented.success || !ReferenceEquals(presented.data, completed.data) ||
+                    !presented.warnings.Contains(WriteResponseBudget432.MassWarning))
+                    throw new Exception("The split result must keep its pieces and warn about their reported volume and centroid.");
+            }
+            var unrelated = Result.Ok("other", new { });
+            if (WriteResponseBudget432.WithPresentationWarnings(unrelated).warnings.Length != 0)
+                throw new Exception("An unrelated edit received the split warning.");
+            return Task.CompletedTask;
+        });
         await test("separate solid accepts disconnected-volume operation without a cutting plane",()=>
         {
             var edit=new Dictionary<string,object>{["operation"]="separate_solid",["handles"]=Enumerable.Range(1,300).Select(i=>i.ToString("X")).ToArray()};
