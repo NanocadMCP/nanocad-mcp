@@ -1,6 +1,7 @@
 using NanoCAD.Contracts;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
-using System.Text.Json;
 using NanoCAD.McpServer;
 
 internal static class DrawingViewBreakTests
@@ -9,14 +10,22 @@ internal static class DrawingViewBreakTests
     {
         await (hostTest ?? test)("drawing break known SDK getters are field-only without native calls", () =>
         {
-            using var evidence = JsonDocument.Parse(File.ReadAllText("docs/research/break2d-sdk.json")); var root = evidence.RootElement;
-            var digest = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(root.GetProperty("assembly").GetString()!)));
-            if (digest != root.GetProperty("sha256").GetString()) throw new Exception("Installed custom class changed; getter review is stale.");
+            string managed = Environment.GetEnvironmentVariable("NanoCadManagedDir") ??
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Nanosoft AS", "nanoCAD x64 26.0", "bin");
+            using var assembly = File.OpenRead(Path.Combine(managed, "..", "bin_nPlat", "mapinet.dll"));
+            const string reviewedHash = "AE5AF483BE83FAA9AE826379A1C4AC689D0B097F7780AFC5D98FB3A05868CA75";
+            if (Convert.ToHexString(SHA256.HashData(assembly)) != reviewedHash)
+                throw new Exception("Installed custom class changed; getter review is stale.");
+            assembly.Position = 0;
+            using var pe = new PEReader(assembly);
+            var metadata = pe.GetMetadataReader();
+            var type = metadata.TypeDefinitions.Select(metadata.GetTypeDefinition).Single(t =>
+                metadata.StringComparer.Equals(t.Namespace, "Mapinet") && metadata.StringComparer.Equals(t.Name, "Break2d"));
             foreach (string name in new[] { "get_BreakType", "get_BreakTypeIndex", "get_GapBetweenLines", "get_VectSkew", "get_TargetDrawingViewId" })
             {
-                var method = root.GetProperty("methods").EnumerateArray().Single(m => m.GetProperty("method").GetString() == name);
-                var bytes = Convert.FromHexString(method.GetProperty("il").GetString()!);
-                if (bytes.Length != 7 || bytes[0] != 0x02 || bytes[1] != 0x7B || bytes[6] != 0x2A || method.GetProperty("direct_calls").GetArrayLength() != 0 || method.GetProperty("indirect_calli_count").GetInt32() != 0)
+                var method = type.GetMethods().Select(metadata.GetMethodDefinition).Single(m => metadata.StringComparer.Equals(m.Name, name));
+                var bytes = pe.GetMethodBody(method.RelativeVirtualAddress).GetILBytes();
+                if (bytes is not { Length: 7 } || bytes[0] != 0x02 || bytes[1] != 0x7B || bytes[6] != 0x2A)
                     throw new Exception("Getter is not reviewed ldarg.0/ldfld/ret: " + name);
             }
             return Task.CompletedTask;
