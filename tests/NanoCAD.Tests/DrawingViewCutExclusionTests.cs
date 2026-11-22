@@ -8,7 +8,7 @@ using NanoCAD.Contracts;
 
 internal static class DrawingViewCutExclusionTests
 {
-    sealed record Call(int Offset, string Type, string Method);
+    sealed record Call(int Offset, string Type, string Method, int Token);
     sealed record Body(Call[] Calls, string[] Strings);
     static void Need(bool condition, string message) { if (!condition) throw new Exception(message); }
     static JsonElement ObjectAlternative(JsonElement value) => value.GetProperty("anyOf").EnumerateArray()
@@ -62,6 +62,10 @@ internal static class DrawingViewCutExclusionTests
                 var owner = metadata.TypeDefinitions.Single(handle => TypeName(handle) == type);
                 var method = metadata.GetTypeDefinition(owner).GetMethods().Select(handle => metadata.GetMethodDefinition(handle))
                     .Single(method => metadata.GetString(method.Name) == name);
+                return ReadDefinition(method);
+            }
+            Body ReadDefinition(MethodDefinition method)
+            {
                 var il = pe.GetMethodBody(method.RelativeVirtualAddress).GetILBytes() ?? throw new Exception("Compiled scope method has no IL.");
                 var calls = new List<Call>(); var strings = new List<string>();
                 for (int index = 0; index < il.Length;)
@@ -76,7 +80,12 @@ internal static class DrawingViewCutExclusionTests
                         OperandType.InlineSwitch => 4 + 4 * BitConverter.ToInt32(il, index),
                         _ => 4
                     };
-                    if (opcode.OperandType == OperandType.InlineMethod) { var target = Target(BitConverter.ToInt32(il, index)); calls.Add(new(offset, target.Type, target.Method)); }
+                    if (opcode.OperandType == OperandType.InlineMethod)
+                    {
+                        int token = BitConverter.ToInt32(il, index);
+                        var target = Target(token);
+                        calls.Add(new(offset, target.Type, target.Method, token));
+                    }
                     if (opcode.OperandType == OperandType.InlineString) strings.Add(metadata.GetUserString(MetadataTokens.UserStringHandle(BitConverter.ToInt32(il, index) & 0xFFFFFF)));
                     Need(opcode.OperandType != OperandType.InlineSig, "Scope selection unexpectedly invokes an unmanaged indirect call."); index += size;
                 }
@@ -105,7 +114,7 @@ internal static class DrawingViewCutExclusionTests
                 "The selected-sketch guard lost the user exclusion or narrowed ordinary document sketches by a null HostSolid heuristic.");
             foreach (var target in new[]{
                 ("NativeSketchConstraintWriter385","Resolve"),("NativeSketchConstraintRemoval430","Resolve"),
-                ("ModelSketchLifecycleWriter362","Resolve"),("ModelSketchParameter411","Capture"),
+                ("ModelSketchLifecycleWriter362","Resolve"),
                 ("ModelProfileLifecycleWriter340","Resolve"),("ModelProfileRegionsWriter350","Resolve"),
                 ("ModelProfileElementsWriter358","Resolve"),("ModelProfileRebindWriter349","Resolve"),
                 ("ModelSketchWriter","Resolve"),("ModelSketchCompositionWriter","Resolve"),
@@ -115,6 +124,15 @@ internal static class DrawingViewCutExclusionTests
                 var caller = Read(target.Item2, "NanoCADBridge." + target.Item1);
                 Need(caller.Calls.Any(call => call.Type == "NanoCADBridge.DrawingViewSketchWriteScope282" && call.Method == "RequireSupported") && !caller.Calls.Any(Mutation),
                     "A selected mutation preflight bypasses cut-sketch scope protection or writes before it: " + target.Item1 + "." + target.Item2);
+            }
+            foreach (string writer in new[] { "ModelParameterGraphWriter410", "ModelParameterNameWriter" })
+            {
+                var resolver = Read("Resolve", "NanoCADBridge." + writer);
+                var capture = resolver.Calls.Single(call => call.Type == "NanoCADBridge.ModelSketchParameter411" && call.Method == "Capture");
+                var callee = (MethodDefinitionHandle)MetadataTokens.EntityHandle(capture.Token);
+                var preflight = ReadDefinition(metadata.GetMethodDefinition(callee));
+                Need(preflight.Calls.Any(call => call.Type == "NanoCADBridge.DrawingViewSketchWriteScope282" && call.Method == "RequireSupported") &&
+                     !preflight.Calls.Any(Mutation), writer + " must select the guarded sketch capture before any mutation.");
             }
             var lifecycle = Read("Prepare", "NanoCADBridge.DrawingViewLifecycleWriter345");
             Need(lifecycle.Calls.Any(call => call.Type == "NanoCADBridge.CadDrawingViewEditWriter" && call.Method == "RequireSupportedViews") && !lifecycle.Calls.Any(Mutation),
