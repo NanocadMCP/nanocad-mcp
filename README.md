@@ -10,7 +10,7 @@ You describe the result, dimensions and constraints. The assistant reads the dra
 
 - Create and edit 2D geometry, text, dimensions, leaders, tables, hatches and static blocks; adjust supported properties of existing dynamic blocks.
 - Reuse eligible local DWG content as static blocks, and update shared definitions while retaining insertion placement and attribute values.
-- Name 3D parts and find them again in the drawing, including imported ACIS solids.
+- Name parametric parts in 3D History and find them by name in the drawing. Search existing DWG group labels on direct solids.
 - Build solids with extrusion, revolution, sweep, loft, Boolean operations and finishing tools.
 - Use supported native sketches, constraints, parameters and dependent features to build editable individual parts.
 - Prepare editable DWG documentation with dimensions linked to supported drawing views, and work with local drawing and raster references.

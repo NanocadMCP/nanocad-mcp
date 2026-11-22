@@ -60,9 +60,25 @@ public sealed record EntitySummary(EntityRef @ref, string type, string runtime_t
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? body_name_source { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? part_name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? native_tree_name { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelBodyNameGroup? body_name_group { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool body_name_group_ambiguous { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? body_name_match_source { get; init; }
+
+    public string? BodyNameMatchSource(string name)
+    {
+        if (string.Equals(body_name, name, StringComparison.OrdinalIgnoreCase)) return body_name_source;
+        if (body_name_source != "native_part_name" || body_name_group_ambiguous) return null;
+        if (body_name_group != null)
+            return string.Equals(body_name_group.description, name, StringComparison.OrdinalIgnoreCase) ? "dwg_group_description" : null;
+        return string.Equals(native_tree_name, name, StringComparison.OrdinalIgnoreCase) ? "native_tree" : null;
+    }
 }
 public sealed record EntityDetail(EntityRef @ref, string type, string runtime_type, LayerDto? layer, string space,
     string detail_support, string coordinate_system, object geometry, object properties, string[] warnings)
@@ -72,9 +88,13 @@ public sealed record EntityDetail(EntityRef @ref, string type, string runtime_ty
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? body_name_source { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? part_name { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? native_tree_name { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public ModelBodyNameGroup? body_name_group { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool body_name_group_ambiguous { get; init; }
 }
 public sealed record ItemResult(string handle, bool success, EntityDetail? entity, DomainError? error);
 public sealed record Page(EntitySummary[] items, int? total_count, int returned_count, bool complete, string? next_cursor, string? selection_revision);

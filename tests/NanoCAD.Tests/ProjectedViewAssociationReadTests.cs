@@ -41,7 +41,8 @@ internal static class ProjectedViewAssociationReadTests
                     feature.TryGetProperty("mc_id", out _), "The expanded feature schema lost native ownership or parameter units.");
                 var sourcePart = link.GetProperty("source_parts").GetProperty("items").GetProperty("properties");
                 Need(sourcePart.TryGetProperty("body_name", out _) && sourcePart.TryGetProperty("body_name_source", out _) &&
-                    sourcePart.TryGetProperty("native_tree_name", out _) && sourcePart.TryGetProperty("body_name_group", out _) &&
+                    sourcePart.TryGetProperty("part_name", out _) && sourcePart.TryGetProperty("native_tree_name", out _) &&
+                    sourcePart.TryGetProperty("body_name_group", out _) &&
                     marker.GetProperty("projection_source").GetProperty("properties").TryGetProperty("native_subelement_kind", out _) &&
                     design.TryGetProperty("view_source_ref", out _) && design.TryGetProperty("feature_unavailable_reason", out _) &&
                     design.TryGetProperty("measurement_driver_unavailable_reason", out _) &&

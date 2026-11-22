@@ -6,9 +6,13 @@ namespace NanoCAD.Contracts;
 public sealed record ModelBodyNameEdit(string[] Targets, string Name, string? ExpectedName)
     : EditSpec("name_model_body", Targets);
 
-public sealed record ModelBodyNameGroup(string name, EntityRef @ref);
+public sealed record ModelBodyNameGroup(string name, EntityRef @ref)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? description { get; init; }
+}
 public sealed record ModelBodyNameChange(EntityRef body_ref, string previous_name, string name,
-    string body_name_source, string? native_tree_name, ModelBodyNameGroup? body_name_group);
+    string body_name_source, string? native_tree_name, ModelBodyNameGroup? body_name_group, string? part_name = null);
 
 public static class BodyNameGroupKey
 {

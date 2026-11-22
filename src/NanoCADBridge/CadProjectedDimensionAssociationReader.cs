@@ -220,16 +220,19 @@ internal static class CadProjectedDimensionAssociationReader
                     if (!includeDesignSource) continue;
                     var nativeBody = body.GetObjectOfType<Mc3dSolid>();
                     var name = CadModelBodyNames.Inspect(physical, transaction, reference,
+                        nativeBody?.ID == body ? CadModelBodyNames.ReadPartName(nativeBody) : null,
                         nativeBody?.ID == body ? CadModelBodyNames.ReadTreeName(nativeBody) : null,
-                        nativeBody?.ID == body ? CadModelBodyNames.IsImported(nativeBody) : null, cancel);
+                        nativeBody?.ID == body ? CadModelBodyNames.IsAlienSolid(nativeBody) : null, cancel);
                     sourceParts.Add(new
                     {
                         @ref = reference,
                         mc_id = body.ToString(),
                         body_name = name.Name,
                         body_name_source = name.Source,
+                        part_name = name.Part,
                         native_tree_name = name.Native,
                         body_name_group = name.Group,
+                        body_name_group_ambiguous = name.AmbiguousGroup,
                         dwg_material_handle = physical.MaterialId.IsNull ? null : physical.MaterialId.Handle.ToString()
                     });
                 }

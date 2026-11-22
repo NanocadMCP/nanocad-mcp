@@ -39,7 +39,7 @@ internal static class TargetedReadSchema407
         text["description"] = "Literal ordinary note content or explicit dimension override; decoded plain MTEXT/MLeader when available. No Field evaluation, Table-cell scan or nested block-attribute traversal. match defaults contains, case_sensitive defaults false.";
         var summary = Flag();
         summary["description"] = "Count filtered objects by type and layer and combine WCS XYZ bounds. For a paged summary, follow next_cursor with the same filters, sum page counts by type/layer and take the union of page bounds. aggregation_scope distinguishes entire_query from this_page.";
-        var bodyName = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["description"] = "Exact effective name of a top-level Model Space solid, matched case-insensitively. Includes native tree names and supported DWG group descriptions for imported solids. Names may repeat. Inspect the matching body handles before editing." };
+        var bodyName = new JsonObject { ["type"] = "string", ["minLength"] = 1, ["description"] = "Find a top-level Model solid by exact part name or its legacy label, case-insensitive. body_name_match_source identifies caption and alias matches. Names may repeat." };
         return new() { ["bounds"] = bounds, ["text"] = text, ["block_definition"] = block, ["body_name"] = bodyName, ["summary_only"] = summary };
     }
     internal static JsonObject InspectProperties() => new()
@@ -114,7 +114,7 @@ internal static class TargetedReadSchema407
                 {
                     ["anyOf"] = new JsonArray(Object(new JsonObject
                     {
-                        ["scope"] = Enum("top_level_model_solid_effective_name"),
+                        ["scope"] = Enum("top_level_model_solid_part_name_history_name_or_group_description", "top_level_model_solid_effective_name"),
                         ["match"] = Enum("ordinal_ignore_case_equals"),
                         ["page_solids_excluded_unavailable_name"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 }
                     }, "scope", "match", "page_solids_excluded_unavailable_name"), new JsonObject { ["type"] = "null" })
@@ -148,6 +148,7 @@ internal static class TargetedReadSchema407
             ["total_count"] = Count(),
             ["by_type"] = Groups("type"),
             ["by_layer"] = Groups("layer"),
+            ["by_body_name_match_source"] = Groups("source"),
             ["bounds"] = new JsonObject { ["anyOf"] = new JsonArray(bounds, new JsonObject { ["type"] = "null" }) },
             ["bounds_unavailable_count"] = Count(),
             ["spatial_excluded_unavailable_bounds_count"] = Count(),

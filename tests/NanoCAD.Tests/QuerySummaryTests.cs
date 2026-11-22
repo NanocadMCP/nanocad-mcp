@@ -14,15 +14,38 @@ internal static class QuerySummaryTests
             {
                 var fields = item.GetProperty("properties");
                 var sources = fields.GetProperty("body_name_source").GetProperty("anyOf").EnumerateArray().Single(s => s.TryGetProperty("enum", out _));
-                foreach (var value in new[] { "native_tree", "dwg_group_description", "ambiguous_dwg_group" })
+                foreach (var value in new[] { "native_part_name", "native_tree", "dwg_group_description", "ambiguous_dwg_group" })
                     if (!sources.GetProperty("enum").EnumerateArray().Any(source => source.GetString() == value))
                         throw new Exception("Missing body name source: " + value);
                 var group = fields.GetProperty("body_name_group").GetProperty("anyOf").EnumerateArray()
                     .Single(option => option.TryGetProperty("properties", out _)).GetProperty("properties");
-                if (!fields.TryGetProperty("native_tree_name", out _) || !group.TryGetProperty("name", out _) ||
+                if (!fields.TryGetProperty("part_name", out _) || !fields.TryGetProperty("native_tree_name", out _) ||
+                    !fields.TryGetProperty("body_name_group_ambiguous", out _) || !group.TryGetProperty("name", out _) ||
+                    !group.TryGetProperty("description", out _) ||
                     !group.GetProperty("ref").GetProperty("properties").TryGetProperty("handle", out _))
                     throw new Exception("Missing tree label or named group reference.");
             }
+            return Task.CompletedTask;
+        });
+        await test("part designation and existing body aliases remain separately searchable", () =>
+        {
+            var body = new EntityRef("bridge", "drawing", "2A");
+            var group = new ModelBodyNameGroup("FORMER_LABEL", body with { handle = "3B" }) { description = "Former label" };
+            var item = new EntitySummary(body, "Solid3d", "Solid3d", null, "model", "supported")
+            {
+                body_name = "Mounting plate", body_name_source = "native_part_name", part_name = "Mounting plate",
+                native_tree_name = "Box 1", body_name_group = group
+            };
+            if (item.BodyNameMatchSource("MOUNTING PLATE") != "native_part_name" || item.BodyNameMatchSource("Box 1") != null ||
+                item.BodyNameMatchSource("Former label") != "dwg_group_description" || item.BodyNameMatchSource(group.name) != null ||
+                item.BodyNameMatchSource("Plate") != null || (item with { body_name_group = null }).BodyNameMatchSource("Box 1") != "native_tree")
+                throw new Exception("A part name, previous effective label or its source was misidentified.");
+            var aggregate = new QuerySummary();
+            aggregate.Add("Solid3d", "0", null, null, "native_part_name");
+            aggregate.Add("Solid3d", "0", null, null, "dwg_group_description");
+            var counts = Wire.Element(aggregate.Result("model", unavailableBodyNames: 0)).GetProperty("by_body_name_match_source");
+            if (counts.GetArrayLength() != 2 || counts.EnumerateArray().Any(c => c.GetProperty("count").GetInt32() != 1))
+                throw new Exception("Name-filtered counts conflated part captions and legacy aliases.");
             return Task.CompletedTask;
         });
         await test("native face query filters supporting geometry and preserves distinct axis and plane distances", () =>

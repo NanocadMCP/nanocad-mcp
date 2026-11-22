@@ -11,7 +11,7 @@ internal static class DwgBodyNameGroup
     internal sealed record Label(ObjectId Id, string Key, string Description)
     {
         internal ModelBodyNameGroup Reference(EntityRef body) =>
-            new(Key, body with { handle = Validation.NormalizeHandle(Id.Handle.ToString()) });
+            new(Key, body with { handle = Validation.NormalizeHandle(Id.Handle.ToString()) }) { description = Description };
     }
 
     internal static (Label? Group, bool Ambiguous) Find(Entity solid, Transaction tx, Action? cancel = null)

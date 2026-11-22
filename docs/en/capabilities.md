@@ -8,7 +8,7 @@ See [installation](installation.md) for requirements and connection instructions
 
 ## Part names and model history
 
-Parametric parts use their names in the nanoCAD model tree. Imported ACIS solids store their labels in the description of a single-member DWG group. Edit the description in Group Manager (`CLASSICGROUP`) to rename the solid. Moving, drilling or finishing the solid preserves its label. Parts that share a name appear as separate search results.
+Naming a parametric body sets its top-level caption in the 3D History panel and retains it in the DWG. In nanoCAD 26, a nonparametric solid can show a new caption during the session but reverts to its generated caption on reopen, including when it was renamed in nanoCAD itself. The bridge reports BODY_NAME_PERSISTENCE_UNAVAILABLE before changing any body in a naming request that includes such a solid. The construction history item and its sketches and features keep their individual names. Drawings created with older versions can still be searched by their existing history item names and DWG group labels. Parts that share a name appear as separate search results.
 
 For a selected face, you can list its boundary edges or trace it to the feature that created it when nanoCAD provides that link. Inspect the feature's parameters and dependencies to find what controls a dimension. Parametric fillets and chamfers accept individual edges. A concentric hole can follow its boss as the boss moves, and an existing Simple Fixed through hole can be updated after the part changes length.
 
