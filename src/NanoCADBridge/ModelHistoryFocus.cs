@@ -16,6 +16,7 @@ internal sealed class ModelHistoryFocus
     private readonly HashSet<string> upstreamIssueCandidates = new(Identity);
     private readonly HashSet<string>? downstream;
     private readonly HashSet<string>? externalDownstream;
+    private readonly List<ModelConcentricHole.CreatorLink> placementLinks = new();
     internal bool Include(string id) => selected.Contains(id) || upstream.Contains(id) || consumers.Contains(id) || downstream?.Contains(id) == true;
 
     internal ModelHistoryFocus(List<McObjectId> contents, string bodyId, string request, bool includeDownstream, Action cancel)
@@ -34,6 +35,9 @@ internal sealed class ModelHistoryFocus
                 var native = node.GetDependsOn(false, false) ?? throw new DomainException("HISTORY_UNAVAILABLE", "A native history item returned no dependency inventory.");
                 dependencies = native.Where(d => !d.IsNull).Select(d => d.ToString())
                     .Where(d => !Identity.Equals(d, bodyId)).Distinct(Identity).ToArray();
+                if (includeDownstream && id.GetObjectOfType<HoleFeature>() is { } hole && hole.ID == id &&
+                    Identity.Equals(hole.HostSolidID.ToString(), bodyId) && ModelConcentricHole.ReadCreatorLink(hole, native) is { } link)
+                    placementLinks.Add(link);
                 if (includeDownstream && Identity.Equals(key, request))
                 {
                     if (node.ID != id || !Identity.Equals(node.HostSolidID.ToString(), bodyId))
@@ -67,6 +71,19 @@ internal sealed class ModelHistoryFocus
         foreach (var (id, deps) in graph)
             if (!selected.Contains(id) && deps.Any(selected.Contains)) consumers.Add(id);
         activeIssues.IntersectWith(selected.Concat(upstream));
+        var dependents = new Dictionary<string, List<string>>(Identity);
+        void Link(string parent, string child)
+        {
+            if (Identity.Equals(parent, child)) return;
+            if (!dependents.TryGetValue(parent, out var children)) dependents[parent] = children = new();
+            children.Add(child);
+        }
+        if (includeDownstream || activeIssues.Count > 0)
+            foreach (var (id, deps) in graph)
+                foreach (var dependency in deps) Link(dependency, id);
+        // Issue diagnosis and direct_consumer_ids retain their GetDependsOn-only meaning.
+        if (activeIssues.Count > 0)
+            upstreamIssueCandidates.UnionWith(activeIssues.Except(Reachable(activeIssues, dependents, cancel), Identity));
         if (includeDownstream)
         {
             if (nativeDependents == null) throw new DomainException("DEPENDENCY_INVENTORY_UNAVAILABLE", "Select a native history item with an available downstream inventory.");
@@ -80,18 +97,11 @@ internal sealed class ModelHistoryFocus
                 if (graph.ContainsKey(key)) downstream.Add(key);
                 else externalDownstream.Add(key);
             }
-        }
-        if (activeIssues.Count > 0)
-        {
-            var dependents = new Dictionary<string, List<string>>(Identity);
-            foreach (var (id, deps) in graph)
-                foreach (var dependency in deps.Where(d => !Identity.Equals(d, id)))
-                {
-                    if (!dependents.TryGetValue(dependency, out var children)) dependents[dependency] = children = new();
-                    children.Add(id);
-                }
-            // An active issue reachable from another active issue can be a downstream symptom.
-            upstreamIssueCandidates.UnionWith(activeIssues.Except(Reachable(activeIssues, dependents, cancel), Identity));
+            placementLinks.RemoveAll(link => !graph.ContainsKey(link.creator_id));
+            foreach (var link in placementLinks) Link(link.creator_id, link.hole_id);
+            downstream.UnionWith(Reachable(selected.Concat(downstream), dependents, cancel));
+            downstream.ExceptWith(selected);
+            placementLinks.RemoveAll(link => !(selected.Contains(link.creator_id) || downstream.Contains(link.creator_id)));
         }
     }
 
@@ -136,13 +146,14 @@ internal sealed class ModelHistoryFocus
             direct_consumer_ids = consumers.OrderBy(id => id, Identity),
             downstream_ids = downstream?.OrderBy(id => id, Identity),
             external_downstream_ids = externalDownstream?.OrderBy(id => id, Identity),
+            downstream_concentric_edge_sources = downstream == null ? null : placementLinks,
             external_reference_ids = external.OrderBy(id => id, Identity),
             unknown_status_ids = unknownStatus.OrderBy(id => id, Identity),
             parameter_variables = drivers,
             upstream_issue_candidate_ids = upstreamIssueCandidates.OrderBy(id => id, Identity),
             next_reads = (request == "issues" ? upstreamIssueCandidates : selected).OrderBy(id => id, Identity)
                 .Select(id => new { operation = "get_model_variables", handle, feature_id = id }),
-            evidence = (downstream == null ? "" : "GetAllDependent(false) supplies unordered direct and indirect consumers. External consumers have IDs only. ") + "GetDependsOn(false,false) within current part contents. External references are leaves. Native statuses and variable bindings do not establish a failure cause or permission to edit."
+            evidence = (downstream == null ? "" : "Downstream IDs combine GetAllDependent(false) and reachable same-part references. downstream_concentric_edge_sources identifies each additional verified creator-to-hole link through its exact stored edge and GetFeatureObjectIdForFEV. Other placement links can be unavailable. External consumers have IDs only. ") + "Direct consumers use GetDependsOn(false,false) within current part contents. External references are leaves. Native statuses and variable bindings do not establish a failure cause or permission to edit."
         };
     }
 }

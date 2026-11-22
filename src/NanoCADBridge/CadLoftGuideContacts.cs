@@ -71,10 +71,15 @@ internal static class CadLoftGuideContacts
                 foreach (Point3d hit in hits)
                 {
                     cancel();
-                    if (!double.IsFinite(hit.X) || !double.IsFinite(hit.Y) || !double.IsFinite(hit.Z) ||
-                        !(hit.DistanceTo(guide.GetClosestPointTo(hit, false)) <= tolerance) ||
-                        !(hit.DistanceTo(curve.GetClosestPointTo(hit, false)) <= tolerance))
-                        throw new DomainException("LOFT_CONTACT_UNVERIFIED", "A reported WCS point could not be verified on both finite curves.");
+                    if (!double.IsFinite(hit.X) || !double.IsFinite(hit.Y) || !double.IsFinite(hit.Z))
+                        throw new DomainException("LOFT_CONTACT_UNVERIFIED", "The intersection returned a nonfinite WCS point.");
+                    double guideDistance = hit.DistanceTo(guide.GetClosestPointTo(hit, false));
+                    double boundaryDistance = hit.DistanceTo(curve.GetClosestPointTo(hit, false));
+                    if (!double.IsFinite(guideDistance) || !double.IsFinite(boundaryDistance))
+                        throw new DomainException("LOFT_CONTACT_UNVERIFIED", "A finite-curve closest-point distance was unavailable.");
+                    if (guideDistance > tolerance || boundaryDistance > tolerance)
+                        throw new DomainException("LOFT_CONTACT_UNVERIFIED", FormattableString.Invariant(
+                            $"WCS intersection ({hit.X:R}, {hit.Y:R}, {hit.Z:R}): distance to finite guide {guideDistance:R}, distance to finite section boundary {boundaryDistance:R}, point tolerance {tolerance:R} (drawing units)."));
                     // A shared Region vertex can be returned by two trims.
                     if (!witnesses.Add((hit.X, hit.Y, hit.Z))) continue;
                     double[] value = [hit.X, hit.Y, hit.Z];

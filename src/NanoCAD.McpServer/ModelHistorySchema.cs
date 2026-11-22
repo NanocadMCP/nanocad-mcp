@@ -32,7 +32,7 @@ internal static class ModelHistorySchema
         schema["properties"]!["include_downstream_history"] = new JsonObject
         {
             ["type"] = "boolean",
-            ["description"] = "With history_focus set to a current sketch or feature ID, include direct and transitive consumers reported by the native GetAllDependent inventory and direct references within this part. For TwoEdges holes read the ordered geometric reference slots (managed object ID, GS marker, parameter and data) and the evaluated center and support-plane normal in WCS. The slot read omits complex paths and viewport references. Nodes and downstream_ids describe recorded dependencies, without assuming recompute order."
+            ["description"] = "With history_focus set to a current sketch or feature ID, trace downstream features through GetAllDependent and recorded local dependencies. For a concentric Hole, downstream_concentric_edge_sources identifies the stored placement edge and its verified native creator. direct_consumer_ids uses GetDependsOn only. For TwoEdges holes read the ordered geometric reference slots (managed object ID, GS marker, parameter and data) and the evaluated center and support-plane normal in WCS. The slot read omits complex paths and viewport references. The trace does not establish recompute order."
         };
         schema["properties"]!["profile_element_ids"] = ModelProfileElementsSchema358.HistoryInput();
         schema["properties"]!["extrusion_extent_ids"] = ModelExtrusionExtentsSchema351.HistoryInput();

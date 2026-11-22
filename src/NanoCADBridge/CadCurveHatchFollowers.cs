@@ -147,7 +147,7 @@ internal sealed class CadCurveHatchFollowers
                 if (!members.Add(id))
                     throw new DomainException("INVALID_HATCH_TOPOLOGY", "A boundary source occurs in more than one loop of the same Hatch.");
                 var curve = tr.GetObject(id, OpenMode.ForRead) as Curve;
-                if (curve == null || curve.Database != hatch.Database || curve.OwnerId != hatch.OwnerId)
+                if (curve == null || curve.ObjectId != id || curve.Database?.UnmanagedObject != hatch.Database.UnmanagedObject || curve.OwnerId != hatch.OwnerId)
                     throw new DomainException("OUT_OF_SCOPE", "Each Hatch loop must retain live boundary curves in its owning drawing space.");
                 var layer = (LayerTableRecord)tr.GetObject(curve.LayerId, OpenMode.ForRead);
                 if (layer.IsLocked || layer.IsDependent)

@@ -65,7 +65,7 @@ internal static class CadSolidSectionAnalysis
             contacts.Add(t);
         }
         var curves = section.BoundaryCurves();
-        var unsupported = curves.FirstOrDefault(curve => curve is not (Line or Circle or Arc));
+        var unsupported = curves.FirstOrDefault(curve => curve is not (Line or Circle or Arc or Spline or Ellipse));
         if (unsupported != null)
             return new
             {
@@ -74,6 +74,7 @@ internal static class CadSolidSectionAnalysis
                 segment = new[] { Station(0), Station(length) },
                 intervals = (object?)null
             };
+        using var segment = new Line(from, to);
         foreach (var curve in curves)
         {
             check();
@@ -93,6 +94,21 @@ internal static class CadSolidSectionAnalysis
                     if (Math.Abs(h0) <= tolerance) Add(t0);
                     if (Math.Abs(h1) <= tolerance) Add(t1);
                     if (Math.Sign(h0) != Math.Sign(h1)) Add(t0 + (t1 - t0) * (h0 / (h0 - h1)));
+                }
+            }
+            else if (curve is Ellipse or Spline)
+            {
+                // These are actual finite trims of the section Region. Keep overlaps and tangencies as well as crossings.
+                var hits = CadCurveRelations.IntersectFinite(segment, curve, section.Normal, check);
+                double Along(double[] point) => (new Point3d(point) - from).DotProduct(axis);
+                foreach (var point in hits.Points) Add(Along(point));
+                foreach (var span in hits.Overlaps)
+                {
+                    var a = Math.Clamp(Along(span.first_start), 0, length);
+                    var b = Math.Clamp(Along(span.first_end), 0, length);
+                    Add(a);
+                    Add(b);
+                    overlaps.Add((Math.Min(a, b), Math.Max(a, b)));
                 }
             }
             else

@@ -42,6 +42,33 @@ internal static class ModelConcentricHole
         return key!.ToString();
     }
 
+    internal sealed record CreatorLink(string creator_id, string edge_id, string hole_id);
+
+    internal static CreatorLink? ReadCreatorLink(HoleFeature hole, IEnumerable<McObjectId> dependencies)
+    {
+        try
+        {
+            using var placement = hole.GetPlacement();
+            if (placement?.DefType != IppDefinitionType.Concentric) return null;
+            var refs = placement.GetAssocParams()?.Where(item => item != null && !item.IsNull).ToArray();
+            if (refs is not { Length: 1 }) return null;
+            var edge = refs[0].ID;
+            var body = hole.HostSolidID;
+            if (body.IsNull || edge.IsNull || !edge.IsEdge || !dependencies.Contains(edge)) return null;
+            Key(edge, body);
+            var creator = Service.GetFeatureObjectIdForFEV(edge);
+            if (creator.IsNull || creator == hole.ID || creator.GetObjectOfType<HistoryItem>() is not { } source ||
+                source.ID != creator || source.HostSolidID != body) return null;
+            return new(creator.ToString(), edge.ToString(), hole.ID.ToString());
+        }
+        catch (Exception ex) when (ex is DomainException or NotSupportedException or NotImplementedException or Teigha.Runtime.Exception)
+        {
+            // A hole can outlive its original edge. Keep the native history inventory
+            // available when this additional local provenance cannot be established.
+            return null;
+        }
+    }
+
     private static (double[] Center, double[] Axis, double Radius) Circle(EntityGeometry? geometry)
     {
         Need(geometry != null && geometry.GeometryType == EntityGeomType.kCircArc, "The native placement parameter does not evaluate to a circle.");

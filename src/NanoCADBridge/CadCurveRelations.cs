@@ -6,6 +6,7 @@ namespace NanoCADBridge;
 
 internal static class CadCurveRelations
 {
+    internal sealed record Overlap(double[] first_start, double[] first_end, double[] second_start, double[] second_end, double length);
     private static double[] P(Point3d p)=>new[]{p.X,p.Y,p.Z};
     private static void RequireXy(Curve curve,SplineGeometry? spline)
     {
@@ -29,11 +30,17 @@ internal static class CadCurveRelations
             try{interval?.Dispose();}catch(System.Exception error){failure??=error;}
         if(failure!=null)throw failure;
     }
-    internal static (double[][] Points,object[] Overlaps) Read(Curve first,Curve second,Action check,SplineGeometry? firstSpline=null,SplineGeometry? secondSpline=null,SketchPlaneSpec? workplane=null)
+    internal static (double[][] Points,Overlap[] Overlaps) Read(Curve first,Curve second,Action check,SplineGeometry? firstSpline=null,SplineGeometry? secondSpline=null,SketchPlaneSpec? workplane=null)
     {
         var normal=Vector3d.ZAxis;
         if(workplane==null){RequireXy(first,firstSpline);RequireXy(second,secondSpline);}
         else {normal=CadCurveWorkplane.Require(first,workplane,check);CadCurveWorkplane.Require(second,workplane,check);}
+        return IntersectFinite(first, second, normal, check);
+    }
+
+    // Callers establish a common plane either from source geometry or from the section Region that owns the trims.
+    internal static (double[][] Points,Overlap[] Overlaps) IntersectFinite(Curve first,Curve second,Vector3d normal,Action check)
+    {
         check();
         using var firstGeometry=first.GetGeCurve();check();using var secondGeometry=second.GetGeCurve();check();
         using var firstRange=firstGeometry.GetInterval();using var secondRange=secondGeometry.GetInterval();
@@ -52,7 +59,7 @@ internal static class CadCurveRelations
         }
         var points=new List<double[]>();
         for(int i=0;i<pointCount;i++){check();var point=relation.GetIntersectionPoint(i);Membership(point);var value=P(point);capacity.Add(value);points.Add(value);}
-        var overlaps=new List<object>();
+        var overlaps=new List<Overlap>();
         for(int i=0;i<overlapCount;i++)
         {
             check();Interval[]? ranges=null;
@@ -74,7 +81,7 @@ internal static class CadCurveRelations
                 Membership(firstGeometry.EvaluatePoint((a.LowerBound+a.UpperBound)/2));
                 Membership(secondGeometry.EvaluatePoint((b.LowerBound+b.UpperBound)/2));
                 CurveRelationsVerification.Endpoints(P(a0),P(a1),P(b0),P(b1));
-                var value=new{first_start=P(a0),first_end=P(a1),second_start=P(b0),second_end=P(b1),length};capacity.Add(value);overlaps.Add(value);
+                var value=new Overlap(P(a0),P(a1),P(b0),P(b1),length);capacity.Add(value);overlaps.Add(value);
             }
             finally{if(ranges!=null)DisposeIntervals(ranges);}
         }

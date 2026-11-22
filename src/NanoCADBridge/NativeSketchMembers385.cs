@@ -430,9 +430,12 @@ internal static class NativeSketchMembers385
             // diagnostics. Null selectors still require strict WCS pick proof.
             return NativeSketchRelations410.SamePoint(Point(inputs,members[0],role),b.PointRefOnObject);
         }
+        // The persisted network may reverse the two picks of an unsigned axis distance.
+        // Check each actual endpoint against its original object and role in either ordering.
+        bool canReverse = spec.Kind is "smooth" or "distance_x" or "distance_y";
         return actual.Type==expected.Type&&Same(actual.ThirdObject,expected.ThirdObject,null)&&
             (Same(actual.FirstObject,expected.FirstObject,first)&&Same(actual.SecondObject,expected.SecondObject,second)||
-             spec.Kind=="smooth"&&Same(actual.FirstObject,expected.SecondObject,second)&&Same(actual.SecondObject,expected.FirstObject,first));
+             canReverse&&Same(actual.FirstObject,expected.SecondObject,second)&&Same(actual.SecondObject,expected.FirstObject,first));
     }
     internal static JsonElement DescribeRelation(ConstraintInfo info)
     {

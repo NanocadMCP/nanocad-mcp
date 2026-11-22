@@ -293,6 +293,10 @@ internal static class ProjectedDimensionWriter
                 Same(linear.GetPosition(0), projection.First) && Same(linear.GetPosition(1), projection.Second),
                 "DRAWING_VIEW_ASSOCIATION_UNAVAILABLE", "The detached native aligned dimension did not retain the selected endpoints.");
             if (binding.ViewScaleDenominator != 1 || projection.Kind == "aligned_centers") linear.DimensionScale = binding.ViewScaleDenominator;
+            // IMcLinearDimension stores the measurement direction separately from its two picks.
+            // The host can keep the initial X axis for a vertical or oblique projected edge.
+            var along = (projection.Second - projection.First).GetNormal();
+            linear.Direction = new G.Vector3d(along.X, along.Y, along.Z);
             linear.LinePosition = Native(binding.Placement);
         }
         VerifyPhysicalMeasurement(dimension, binding);

@@ -140,8 +140,17 @@ internal static class ModelFeatureReorderState345
             cancel();var native=id.GetObjectOfType<HistoryItem>();
             if(terminalIntent&&native!=null)
             {
-                Need(native.DbEntity.Document!=null&&native.DbEntity.Document.ID==owner.ID,
-                    "DEPENDENCY_OWNERSHIP_MISMATCH","Each retained native history item must resolve in this part's actual owner document.");
+                var nativeOwner = native.DbEntity.Document;
+                if (nativeOwner == null || nativeOwner.ID != owner.ID)
+                {
+                    var itemType = native.GetType().FullName;
+                    var actualOwner = nativeOwner == null ? null : Id(nativeOwner.ID);
+                    throw new DomainException("DEPENDENCY_OWNERSHIP_MISMATCH",
+                        $"History item {Key(id)} ({itemType}) reports owner {actualOwner ?? "(unavailable)"}; the selected part reports owner {Key(owner.ID)}.",
+                        false, new { item_id = Key(id), item_type = itemType, item_owner_document_id = actualOwner,
+                            item_db_document_id = Id(native.DbEntity.DocumentID), item_host_solid_id = Id(native.HostSolidID),
+                            part_id = Key(body.ID), part_owner_document_id = Key(owner.ID) });
+                }
                 var value=new{id=Key(id),owner=Key(owner.ID),
                     layer=native.DbEntity.Layer,visibility=native.DbEntity.Visibility,
                     metadata=ModelSketchLifecycleReader362.Metadata(id,native.DbEntity,owner,state,tx,cancel,observeResidentIdentity:captureResidentIdentity)};

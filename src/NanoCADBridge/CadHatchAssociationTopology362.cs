@@ -49,10 +49,20 @@ internal static class CadHatchAssociationTopology362
         var kind=observation.GetType();
         bool legacy=kind==typeof(Polyline)&&source.GetType()==typeof(Polyline2d);
         bool primitive=kind==source.GetType()&&(kind==typeof(Line)||kind==typeof(Arc)||kind==typeof(Circle));
-        Need((legacy||primitive)&&observation.ObjectId.IsNull&&observation.OwnerId.IsNull&&observation.Database==null&&
-            observation.UnmanagedObject!=source.UnmanagedObject&&!source.ObjectId.IsNull&&source.ObjectId.IsValid&&
-            !source.ObjectId.IsErased&&!source.ObjectId.IsEffectivelyErased&&source.Database==hatch.Database&&source.OwnerId==hatch.OwnerId,
-            "INVALID_SOURCE_PROVENANCE","The planned curve must be a detached observation of the exact local boundary source.");
+        var database=hatch.Database?.UnmanagedObject??IntPtr.Zero;
+        var liveId=source.ObjectId;
+        bool local=database!=IntPtr.Zero&&source.Database?.UnmanagedObject==database&&
+            !liveId.IsNull&&liveId.IsValid&&!liveId.IsErased&&!liveId.IsEffectivelyErased&&source.OwnerId==hatch.OwnerId;
+        // DBObject.Clone can retain the originating database context on a transient
+        // curve. ObjectId and OwnerId determine whether the clone is resident.
+        var context=observation.Database?.UnmanagedObject??IntPtr.Zero;
+        bool detached=observation.ObjectId.IsNull&&observation.OwnerId.IsNull&&observation.UnmanagedObject!=IntPtr.Zero&&
+            observation.UnmanagedObject!=source.UnmanagedObject&&(context==IntPtr.Zero||context==database);
+        if(!(legacy||primitive)||!local||!detached)
+            throw new DomainException("INVALID_SOURCE_PROVENANCE","The planned curve must be a detached observation of the exact local boundary source.",
+                false,new{supported_pair=legacy||primitive,local_source=local,detached_object_id=observation.ObjectId.IsNull,
+                    detached_owner=observation.OwnerId.IsNull,distinct_native_object=observation.UnmanagedObject!=IntPtr.Zero&&observation.UnmanagedObject!=source.UnmanagedObject,
+                    local_or_empty_preview_context=context==IntPtr.Zero||context==database});
         return source;
     }
     static Boundary Capture(Entity entity,Hatch hatch,Action cancel,ModelInventoryBudget budget,IReadOnlyDictionary<Entity,Entity>? observationSources=null)

@@ -73,7 +73,7 @@ The assistant reads eligibility before writing and checks the actual result.
 
 Direct modeling includes supported primitives, extrusion, revolution, Sweep, Loft, Boolean operations, splitting, fillets, chamfers, shells and selected face edits.
 
-For a guided Loft, `loft_guide_contacts` reports finite 3D intersection points between one guide and each ordered section. A guide that misses a section, or a section the kernel cannot inspect, is identified individually. Use a cut through the resulting solid to check the shape between the input sections. A Loft can also request normals at the first section, last section, both ends or all sections.
+For a guided Loft, `loft_guide_contacts` reports finite 3D intersection points between one guide and each ordered section. A guide that misses a section, or a section the kernel cannot inspect, is identified individually. Use a cut through the resulting solid to check the shape between the input sections. The optional `normal_option` passes a section-normal request to nanoCAD. On nanoCAD 26 the kernel rejected `ends` for two smooth, unguided Lofts, one through mixed profiles and one through three circles. The same mixed profiles formed a solid with the default settings. Other explicit normal conditions still need native verification.
 
 Parametric modeling can retain native sketches, geometric relations, dimensional controls, named variables, expressions, profiles and feature history. Supported features can be repeated with native rectangular or circular patterns and mirrored within one part. The assistant can change supported drivers and check the dependent geometry.
 
