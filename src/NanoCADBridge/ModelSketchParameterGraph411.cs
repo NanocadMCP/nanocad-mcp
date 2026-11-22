@@ -188,8 +188,11 @@ internal static class ModelSketchParameterGraph411
         var originalSketches=value.Part.Preserved.GetProperty("sketches").EnumerateArray().ToDictionary(row=>row.GetProperty("id").GetString()!,StringComparer.OrdinalIgnoreCase);
         foreach(var sketch in part["sketches"]!.AsArray())if(sketch?["retained"] is JsonObject retained)
         {
-            var prior=originalSketches[sketch["id"]!.GetValue<string>()].GetProperty("retained");
+            string id=sketch["id"]!.GetValue<string>();
+            var prior=originalSketches[id].GetProperty("retained");
             if(prior.ValueKind==JsonValueKind.Object)Bindings(retained["projection_bindings"],prior.GetProperty("projection_bindings"));
+            if(affected.Contains(id)&&stationary.Contains(id)&&!controlledSketches.Contains(id))
+                ModelSketchProjectedDatum.CompareRelativeToSource(sketch,retained,value.ProjectedDatums,id,movingSources,cancel);
         }
         var originalProfiles=value.Part.Preserved.GetProperty("profiles").EnumerateArray().ToDictionary(row=>row.GetProperty("profile_id").GetString()!,StringComparer.OrdinalIgnoreCase);
         foreach(var profile in part["profiles"]!.AsArray())Bindings(profile!["projection_bindings"],originalProfiles[profile["profile_id"]!.GetValue<string>()].GetProperty("projection_bindings"));
@@ -211,7 +214,7 @@ internal static class ModelSketchParameterGraph411
         {
             cancel();var first=group.First();var before=NativeSketchSolveExpected445.CanonicalComparisons(first.State,completed,cancel);string oldHandle=Validation.NormalizeHandle(before.Part.Representation.Handle.ToString());var scope=affected[oldHandle];
             NativeSketchConstraintState385.Snapshot after;
-            using(var tx=document.Document.Database.TransactionManager.StartTransaction())after=NativeSketchConstraintState385.Capture(handles[oldHandle],Key(first.ID),ModelSketchParameter411.Context(args),document,tx,cancel);
+            using(var tx=document.Document.Database.TransactionManager.StartTransaction())after=ModelSketchParameter411.Capture(handles[oldHandle],Key(first.ID),args,document,tx,cancel);
             after=NativeSketchSolveExpected445.CanonicalComparisons(after,completed,cancel);
             NativeSketchMembers385.ValidateSmoothRelations(after.Relations,after.Inputs,cancel);
             var stationary=Stationary(before,scope);

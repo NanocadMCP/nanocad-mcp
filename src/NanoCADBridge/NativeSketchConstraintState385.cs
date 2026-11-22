@@ -16,7 +16,10 @@ internal static class NativeSketchConstraintState385
     internal const string Scope="Native owned Line/Circle/Arc/Spline/Ellipse and actual SDK polyline-segment relations with exact same-sketch source projections as immutable references; persistent dimensional numeric controls in millimeters or radians. Explicit solve/rebuild may move connected owned geometry. Native construction anchors, source geometry, relation intent/formulas, profile/feature IDs and consumer links remain retained; initial value alone is not proof of reactive driving and no globally constrained-state claim is made.";
     internal sealed record Snapshot(ModelFeatureReorderState345.Snapshot Part,ModelSketchLifecycleReader362.Snapshot Sketch,NativeSketchMembers385.Snapshot Inputs,
         JsonElement Relations,JsonElement Protected,ModelSketchConstraintMetadata379.Binding[] Storage,string Token,McObjectId[] GraphRoots,HashSet<string> Affected,
-        NativeBodyTransparency445.Witness? BodyTransparency=null);
+        NativeBodyTransparency445.Witness? BodyTransparency=null)
+    {
+        internal ModelSketchProjectedDatum.Datum[] ProjectedDatums { get; init; } = [];
+    }
     internal sealed record Control(Snapshot State,McObjectId Constraint,McObjectId Variable,string Kind,double Value,string Expression,McObjectId Member,JsonElement VariableState,
         McObjectId ParameterVariable,double? ParameterValue,double? ParameterRawValue,double RelationValue,string? RelationExpression);
     static void Need([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool ok,string code,string message)=>NativeSketchMembers385.Need(ok,code,message);

@@ -14,7 +14,7 @@ For a selected face, you can list its boundary edges or trace it to the feature 
 
 ## Sections and drawing views
 
-A planar section shows the cut profile of a solid. A measurement line through the part reports where it passes through material and where it crosses a void. For a loaded point cloud, the assistant can compare points against a solid section and show which parts of the profile have scan coverage.
+A planar section shows the cut profile of a solid. A measurement line reports the intervals of material and void along the cut, including cuts whose boundary contains spline or elliptical segments. For a loaded point cloud, the assistant can compare points against a solid section and show which parts of the profile have scan coverage.
 
 On a sheet, you can check whether a proposed view overlaps other views or annotations and find the dimensions attached to a particular projected edge or circle. A dimension attached to two projected hole centers follows their spacing. A dimension placed using paper coordinates needs a separate edit when its defining points move. Associative diameter labels can be repositioned with `DIMTMOVE` set to 2.
 

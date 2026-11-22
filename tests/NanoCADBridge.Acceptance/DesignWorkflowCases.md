@@ -1,6 +1,6 @@
 # Native acceptance for the three design workflows
 
-These cases are pending a joint nanoCAD run. Use a disposable DWG for each case and record the candidate server and bridge hashes. Capture the actual drawing through MCP and inspect the returned images at the stated milestones. Record handles, revisions, exact readings and any unavailable evidence alongside the images. Use the original operation ID to reconcile a pending write.
+Use a separate DWG for each case and record the candidate server and bridge hashes. Capture the actual drawing through MCP and inspect the images at the stated milestones. Record handles, revisions, exact readings and any unavailable evidence alongside the images. Use the original operation ID to reconcile a pending write.
 
 ## 1. Lengthen an existing hatched outline
 
@@ -17,7 +17,9 @@ Use parallel XY planes and millimetres. At z=0 use a Circle centred at (0,0), ra
 1. Use a straight guide from (10,0,0) to (24,0,40). Its expected finite contacts in section order are (10,0,0), (17,0,20) and (24,0,40). Check each with `analyze_geometry` mode `loft_guide_contacts`. Repeat with an open fit Spline through (0,10,0), (0.4,11.2,8), (2,12,20), (3.2,14.5,32), (4,14,40). Inspect the actual points for all three sections. A Line on the first guide stopped at z=39 should report no point on the last section.
 2. Build a smooth solid Loft from the original ordered sections and both full guides. Inspect a shaded-with-edges model image, source identities and the new solid. A section contact is evidence about one guide only; record any subsequent kernel rejection separately.
 3. Cut the resulting solid at z=10 with `solid_section`. Check for a closed section of positive area. With `section_material_intervals`, inspect the finite X segment from (-35,0,10) to (35,0,10). At the straight guide, verify the section boundary passes through (13.5,0,10) within drawing tolerance. Inspect an intermediate section image as well as the original solid.
-4. On a separate copy, create an unguided smooth Loft with `normal_option=ends`. Inspect the end conditions on the geometry. A successful options readback alone does not establish the solid's shape.
+4. On a separate copy, request an unguided smooth Loft with `normal_option=ends`. The nanoCAD 26.0.7476.3867 kernel returned `InvalidInput` for this fixture and for a control with three coaxial circles. The mixed fixture produced a solid with the default end conditions. If a later kernel accepts the explicit option, inspect the end conditions on the geometry.
+
+On the assessed host the material interval at z=10 ran from x=−11.8169463309 to 13.4999438407 mm. The latter differs from the analytical intersection with the straight guide by approximately 0.0000562 mm. The section kernel and independent evaluation of the stored NURBS trim curves agreed. The Spline fitted with 1e−8 mm tolerance missed the middle Ellipse by more than the native 1e−10 mm point tolerance. A separate fit with 1e−12 mm tolerance yielded three verified contacts.
 
 ## 3. Drive a feature chain and its sheet dimension
 
