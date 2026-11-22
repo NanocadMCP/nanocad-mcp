@@ -77,7 +77,9 @@ internal static class DiscoveryRetentionTests
                 File.SetAttributes(locked, FileAttributes.ReadOnly);
                 try { logs[0].Write("test", "no-write-access", "ok"); }
                 finally { File.SetAttributes(locked, FileAttributes.Normal); }
-                Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", legacy);
+                string logUnavailable = Directory.CreateDirectory(Path.Combine(root, "log-unavailable")).FullName;
+                File.WriteAllText(Path.Combine(logUnavailable, "logs"), "Only diagnostic storage is unavailable.");
+                Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", logUnavailable);
                 new JsonLog("server").Write("test", "no-directory", "ok");
             }
             finally { Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME",prior); }

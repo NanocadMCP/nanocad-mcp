@@ -11,10 +11,11 @@ public sealed class JsonLog
 
     public JsonLog(string component)
     {
+        // The discovery home is also the IPC identity boundary. A broken home must fail startup.
+        string root = LocalSecurity.SecureDirectory(Discovery.Root);
         try
         {
-            LocalSecurity.SecureDirectory(Discovery.Root);
-            string directory = LocalSecurity.SecureDirectory(Path.Combine(Discovery.Root, "logs"));
+            string directory = LocalSecurity.SecureDirectory(Path.Combine(root, "logs"));
             _prefix = Path.Combine(directory, component);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* Unavailable diagnostic storage. */ }
