@@ -2,6 +2,13 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 461
+
+- Fixed parametric body renaming in 3D History. The name is stored on the top-level part and survives reopening the DWG. Nonparametric bodies that lose their captions on reopen now return a specific error before any rename in the request.
+- Added in-place contour edits for associative hatches bounded by lines and arcs. Connected dimensions and circular holes retain their original associations.
+- Added guide-to-section contact checks for Loft and material interval measurements on sections with spline or elliptical edges. Loft errors now identify a rejected section normal setting.
+- Added downstream feature history and before-and-after readings for associated sheet dimensions when a model parameter changes. Fixed vertical projected dimensions and verification of sketch elements constrained to a moving edge.
+
 ## Build 460
 
 - Revised drawing review instructions to check view placement before dimensioning, inspect annotations at a readable scale, and review every changed DWG sheet before delivery.

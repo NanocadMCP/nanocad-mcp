@@ -24,7 +24,7 @@ Download the installer or release ZIP from the [download section](../../README.m
 ## Install with the Windows installer
 
 1. Save **all** open drawings and close nanoCAD. Close the assistant you want to connect.
-2. Run `NanoCAD-MCP-Setup-460.exe` from [release 460](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/460).
+2. Run `NanoCAD-MCP-Setup-461.exe` from the distribution. Published installers are listed on [GitHub Releases](https://github.com/NanocadMCP/nanocad-mcp/releases).
 3. Check the nanoCAD 26 installation folder. It must contain `nCad.exe` and `nCad.ini`.
 4. Select **Codex**, **Claude Desktop**, or both, then click **Install**. For an update, select every assistant connected by the previous installation.
 5. Approve the Windows permission request if it appears.
@@ -34,9 +34,9 @@ Download the installer or release ZIP from the [download section](../../README.m
 
 The installer places the program in `%LOCALAPPDATA%\Programs\NanoCADMCP`, registers the bridge for automatic loading and adds the `nanocad` MCP entry to the selected assistant's settings. It backs up changed settings and retains the previous `nanocad` entry for removal. Other MCP entries are preserved. No manual DLL loading is required after normal installation.
 
-For build 460, installed documentation starts at `%LOCALAPPDATA%\Programs\NanoCADMCP\versions\460\server\README.md`. Keep the accompanying `docs` and `licenses` folders so their links work offline.
+For build 461, installed documentation starts at `%LOCALAPPDATA%\Programs\NanoCADMCP\versions\461\server\README.md`. Keep the accompanying `docs` and `licenses` folders so their links work offline.
 
-The connection reports server **0.288.0** and bridge **0.245.0**. This bridge includes the assessed fix for the reported nanoCAD tab accessibility crash with Codex Computer Use active. You do not need to disable Computer Use or change its app permissions. Protection starts after the bridge loads.
+The connection reports server **0.290.0** and bridge **0.247.0**. This bridge includes the assessed fix for the reported nanoCAD tab accessibility crash with Codex Computer Use active. You do not need to disable Computer Use or change its app permissions. Protection starts after the bridge loads.
 
 ## Manual ZIP setup
 

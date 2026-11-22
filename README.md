@@ -27,20 +27,20 @@ Each operation has its own requirements. Read [capabilities and limits](docs/en/
 
 The release includes the MCP server runtime. You do not need Python, a compiler or the nanoCAD SDK to use the packaged application. The integration runs locally; your AI client may send drawing information and images to its provider. Read [data and privacy](docs/en/privacy.md).
 
-## What's new in 460
+## What's new in 461
 
-Updated the assistant's drawing instructions to check each sheet in nanoCAD after placing views and dimensions. [Release notes](RELEASE-NOTES.md#build-460)
+Parametric body names now appear on the top row of 3D History. Contour edits preserve associated hatches and dimensions. Parameter changes can report the updated dimensions on a drawing sheet. Loft inspection now checks guide contacts and measures sections with spline or elliptical edges. [Release notes](RELEASE-NOTES.md#build-461)
 
 ## Download
 
-Get the installer or ready-to-run ZIP from [release 460](https://github.com/NanocadMCP/nanocad-mcp/releases/tag/460).
+Published installers and ready-to-run archives are available on [GitHub Releases](https://github.com/NanocadMCP/nanocad-mcp/releases).
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-460.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-460.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-461.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-461.zip` | Manual setup, or installation from an extracted folder |
 
-Checksums are listed in `SHA256SUMS-460.txt` on the release page.
+Checksums for this build are listed in `SHA256SUMS-461.txt`.
 
 ## Get started
 
