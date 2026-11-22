@@ -250,7 +250,6 @@ internal sealed class CadCurveHatchFollowers
             if (verifyCurrentSources)
                 CadHatchAssociationGeometry362.Verify(hatch, Geometry(saved, tr, null, cancel), cancel);
             var roles = saved.Groups.SelectMany((group, index) => group.Select(id => (id, role: saved.LoopTypes[index]))).ToDictionary(item => item.id, item => item.role);
-            const HatchLoopTypes derived = HatchLoopTypes.Polyline | HatchLoopTypes.Derived;
             for (int index = 0; index < hatch.NumberOfLoops; index++)
             {
                 cancel();
@@ -260,7 +259,13 @@ internal sealed class CadCurveHatchFollowers
                 {
                     var source = (Entity)tr.GetObject(id, OpenMode.ForRead);
                     using var links = source.GetPersistentReactorIds();
-                    if ((loopType & ~derived) != (roles[id] & ~derived) || links.Cast<ObjectId>().Count(link => link == saved.Id) != 1)
+                    // Re-evaluation may classify a first-level island as Outermost.
+                    // External membership, exact geometry and strict containment are
+                    // checked above; Outermost on a derived loop is an evaluation flag.
+                    var original = roles[id];
+                    var derived = HatchLoopTypes.Polyline | HatchLoopTypes.Derived;
+                    if (((original | loopType) & HatchLoopTypes.Derived) != 0) derived |= HatchLoopTypes.Outermost;
+                    if ((loopType & ~derived) != (original & ~derived) || links.Cast<ObjectId>().Count(link => link == saved.Id) != 1)
                         throw new DomainException("NATIVE_HATCH_ASSOCIATION_MISMATCH", "A retained Hatch source lost its native loop role or reverse association.");
                 }
             }

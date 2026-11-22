@@ -24,6 +24,25 @@ internal static class ModelFeatureReorderState345
     internal static string? Id(McObjectId id)=>id.IsNull?null:Key(id);
     internal static Db.ObjectId Model(Db.Database db,Db.Transaction tx)=>
         ((Db.BlockTable)tx.GetObject(db.BlockTableId,Db.OpenMode.ForRead))[Db.BlockTableRecord.ModelSpace];
+    private static bool IsLocalPaperFollower(HistoryItem item, McDocument? sheet, McDocument drawing,
+        ModelViewFollowers.Snapshot followers, Db.Database db, Db.Transaction tx)
+    {
+        // Resolve() verified the view's native source, host part and history chain.
+        // A Paper DrawingView resides in the sheet's document and layout block record.
+        if (item is not DrawingView view || !followers.ViewIds.Contains(view.ID) ||
+            sheet == null || !sheet.IsLayout || sheet.IsModel || sheet.ID.IsNull ||
+            view.DbEntity.DocumentID != sheet.ID || sheet.TopDoc == null || drawing.TopDoc == null ||
+            sheet.TopDoc.ID != drawing.TopDoc.ID || view.ID.Handle == 0 ||
+            !db.TryGetObjectId(new Db.Handle(view.ID.Handle), out var raw) || raw.IsNull ||
+            CadDrawingViewEditState.Gone(raw) || McObjectId.FromHandle(raw.Handle.Value, drawing.ID) != view.ID)
+            return false;
+        var entity = tx.GetObject(raw, Db.OpenMode.ForRead);
+        if (entity.GetType().FullName != "Teigha.DatabaseServices.ImpCurve" ||
+            entity.ObjectId != raw || entity.Database?.UnmanagedObject != db.UnmanagedObject)
+            return false;
+        var space = CadBlockSpace.RequireSpace(db, tx, entity.OwnerId);
+        return space.Kind == "paper" && McObjectId.FromHandle(space.Space.Handle.Value, drawing.ID) == sheet.ID;
+    }
     internal static McDocument Scope(DocumentState state,Db.Transaction tx,string? expected=null)
     {
         var active=McDocument.ActiveDocument;
@@ -141,7 +160,8 @@ internal static class ModelFeatureReorderState345
             if(terminalIntent&&native!=null)
             {
                 var nativeOwner = native.DbEntity.Document;
-                if (nativeOwner == null || nativeOwner.ID != owner.ID)
+                if (nativeOwner == null || nativeOwner.ID != owner.ID &&
+                    !IsLocalPaperFollower(native, nativeOwner, active, views, state.Document.Database, tx))
                 {
                     var itemType = native.GetType().FullName;
                     var actualOwner = nativeOwner == null ? null : Id(nativeOwner.ID);
@@ -151,9 +171,9 @@ internal static class ModelFeatureReorderState345
                             item_db_document_id = Id(native.DbEntity.DocumentID), item_host_solid_id = Id(native.HostSolidID),
                             part_id = Key(body.ID), part_owner_document_id = Key(owner.ID) });
                 }
-                var value=new{id=Key(id),owner=Key(owner.ID),
+                var value=new{id=Key(id),owner=Key(nativeOwner.ID),
                     layer=native.DbEntity.Layer,visibility=native.DbEntity.Visibility,
-                    metadata=ModelSketchLifecycleReader362.Metadata(id,native.DbEntity,owner,state,tx,cancel,observeResidentIdentity:captureResidentIdentity)};
+                    metadata=ModelSketchLifecycleReader362.Metadata(id,native.DbEntity,nativeOwner,state,tx,cancel,observeResidentIdentity:captureResidentIdentity)};
                 bytes.Add(value);construction.Add(value);
             }
             var sketch=id.GetObjectOfType<PlanarSketch>();

@@ -118,12 +118,34 @@ internal static class CadHatchAssociationGeometry362
         {cancel();result[0]=merged;result.RemoveAt(result.Count-1);}
         return result.ToArray();
     }
-    static bool Chain(Edge[] expected,Edge[] actual,Action cancel)
+    static bool SameDerivedPieces(Edge[] expected,Edge[] actual,Action cancel)
     {
-        expected=Coalesced(expected,cancel);actual=Coalesced(actual,cancel);
-        if(expected.Length==1&&expected[0].Kind=="circle"&&Near(expected[0].Sweep,2*Math.PI,Tolerance.Global.EqualVector))
-            return FullConic(expected[0],actual,cancel);
-        return Segments(expected,actual,cancel);
+        if(expected.Length!=actual.Length)return false;
+        // A derived Hatch can enumerate the certified ring's curves in storage
+        // order. Match every complete primitive once, including arc direction,
+        // sweep and center. Duplicates, ambiguity and missing spans fail.
+        var used=new bool[actual.Length];
+        foreach(var piece in expected)
+        {
+            int match=-1;
+            for(int index=0;index<actual.Length;index++)
+            {
+                cancel();
+                if(used[index]||!(SameEdge(piece,actual[index],false)||SameEdge(piece,actual[index],true)))continue;
+                if(match>=0)return false;
+                match=index;
+            }
+            if(match<0)return false;
+            used[match]=true;
+        }
+        return true;
+    }
+    static bool Chain(Edge[] expected,Edge[] actual,Action cancel,bool derived=false)
+    {
+        var wanted=Coalesced(expected,cancel);var stored=Coalesced(actual,cancel);
+        if(wanted.Length==1&&wanted[0].Kind=="circle"&&Near(wanted[0].Sweep,2*Math.PI,Tolerance.Global.EqualVector))
+            return FullConic(wanted[0],stored,cancel);
+        return Segments(wanted,stored,cancel)||(derived&&SameDerivedPieces(expected,actual,cancel));
     }
     static Edge[] PolylineEdges(Vertex[] vertices,Action cancel)
     {
@@ -186,7 +208,7 @@ internal static class CadHatchAssociationGeometry362
                 var curves=loop.Curves;var edges=new List<Edge>();
                 try{foreach(Curve2d curve in curves){cancel();edges.Add(Capture(curve));}}
                 finally{var released=new HashSet<Curve2d>(ReferenceEqualityComparer.Instance);foreach(Curve2d curve in curves)if(released.Add(curve))curve.Dispose();}
-                match=source!.Kind=="Line_Arc_chain"?Chain(source.Edges,edges.ToArray(),cancel):
+                match=source!.Kind=="Line_Arc_chain"?Chain(source.Edges,edges.ToArray(),cancel,(loop.LoopType&HatchLoopTypes.Derived)!=0):
                     source.Vertices.Length>0?Segments(source.Edges,edges.ToArray(),cancel):FullConic(source.Edges[0],edges.ToArray(),cancel);
             }
             Need(match,"NATIVE_HATCH_ASSOCIATION_MISMATCH","Stored native loop geometry differs from its unchanged source primitive inventory.");
