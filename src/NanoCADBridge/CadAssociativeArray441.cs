@@ -426,8 +426,8 @@ internal static class CadAssociativeArray441
             NativeCurveRead342.CheckSerializedBudget(result,Wire.PayloadBudget-4096,job.CheckCancellation);stage="native_commit";job.BeginCommit();tr.Commit();job.RecordCommit(result);
         }
         catch(Exception error){failure=error;}
-        Exception? cleanup=null;try{tr?.Dispose();}catch(Exception error){cleanup=error;}
-        if(job.CommittedResult is {} committed){if(cleanup!=null)committed=committed with{warnings=committed.warnings.Append("POST_COMMIT_CLEANUP_FAILED: Native array commit recorded; inspect current ownership/rendering.").ToArray()};job.RecordCommit(committed);return committed;}
+        if (NativeTransactionCompletion.DisposeAndGetCommit(tr, job,
+            "POST_COMMIT_CLEANUP_FAILED: Native array commit recorded; inspect current ownership/rendering.", out var cleanup) is { } committed) return committed;
         string code=failure is DomainException domain?domain.Error.code:failure is OperationCanceledException?"CANCELLED":"NATIVE_ARRAY_FAILED";bool unknown=started||cleanup!=null;
         return job.Error(unknown?"WRITE_OUTCOME_UNKNOWN":code,unknown?"Native polar/path array mutation started or cleanup failed. Inspect exact root/source/path ownership; do not replay with a new operation_id.":failure?.Message??"Native array did not start.",unknown?"unknown":"not_started",context,
             new{cause=code,stage,exception_type=failure?.GetType().FullName,native_error_status=failure is Teigha.Runtime.Exception native?native.ErrorStatus.ToString():null,

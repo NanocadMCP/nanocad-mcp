@@ -154,12 +154,8 @@ internal static class CadAssociativeArray431
             stage="native_commit";job.BeginCommit();tr.Commit();job.RecordCommit(outcome);
         }
         catch(Exception error){failure=error;}
-        Exception? cleanup=null;try{tr?.Dispose();}catch(Exception error){cleanup=error;}
-        if(job.CommittedResult is {} committed)
-        {
-            if(cleanup!=null)committed=committed with{warnings=committed.warnings.Append("POST_COMMIT_CLEANUP_FAILED: Native array commit recorded; refresh current ownership and rendering.").ToArray()};
-            job.RecordCommit(committed);return committed;
-        }
+        if (NativeTransactionCompletion.DisposeAndGetCommit(tr, job,
+            "POST_COMMIT_CLEANUP_FAILED: Native array commit recorded; refresh current ownership and rendering.", out var cleanup) is { } committed) return committed;
         string code=failure is DomainException domain?domain.Error.code:failure is OperationCanceledException?"CANCELLED":"NATIVE_ARRAY_FAILED";
         bool unknown=started||cleanup!=null;
         return job.Error(unknown?"WRITE_OUTCOME_UNKNOWN":code,unknown?"Native array mutation/evaluation started or cleanup failed; inspect current root/source ownership and preserve the exact request. Do not submit another operation_id.":failure?.Message??"Native array did not start.",

@@ -10,7 +10,7 @@ using Application = HostMgd.ApplicationServices.Application;
 
 namespace NanoCADBridge;
 
-public sealed class Entry : IExtensionApplication
+public sealed partial class Entry : IExtensionApplication
 {
     private static Entry? _current;
     private ReadQueue? _queue;
@@ -85,6 +85,7 @@ public sealed class Entry : IExtensionApplication
                 ready_at_last_idle = _ready,
                 ui_heartbeat_age_ms = heartbeat == 0 ? (double?)null : (DateTime.UtcNow.Ticks - heartbeat) / (double)TimeSpan.TicksPerMillisecond,
                 queued_reads = queue.Count,
+                native_accessibility_guard = _accessibilityGuard?.LastStart,
                 supported_tools = Wire.Operations,
                 queued_writes = _writeQueue?.Count,
                 operation_ledger_count = _writeQueue?.LedgerCount,
@@ -94,6 +95,7 @@ public sealed class Entry : IExtensionApplication
                 long_write_policy = "running_work_survives_response_timeout; exact_replay_only; cooperative_execution_deadline",
                 write_dispatch_pending = _writes?.Pending,
                 write_dispatch_available = _writes?.Available,
+                write_dispatch_isolating_operation_id = _writeQueue?.IsolatedByOperationId,
                 camera_write_available = _writes?.CameraAvailable,
                 write_policy = "native_command_transaction",
                 write_acceptance = "operation_specific_not_blanket_rollback_guarantee",
@@ -142,58 +144,9 @@ public sealed class Entry : IExtensionApplication
         catch (System.Exception) { /* A missing logger must not hide or change command execution. */ }
         current?._writes?.ExecuteCommand(Application.DocumentManager.MdiActiveDocument);
     }
-#if HATCH_UNDO_PROBE
-    [CommandMethod(HatchUndoProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeHatchUndo() => HatchUndoProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if BLOCK_POSITION_PROBE
-    [CommandMethod(BlockPositionProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeBlockPosition() => BlockPositionProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if DIMENSION_PLACEMENT_PROBE
-    [CommandMethod(DimensionPlacementProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeDimensionPlacement() => DimensionPlacementProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if CORE_PARAMETER_PROBE
-    [CommandMethod(CoreParameterProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeCoreParameter() => CoreParameterProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if PARAMETRIC_SKETCH_PROBE
-    [CommandMethod(ParametricSketchProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeParametricSketch() => ParametricSketchProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if DOCUMENT_CONSTRAINTS_PROBE
-    [CommandMethod(DocumentConstraintsProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeDocumentConstraints() => DocumentConstraintsProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if DOCUMENT_DRIVEN_MODEL_PROBE
-    [CommandMethod(DocumentDrivenModelProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeDocumentDrivenModel() => DocumentDrivenModelProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if STATE_IMPORT_PROBE
-    [CommandMethod(StateImportProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeStateImport() => StateImportProbe.Execute(_current?._descriptor,_current?._documents);
-#endif
-#if MULTICAD_TRANSACTION_PROBE
-    [CommandMethod(ModelTransactionProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeModelTransaction() => ModelTransactionProbe.Execute(_current?._descriptor);
-#endif
-#if DRAWING_VIEW_FIXTURE
-    [CommandMethod(DrawingViewFixture.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void SeedDrawingViews() => DrawingViewFixture.Execute(_current?._descriptor);
-#endif
-#if DRAWING_VIEW_WRITE_PROBE
-    [CommandMethod(DrawingViewWriteProbe.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void ProbeDrawingViewWrite() => DrawingViewWriteProbe.Execute(_current?._descriptor);
-#endif
-#if SHEET_METAL_FIXTURE
-    [CommandMethod(SheetMetalFixture.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void SeedSheetMetal() => SheetMetalFixture.Execute(_current?._descriptor);
-#endif
-#if POINT_CLOUD_FIXTURE
-    [CommandMethod(PointCloudFixture.CommandName, CommandFlags.Modal | CommandFlags.NoHistory)]
-    public void SeedPointCloud() => PointCloudFixture.Execute(_current?._descriptor);
-#endif
+    partial void CheckAcceptancePending(ref bool pending);
+    partial void PumpAcceptanceProbes();
+
     private void OnIdle(object? sender, EventArgs args)
     {
         if (_pumping || _queue == null || _writes?.DocumentOperationRunning == true) return;
@@ -220,104 +173,14 @@ public sealed class Entry : IExtensionApplication
             // Both paths are synchronous on this UI thread. Busy native
             // commands are rejected by the read gate; a queued write must not
             // indefinitely prevent diagnostics/read responses.
-#if STATE_IMPORT_PROBE
-            if (StateImportProbe.Pending) { _ready = false; return; }
-#endif
-#if MULTICAD_TRANSACTION_PROBE
-            if (ModelTransactionProbe.Pending) { _ready = false; return; }
-#endif
-#if DRAWING_VIEW_FIXTURE
-            if (DrawingViewFixture.Pending) { _ready = false; return; }
-#endif
-#if DRAWING_VIEW_WRITE_PROBE
-            if (DrawingViewWriteProbe.Pending) { _ready = false; return; }
-#endif
-#if SHEET_METAL_FIXTURE
-            if (SheetMetalFixture.Pending) { _ready = false; return; }
-#endif
-#if POINT_CLOUD_FIXTURE
-            if (PointCloudFixture.Pending) { _ready = false; return; }
-#endif
-#if CORE_PARAMETER_PROBE
-            if (CoreParameterProbe.Pending) { _ready = false; return; }
-#endif
-#if PARAMETRIC_SKETCH_PROBE
-            if (ParametricSketchProbe.Pending) { _ready = false; return; }
-#endif
-#if DOCUMENT_CONSTRAINTS_PROBE
-            if (DocumentConstraintsProbe.Pending) { _ready = false; return; }
-#endif
-#if DOCUMENT_DRIVEN_MODEL_PROBE
-            if (DocumentDrivenModelProbe.Pending) { _ready = false; return; }
-#endif
-#if DIMENSION_PLACEMENT_PROBE
-            if (DimensionPlacementProbe.Pending) { _ready = false; return; }
-#endif
-#if HATCH_UNDO_PROBE
-            if (HatchUndoProbe.Pending) { _ready = false; return; }
-#endif
-#if BLOCK_POSITION_PROBE
-            if (BlockPositionProbe.Pending) { _ready = false; return; }
-#endif
+            bool probePending = false;
+            CheckAcceptancePending(ref probePending);
+            if (probePending) { _ready = false; return; }
             _queue.Pump((request, cancellation) => request.operation == WritePreviewRequest.Route
-                ? _writes!.Preview(request, cancellation) : _reader!.Execute(request, cancellation));
+                ? _writes!.Preview(request, cancellation) : _reader!.Execute(request, cancellation),
+                TimeSpan.FromMilliseconds(12), () => _writeQueue?.Count > 0 || _writes?.Pending == true);
             _writes?.Pump();
-#if HATCH_UNDO_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                HatchUndoProbe.Pump(_descriptor!,_documents!);
-#endif
-#if BLOCK_POSITION_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                BlockPositionProbe.Pump(_descriptor!,_documents!);
-#endif
-#if DIMENSION_PLACEMENT_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                DimensionPlacementProbe.Pump(_descriptor!,_documents!);
-#endif
-#if CORE_PARAMETER_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                CoreParameterProbe.Pump(_descriptor!,_documents!);
-#endif
-#if PARAMETRIC_SKETCH_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                ParametricSketchProbe.Pump(_descriptor!,_documents!);
-#endif
-#if DOCUMENT_CONSTRAINTS_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                DocumentConstraintsProbe.Pump(_descriptor!,_documents!);
-#endif
-#if DOCUMENT_DRIVEN_MODEL_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                DocumentDrivenModelProbe.Pump(_descriptor!,_documents!);
-#endif
-#if SOLID_TOPOLOGY_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                SolidTopologyProbe.Pump(_descriptor!,_documents!);
-#endif
-#if STATE_IMPORT_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                StateImportProbe.Pump(_descriptor!,_documents!);
-#endif
-#if MULTICAD_TRANSACTION_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                ModelTransactionProbe.Pump(_descriptor!);
-#endif
-#if DRAWING_VIEW_FIXTURE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                DrawingViewFixture.Pump(_descriptor!);
-#endif
-#if DRAWING_VIEW_WRITE_PROBE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                DrawingViewWriteProbe.Pump(_descriptor!);
-#endif
-#if SHEET_METAL_FIXTURE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                SheetMetalFixture.Pump(_descriptor!);
-#endif
-#if POINT_CLOUD_FIXTURE
-            if (_ready && _queue.Count == 0 && _writeQueue?.Count == 0 && _writes?.Pending == false)
-                PointCloudFixture.Pump(_descriptor!);
-#endif
+            PumpAcceptanceProbes();
         }
         catch (System.Exception e) { _ready = false; _log?.Write("idle", "", e.GetType().Name); }
         finally { _pumping = false; }

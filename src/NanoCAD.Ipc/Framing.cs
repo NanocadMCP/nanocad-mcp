@@ -17,10 +17,27 @@ public static class Framing
         // JsonSerializer enforces the depth bound; malformed UTF-8 is rejected by its reader.
         return JsonSerializer.Deserialize<T>(body, Wire.Json) ?? throw new InvalidDataException("Null frame.");
     }
-    public static async Task WriteAsync<T>(Stream stream, T value, int limit, CancellationToken cancellationToken)
+    internal static byte[] Encode<T>(T value, int limit)
     {
         var body = JsonSerializer.SerializeToUtf8Bytes(value, Wire.Json);
-        if (body.Length > limit) throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Response exceeds the byte budget; request a smaller batch.");
+        if (body.Length <= limit) return body;
+        if (value is Request request)
+        {
+            object size = new { request_bytes = body.Length, max_request_bytes = limit };
+            object details = Wire.WriteOperations.Contains(request.operation) &&
+                request.arguments.ValueKind == JsonValueKind.Object && request.arguments.TryGetProperty("operation_id", out var id) &&
+                id.ValueKind == JsonValueKind.String
+                ? new WriteErrorDetails(id.GetString()!, "not_started", false, "unchanged", size) : size;
+            throw new DomainException("REQUEST_TOO_LARGE", "The request exceeds the IPC byte limit. Reduce its size before sending it.", false, details);
+        }
+        throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Response exceeds the byte budget; request a smaller batch.");
+    }
+    public static async Task WriteAsync<T>(Stream stream, T value, int limit, CancellationToken cancellationToken)
+    {
+        await WriteFrameAsync(stream, Encode(value, limit), cancellationToken).ConfigureAwait(false);
+    }
+    internal static async Task WriteFrameAsync(Stream stream, byte[] body, CancellationToken cancellationToken)
+    {
         var header = new byte[4];
         BinaryPrimitives.WriteInt32LittleEndian(header, body.Length);
         await stream.WriteAsync(header.AsMemory(), cancellationToken).ConfigureAwait(false);

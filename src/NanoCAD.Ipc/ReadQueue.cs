@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using NanoCAD.Contracts;
 
 namespace NanoCAD.Ipc;
@@ -35,10 +36,14 @@ public sealed class ReadQueue : IDisposable
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         { return Result.Fail(request.requestId, new("UI_DISPATCH_UNAVAILABLE", "UI did not finish the read within 5 seconds. Native calls cannot be interrupted.", true)); }
     }
-    public void Pump(Func<Request, CancellationToken, Result> execute)
+    public void Pump(Func<Request, CancellationToken, Result> execute) => Pump(execute, TimeSpan.Zero);
+
+    public void Pump(Func<Request, CancellationToken, Result> execute, TimeSpan timeBudget, Func<bool>? yieldToWrite = null)
     {
         if (Environment.CurrentManagedThreadId != _uiThread) throw new InvalidOperationException("CAD dispatch must stay on the Initialize/UI thread.");
-        // Drain expired jobs but execute no more than one live operation per Idle callback.
+        // A native read cannot be preempted. Check the budget between live jobs and leave pending writes a turn.
+        long start = Stopwatch.GetTimestamp();
+        double budgetTicks = timeBudget.TotalSeconds * Stopwatch.Frequency;
         while (_jobs.TryDequeue(out var job))
         {
             Interlocked.Decrement(ref _count);
@@ -51,7 +56,7 @@ public sealed class ReadQueue : IDisposable
             }
             catch (OperationCanceledException) { job.Completion.TrySetCanceled(); }
             catch (Exception) { job.Completion.TrySetResult(Result.Fail(job.Request.requestId, new("API_EXCEPTION", "Unhandled read error; see bridge diagnostics."))); }
-            return;
+            if (_jobs.IsEmpty || Stopwatch.GetTimestamp() - start >= budgetTicks || yieldToWrite?.Invoke() == true) return;
         }
     }
     public void Dispose()

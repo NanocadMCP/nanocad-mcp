@@ -132,6 +132,23 @@ public static class VisualCaptureService
         RequirePng(png, width, height, maxEdge);
         return png;
     }
+    internal static (int Width, int Height, int SourceWidth, int SourceHeight) ReadFrame(
+        JsonElement remote, string captureId, int processId)
+    {
+        if (remote.ValueKind != JsonValueKind.Object ||
+            !remote.TryGetProperty("capture_id", out var token) || token.ValueKind != JsonValueKind.String ||
+            !remote.TryGetProperty("process_id", out var pid) || pid.ValueKind != JsonValueKind.Number || !pid.TryGetInt32(out int reportedPid))
+            throw new DomainException("PROTOCOL_MISMATCH", "The bridge capture response is missing a valid capture ID or process ID.");
+        if (token.GetString() != captureId || reportedPid != processId)
+            throw new DomainException("CAPTURE_FAILED", "Bridge capture token or process identity differs.");
+
+        int Pixels(string field) =>
+            remote.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.Number &&
+            value.TryGetInt32(out int pixels) && pixels > 0 ? pixels :
+            throw new DomainException("PROTOCOL_MISMATCH", $"The bridge capture response is missing a valid '{field}' dimension.");
+        return (Pixels("width"), Pixels("height"), Pixels("source_width"), Pixels("source_height"));
+    }
+
     private static IntPtr Target(Descriptor descriptor, IntPtr expected = default)
     {
         using var p = Process.GetProcessById(descriptor.process_id);
@@ -170,7 +187,6 @@ public static class VisualCaptureService
                 // desktop; it never sends input or CAD commands.
             }
             string started = DateTime.UtcNow.ToString("O");
-            JsonElement frame;
             // An MCP server may discover the host HWND while its own desktop
             // still cannot render the CAD graphics surface. The bridge lives
             // in nanoCAD's desktop, so use its read-only WGC worker in both
@@ -207,22 +223,10 @@ public static class VisualCaptureService
                     : new DomainException("CAPTURE_VIEWPORT_UNAVAILABLE", "The loaded bridge does not support viewport-only capture.");
             if (!response.success) throw new DomainException(response.error!.code, response.error.message, response.error.retryable, response.error.details);
             var remote = Wire.Element(response.data!);
-            if (remote.GetProperty("capture_id").GetString() != captureId || remote.GetProperty("process_id").GetInt32() != descriptor.process_id)
-                throw new DomainException("CAPTURE_FAILED", "Bridge capture token or process identity differs.");
+            var (width, height, sourceWidth, sourceHeight) = ReadFrame(remote, captureId, descriptor.process_id);
             RequireCaptureArea(args, remote, args.NativeGraphics ? beforeData.GetProperty("view").GetProperty("camera_token").GetString() : null);
             var offscreenObservation = ReadDrawingObservation(args, remote, beforeData);
             var (timestamp, captureStart) = CaptureTiming(remote);
-            frame = Wire.Element(new
-            {
-                captured = true,
-                pid = descriptor.process_id,
-                width = remote.GetProperty("width").GetInt32(),
-                height = remote.GetProperty("height").GetInt32(),
-                source_width = remote.GetProperty("source_width").GetInt32(),
-                source_height = remote.GetProperty("source_height").GetInt32()
-            });
-            if (!frame.GetProperty("captured").GetBoolean() || frame.GetProperty("pid").GetInt32() != descriptor.process_id) throw new DomainException("CAPTURE_FAILED", "Visual worker identity or result differs.");
-            int width = frame.GetProperty("width").GetInt32(), height = frame.GetProperty("height").GetInt32();
             byte[] png = DecodeImage(remote, width, height, args.MaxEdge);
             if (window != IntPtr.Zero) Target(descriptor, window);
             var after = await Context(); var afterData = Wire.Element(after.data!); RequireUnchanged(beforeData, afterData);
@@ -244,8 +248,8 @@ public static class VisualCaptureService
                 mime_type = "image/png",
                 width,
                 height,
-                source_width = frame.GetProperty("source_width").GetInt32(),
-                source_height = frame.GetProperty("source_height").GetInt32(),
+                source_width = sourceWidth,
+                source_height = sourceHeight,
                 png_sha256 = digest,
                 process_id = descriptor.process_id,
                 process_start_utc_ticks = descriptor.process_start_utc_ticks.ToString(CultureInfo.InvariantCulture),

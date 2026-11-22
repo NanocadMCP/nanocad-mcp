@@ -5,8 +5,8 @@ internal static class LongOperationTests
 {
     private static readonly string Bridge=Guid.NewGuid().ToString("D"),Document=Guid.NewGuid().ToString("D");
     private static void Check(bool value,string message){if(!value)throw new Exception(message);}
-    private static Request Request(int timeout=40)=>new(Wire.Version,Guid.NewGuid().ToString("D"),"create_entities",timeout,Wire.Element(new{
-        bridge_instance_id=Bridge,document_id=Document,expected_revision="1",operation_id=Guid.NewGuid().ToString("D"),units="Millimeters",
+    private static Request Request(int timeout=40,string? bridgeId=null)=>new(Wire.Version,Guid.NewGuid().ToString("D"),"create_entities",timeout,Wire.Element(new{
+        bridge_instance_id=bridgeId??Bridge,document_id=Document,expected_revision="1",operation_id=Guid.NewGuid().ToString("D"),units="Millimeters",
         entities=new[]{new{type="Line",start=new[]{0d,0d},end=new[]{1d,0d}}}}));
     private static Result Success(WriteJob job)=>Result.Ok(job.OriginalRequestId,new CreatedEntities(job.OperationId,"committed",false,
         new[]{new EntityRef(Bridge,Document,"AA")},"single_command"),new(Bridge,Document,"2",DateTime.UtcNow.ToString("O")));
@@ -14,6 +14,96 @@ internal static class LongOperationTests
     {try{action();throw new Exception("Expected cancellation");}catch(OperationCanceledException){}}
     public static async Task Run(Func<string,Func<Task>,Task> test)
     {
+        await test("write transport: oversized request is not started and never needs a pipe", async () =>
+        {
+            var operationId = Guid.NewGuid().ToString("D");
+            var request = Request(10000) with { arguments = Wire.Element(new {
+                operation_id = operationId, text = new string('a', Wire.MaxRequestBytes)
+            }) };
+            var descriptor = Discovery.Describe(Bridge, "request-size-only");
+            try
+            {
+                await new BridgeClient().CallAsync(descriptor, request, default);
+                throw new Exception("Oversized request accepted.");
+            }
+            catch (DomainException error)
+            {
+                Check(error.Error.code == "REQUEST_TOO_LARGE" &&
+                    error.Error.details is WriteErrorDetails { outcome: "not_started", undo_history: "unchanged" } details &&
+                    details.operation_id == operationId, "Local size rejection was classified as possible execution.");
+            }
+        });
+        await test("write transport: cancellation after dispatch preserves original operation identity", async () =>
+        {
+            var descriptor = Discovery.Describe(Guid.NewGuid().ToString("D"), "write-owner-cancel-no-CAD");
+            var received = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            using var listener = new BridgeListener(descriptor, async (request, stop) =>
+            {
+                received.TrySetResult(true);
+                await Task.Delay(Timeout.Infinite, stop);
+                return Result.Ok(request.requestId, new { });
+            }, new JsonLog("write-owner-cancel-test"));
+            var request = Request(10000, descriptor.bridge_instance_id);
+            using var cancel = new CancellationTokenSource();
+            var response = new BridgeClient().CallAsync(descriptor, request, cancel.Token);
+            await received.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            cancel.Cancel();
+            try { await response; throw new Exception("Expected interrupted write response."); }
+            catch (DomainException error)
+            {
+                Check(error.Error.code == "WRITE_OUTCOME_UNKNOWN" &&
+                    error.Error.details is WriteErrorDetails { outcome: "unknown" } details &&
+                    details.operation_id == request.arguments.GetProperty("operation_id").GetString() &&
+                    Wire.Element(details.cause!).GetProperty("bridge_instance_id").GetString() == descriptor.bridge_instance_id,
+                    "Cancellation lost the original operation identity or claimed a known outcome.");
+            }
+        });
+        await test("transport: inconsistent result envelope preserves a sent write's uncertain outcome", async () =>
+        {
+            var descriptor = Discovery.Describe(Guid.NewGuid().ToString("D"), "envelope-contract-no-CAD");
+            using var listener = new BridgeListener(descriptor, (request, _) =>
+                Task.FromResult(new Result(Wire.Version, request.requestId, false, null, null, null, Array.Empty<string>())),
+                new JsonLog("envelope-contract-test"));
+            var write = Request(10000, descriptor.bridge_instance_id);
+            var read = write with { operation = "get_status", arguments = Wire.Element(new { descriptor.bridge_instance_id }) };
+            foreach (var request in new[] { read, write })
+            {
+                try { await new BridgeClient().CallAsync(descriptor, request, default); throw new Exception("Invalid outcome accepted."); }
+                catch (DomainException error)
+                {
+                    Check(error.Error.code == (request == read ? "PROTOCOL_MISMATCH" : "WRITE_OUTCOME_UNKNOWN"),
+                        "Response classification ignored the possible write.");
+                }
+            }
+        });
+        await test("write isolation: waiting and new writes stop while original receipts remain readable", async () =>
+        {
+            using var queue = new WriteQueue(Environment.CurrentManagedThreadId);
+            var original = Request(10000);
+            var cause = queue.Enqueue(original).Job;
+            Check(queue.Take() == cause && cause.TryStart(), "Could not start the original write.");
+            var waiting = Request(10000);
+            var pending = queue.SubmitAsync(waiting, default);
+            queue.Isolate(cause);
+            cause.Complete(cause.Error("WRITE_OUTCOME_UNKNOWN", "Unknown native outcome.", "unknown"));
+            var cancelled = await pending.WaitAsync(TimeSpan.FromSeconds(1));
+            Check(cancelled.error is { code: "WRITES_ISOLATED_UNTIL_RESTART", details: WriteErrorDetails { outcome: "not_started" } } &&
+                queue.Count == 0 && queue.IsolatedByOperationId == cause.OperationId, "Waiting write or isolation identity lost.");
+            try { await queue.SubmitAsync(Request(), default); throw new Exception("Write accepted during isolation."); }
+            catch (DomainException error)
+            {
+                Check(error.Error.code == "WRITES_ISOLATED_UNTIL_RESTART" &&
+                    error.Error.details is WriteErrorDetails { outcome: "not_started" } blocked &&
+                    Wire.Element(blocked.cause!).GetProperty("isolating_operation_id").GetString() == cause.OperationId,
+                    "Fresh write did not identify the isolating operation.");
+            }
+            var history = await queue.ReadOperationAsync(new Request(Wire.Version, Guid.NewGuid().ToString("D"), "get_operation_result",
+                1000, Wire.Element(new { bridge_instance_id = Bridge, operation_id = cause.OperationId })), default);
+            var replay = await queue.SubmitAsync(original, default);
+            Check(history.data is OperationResultLookup432 { found: true, outcome: "unknown" } &&
+                replay.error?.details is WriteErrorDetails { outcome: "unknown", replayed: true } && queue.LedgerCount == 2,
+                "Isolation blocked historical lookup or changed the original write outcome.");
+        });
         await test("long write: response expiry and later disconnect retain one running job",()=>{
             using var queue=new WriteQueue(Environment.CurrentManagedThreadId);
             using var owner=new CancellationTokenSource();var request=Request();

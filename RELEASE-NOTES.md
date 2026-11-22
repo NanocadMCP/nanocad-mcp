@@ -4,6 +4,8 @@
 
 ## Build 461
 
+- Fixed write recovery when the bridge connection is interrupted. Oversized requests report that no write started. If a native command leaves writes isolated, new requests identify that command immediately.
+- Improved paging for concurrent drawing queries, reduced PNG capture processing, and bounded routine log growth across application restarts.
 - Fixed parametric body renaming in 3D History. The name is stored on the top-level part and survives reopening the DWG. Nonparametric bodies that lose their captions on reopen now return a specific error before any rename in the request.
 - Added in-place contour edits for associative hatches bounded by lines and arcs. Connected dimensions and circular holes retain their original associations.
 - Added guide-to-section contact checks for Loft and material interval measurements on sections with spline or elliptical edges. Loft errors now identify a rejected section normal setting.

@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
 using System.Text.Json;
 using NanoCAD.Contracts;
 
@@ -19,12 +21,65 @@ public static class Discovery
     {
         LocalSecurity.SecureDirectory(Root);
         LocalSecurity.SecureDirectory(Instances);
+        using var own = Process.GetCurrentProcess();
+        PruneRetiredLifetimes(own.SessionId);
         var path = Path.Combine(Instances, descriptor.bridge_instance_id + ".json");
         var temp = path + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(descriptor, Wire.Json));
         File.Move(temp, path, true);
         return path;
     }
+    // Prune on bridge startup so read-only discovery never modifies the directory.
+    private static void PruneRetiredLifetimes(int session)
+    {
+        try
+        {
+            foreach (string path in Directory.EnumerateFiles(Instances, "*.json"))
+            {
+                if (!Guid.TryParseExact(Path.GetFileNameWithoutExtension(path), "D", out _)) continue;
+                try
+                {
+                    // Validate and delete the same file handle. The open prevents replacement
+                    // or rewriting between the lifetime check and deletion.
+                    using var handle = OpenDescriptor(path, ReadAndDelete, FileShare.Read, IntPtr.Zero, FileMode.Open,
+                        OpenReparsePoint, IntPtr.Zero);
+                    if (handle.IsInvalid || (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0) continue;
+                    using var stream = new FileStream(handle, FileAccess.Read);
+                    if (stream.Length > 8192) continue;
+                    var old = JsonSerializer.Deserialize<Descriptor>(stream, Wire.Json);
+                    if (old == null || old.session_id != session || old.process_id <= 0 || old.process_start_utc_ticks <= 0 ||
+                        !string.Equals(Path.GetFileNameWithoutExtension(path), old.bridge_instance_id, StringComparison.OrdinalIgnoreCase) ||
+                        old.pipe_name != $"NanoCADMcp-{old.process_id}-{old.bridge_instance_id}") continue;
+                    if (IsRetired(old))
+                    {
+                        byte deleteOnClose = 1;
+                        SetFileInformationByHandle(handle, 4, ref deleteOnClose, 1); // FileDispositionInfo
+                    }
+                }
+                catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException or
+                    InvalidOperationException or System.ComponentModel.Win32Exception) { }
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    private static bool IsRetired(Descriptor descriptor)
+    {
+        Process process;
+        try { process = Process.GetProcessById(descriptor.process_id); }
+        catch (ArgumentException) { return true; } // No process with this PID.
+        using (process)
+            return process.HasExited || process.StartTime.ToUniversalTime().Ticks != descriptor.process_start_utc_ticks;
+    }
+
+    private const uint ReadAndDelete = 0x80000000 | 0x00010000;
+    private const uint OpenReparsePoint = 0x00200000;
+    [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern SafeFileHandle OpenDescriptor(string path, uint access, FileShare share, IntPtr security,
+        FileMode mode, uint flags, IntPtr template);
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    private static extern bool SetFileInformationByHandle(SafeFileHandle file, int informationClass, ref byte data, int size);
+
     public static Descriptor[] List()
     {
         if (!Directory.Exists(Instances)) return Array.Empty<Descriptor>();

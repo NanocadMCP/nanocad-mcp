@@ -53,7 +53,7 @@ public sealed class ToolService
                 }
                 else
                 {
-                    var descriptor = Discovery.Choose(bridgeId);
+                    var descriptor = options?.SelectedBridge ?? Discovery.Choose(bridgeId);
                     selectedBridge = descriptor.bridge_instance_id;
                     if (options?.ValidateOnly == true)
                         request = request with { operation = WritePreviewRequest.Route, arguments = Wire.Element(new WritePreviewRequest(operation, input)) };
@@ -65,8 +65,7 @@ public sealed class ToolService
                             state = await WriteResultState.ReadAsync(operation, result,
                                 (reader, arguments, cancel) => ReadBridge(descriptor, reader, arguments, cancel), cancellationToken);
                         }
-                        catch (Exception error) when (error is DomainException or OperationCanceledException or IOException or
-                            UnauthorizedAccessException or JsonException or InvalidOperationException or KeyNotFoundException or System.ComponentModel.Win32Exception)
+                        catch (Exception error) when (Recoverable(error))
                         {
                             state = new("unavailable", result.context, null,
                                 error is DomainException domain ? domain.Error.code : "OBSERVATION_UNAVAILABLE");
@@ -80,22 +79,12 @@ public sealed class ToolService
         catch (JsonException) { result = Result.Fail(id, new("PROTOCOL_MISMATCH", "Invalid JSON in the bridge response.")); }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         { result = Result.Fail(id, new("BRIDGE_UNAVAILABLE", "Local bridge discovery or transport failed.", true)); }
+        catch (Exception e) when (Recoverable(e))
+        { result = Result.Fail(id, new("INTERNAL_ERROR", "The MCP server could not complete this tool call.", false, new { exception_type = e.GetType().Name })); }
 
         if (result.error is { } invalid) result = result with { error = InputError.Complete(invalid) };
-        (result, image) = FitResponseBudget(result, operation, image, selectedBridge);
-        if (state is not null && result.success)
-        {
-            var withState = result with { write_state = state };
-            if (JsonSerializer.SerializeToUtf8Bytes(Wrap(withState)).Length <= ResponseBudget) result = withState;
-            else
-            {
-                withState = result with { write_state = new("unavailable", result.context, null, "RESPONSE_LIMIT_EXCEEDED") };
-                if (JsonSerializer.SerializeToUtf8Bytes(Wrap(withState)).Length <= ResponseBudget) result = withState;
-            }
-        }
-        var preparation = PrepareRead(operation, preparationSelection, result, image);
-        var responseResult = Wrap(result, image, preparation);
-        _log.Write(operation, id, result.success ? "ok" : result.error!.code, watch.ElapsedMilliseconds);
+        var (presented, responseResult) = Present(result, operation, image, selectedBridge, state, preparationSelection);
+        _log.Write(operation, id, presented.success ? "ok" : presented.error!.code, watch.ElapsedMilliseconds);
         return responseResult;
     }
 
@@ -138,25 +127,40 @@ public sealed class ToolService
         });
     }
 
-    private static (Result Result, byte[]? Image) FitResponseBudget(Result result, string operation, byte[]? image, string? selectedBridge)
+    private static bool Recoverable(Exception error) =>
+        error is not (OutOfMemoryException or StackOverflowException or AccessViolationException);
+
+    internal static (Result Result, CallToolResult Response) Present(Result result, string operation, byte[]? image,
+        string? selectedBridge, WriteStateObservation? state, ReadPreparationSelection433? selection)
     {
-        // Bound the actual MCP result, reserving JSON-RPC metadata bytes.
-        // Images are read-only visual payloads. If they exhaust the actual
-        // wrapper budget, return the ordinary read-page failure without image.
-        if (image != null && JsonSerializer.SerializeToUtf8Bytes(Wrap(result, image)).Length > ResponseBudget)
+        if (image != null)
         {
+            // capture_view has no optional write state or read preparation.
+            var captured = Wrap(result, image);
+            if (Bytes(captured) <= ResponseBudget) return (result, captured);
             result = Result.Fail(result.request_id,
                 new("RESPONSE_LIMIT_EXCEEDED", "The captured image exceeds the response budget; request a smaller image."), result.context);
-            image = null;
+            return (result, Wrap(result));
         }
-        WriteResponseBudget432.TryFit(result, operation, ResponseBudget,
-            value => JsonSerializer.SerializeToUtf8Bytes(Wrap(value, image)).Length, out result, selectedBridge);
-        return (result, image);
-    }
 
-    private static JsonObject? PrepareRead(string operation, ReadPreparationSelection433? selection, Result result, byte[]? image)
-    {
-        if (selection == null) return null;
+        Result? lastFit = null;
+        CallToolResult? response = null;
+        int Measure(Result candidate)
+        {
+            var wrapped = Wrap(candidate);
+            int size = Bytes(wrapped);
+            if (size <= ResponseBudget) (lastFit, response) = (candidate, wrapped);
+            return size;
+        }
+        WriteResponseBudget432.TryFit(result, operation, ResponseBudget, Measure, out result, selectedBridge);
+        if (!ReferenceEquals(lastFit, result) || response == null) response = Wrap(result);
+        if (state != null && result.success)
+        {
+            var withState = result with { write_state = state };
+            if (Measure(withState) > ResponseBudget)
+                Measure(result with { write_state = new("unavailable", result.context, null, "RESPONSE_LIMIT_EXCEEDED") });
+        }
+        if (selection == null) return (result, response!);
         JsonObject observed;
         try { observed = ReadPreparation433.Build(operation, selection, result); }
         catch (Exception error) when (error is JsonException or InvalidOperationException)
@@ -169,9 +173,17 @@ public sealed class ToolService
                 ["detail"] = "Optional preparation could not represent this observation. The original read is unchanged; use its returned data and focused input contract. This does not restrict any operation."
             };
         }
-        return ReadPreparation433.Fit(observed,
-            candidate => JsonSerializer.SerializeToUtf8Bytes(Wrap(result, image, candidate)).Length, ResponseBudget);
+        ReadPreparation433.Fit(observed, candidate =>
+        {
+            var wrapped = Wrap(result, preparation: candidate);
+            int size = Bytes(wrapped);
+            if (size <= ResponseBudget) response = wrapped;
+            return size;
+        }, ResponseBudget);
+        return (result, response!);
     }
+
+    private static int Bytes(CallToolResult response) => JsonSerializer.SerializeToUtf8Bytes(response).Length;
 
     internal static CallToolResult Wrap(Result result, byte[]? image = null, JsonObject? preparation = null)
     {

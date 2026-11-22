@@ -5,7 +5,7 @@ using NanoCAD.Ipc;
 
 namespace NanoCAD.McpServer;
 
-internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateOnly, bool ReturnState)
+internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateOnly, bool ReturnState, Descriptor? SelectedBridge)
 {
     private const string UuidPattern = "[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}";
     private const string NumericRevision = "[0-9]{1,20}";
@@ -35,6 +35,7 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
         if (UnitsDefault(operation) && !arguments.ContainsKey("units")) arguments["units"] = "Millimeters";
 
         string? bridge = ReadId("bridge_instance_id"), document = ReadId("document_id");
+        Descriptor? selected = null;
         bool omittedBridge = bridge == null;
         if (ScopedRevision(operation) && arguments["expected_revision"] is JsonValue revision &&
             revision.TryGetValue<string>(out var text) && ScopedWriteRevision.TryParse(text, out var scope))
@@ -43,14 +44,14 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
                 throw InputError.Create("$.expected_revision", "The qualified revision must match the supplied bridge and document.");
             if (bridge == null)
             {
-                var selected = choose(null);
+                selected = choose(null);
                 if (selected.bridge_instance_id != scope.bridge_instance_id)
                     throw new DomainException("STALE_DOCUMENT", "The qualified revision belongs to another bridge lifetime.", true);
                 bridge = selected.bridge_instance_id;
             }
             if (document == null)
             {
-                var selected = choose(bridge);
+                selected ??= choose(bridge);
                 var open = await list(selected, cancellation).ConfigureAwait(false);
                 if (open.bridge_instance_id != bridge || open.documents.Length != 1 || open.active_document_id == null)
                     throw new DomainException("AMBIGUOUS_DOCUMENT", "Specify document_id when the bridge does not have exactly one open active drawing.");
@@ -63,9 +64,13 @@ internal sealed record WriteRequestOptions(JsonElement Arguments, bool ValidateO
         }
         if (ScopedRevision(operation) && document == null)
             throw InputError.Create("$.document_id", "Specify document_id or use the qualified context.write_revision from a read.");
-        if (omittedBridge) arguments["bridge_instance_id"] = bridge ?? choose(null).bridge_instance_id;
+        if (omittedBridge)
+        {
+            selected ??= choose(null);
+            arguments["bridge_instance_id"] = selected.bridge_instance_id;
+        }
         if (document != null && !arguments.ContainsKey("document_id")) arguments["document_id"] = document;
-        return new(Wire.Element(arguments), validate, state);
+        return new(Wire.Element(arguments), validate, state, selected);
 
         string? ReadId(string name)
         {

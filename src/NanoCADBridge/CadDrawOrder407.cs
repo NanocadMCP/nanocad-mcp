@@ -37,7 +37,8 @@ internal static class CadDrawOrder407
             edit.Handles.Select(handle=>ResolveEntity(handle,true)).ToArray(),edit.RelativeTo==null?ObjectId.Null:ResolveEntity(edit.RelativeTo,false),owner,table)).ToArray();
     }
     internal static void Preflight(ModifyArguments args,DocumentState state,Transaction tr,Action? cancel=null)=>Resolve(args,state.Document.Database,tr,cancel??(()=>{}));
-    static ObjectId[] Order(DrawOrderTable table,ObjectId owner,Transaction tr,Action cancel)
+    private sealed record OrderSnapshot(ObjectId[] Items, HashSet<ObjectId> Membership);
+    static OrderSnapshot Order(DrawOrderTable table,ObjectId owner,Transaction tr,Action cancel)
     {
         using var full=table.GetFullDrawOrder(0);var result=new List<ObjectId>();var seen=new HashSet<ObjectId>();
         foreach(ObjectId id in full)
@@ -46,12 +47,12 @@ internal static class CadDrawOrder407
             Need(seen.Add(id)&&tr.GetObject(id,OpenMode.ForRead) is Entity entity&&entity.OwnerId==owner,
                 "Native drawing order contains duplicate or foreign identities.","NATIVE_DRAW_ORDER_MISMATCH");result.Add(id);
         }
-        return result.ToArray();
+        return new(result.ToArray(), seen);
     }
-    static void Verify(Plan plan,ObjectId[] before,ObjectId[] after,DrawOrderTable table,Action cancel)
+    static void Verify(Plan plan,OrderSnapshot previous,OrderSnapshot current,DrawOrderTable table,Action cancel)
     {
-        var selected=plan.Selected.ToHashSet();
-        Need(before.Length==after.Length&&before.ToHashSet().SetEquals(after)&&plan.Selected.All(id=>after.Contains(id)),
+        var before=previous.Items; var after=current.Items; var selected=plan.Selected.ToHashSet();
+        Need(before.Length==after.Length&&previous.Membership.SetEquals(current.Membership)&&selected.IsSubsetOf(current.Membership),
             "Native drawing-order change lost, added or substituted entity identities.","NATIVE_DRAW_ORDER_MISMATCH");
         Need(before.Where(id=>!selected.Contains(id)).SequenceEqual(after.Where(id=>!selected.Contains(id))),
             "Native drawing-order change reordered unselected entities.","NATIVE_DRAW_ORDER_MISMATCH");
@@ -101,7 +102,7 @@ internal static class CadDrawOrder407
             foreach(var plan in plans)
             {
                 job.CheckCancellation();var read=(DrawOrderTable)tr.GetObject(plan.Table,OpenMode.ForRead);var before=Order(read,plan.Owner,tr,job.CheckCancellation);
-                Need(plan.Selected.All(id=>before.Contains(id))&&(plan.Anchor.IsNull||before.Contains(plan.Anchor)),"Selected/relative entity is absent from the actual native order.","NATIVE_DRAW_ORDER_MISMATCH");
+                Need(plan.Selected.All(before.Membership.Contains)&&(plan.Anchor.IsNull||before.Membership.Contains(plan.Anchor)),"Selected/relative entity is absent from the actual native order.","NATIVE_DRAW_ORDER_MISMATCH");
                 var table=(DrawOrderTable)tr.GetObject(plan.Table,OpenMode.ForWrite);using var ids=new ObjectIdCollection(plan.Selected);
                 stage="native_draw_order";job.CheckCancellation();started=true;
                 switch(plan.Edit.Position)
@@ -114,12 +115,8 @@ internal static class CadDrawOrder407
             stage="native_commit";job.BeginCommit();tr.Commit();job.RecordCommit(outcome);
         }
         catch(Exception error){failure=error;}
-        Exception? cleanup=null;try{tr?.Dispose();}catch(Exception error){cleanup=error;}
-        if(job.CommittedResult is {} committed)
-        {
-            if(cleanup!=null)committed=committed with{warnings=committed.warnings.Append("POST_COMMIT_CLEANUP_FAILED: Drawing-order commit is recorded; refresh current state before further writes.").ToArray()};
-            job.RecordCommit(committed);return committed;
-        }
+        if (NativeTransactionCompletion.DisposeAndGetCommit(tr, job,
+            "POST_COMMIT_CLEANUP_FAILED: Drawing-order commit is recorded; refresh current state before further writes.", out var cleanup) is { } committed) return committed;
         string code=failure is DomainException domain?domain.Error.code:failure is OperationCanceledException?"CANCELLED":"NATIVE_DRAW_ORDER_FAILED";bool unknown=started||cleanup!=null;
         return job.Error(unknown?"WRITE_OUTCOME_UNKNOWN":code,unknown?"Native drawing-order mutation started or cleanup failed; inspect the current visible result and preserve the exact request. Do not submit another operation_id.":failure?.Message??"Drawing-order change did not complete.",
             unknown?"unknown":"not_started",context,new{cause=code,stage,native_error_status=failure is Teigha.Runtime.Exception native?native.ErrorStatus.ToString():null,cleanup_error=cleanup?.GetType().Name})

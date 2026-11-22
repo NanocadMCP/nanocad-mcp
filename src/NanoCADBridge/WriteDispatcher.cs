@@ -18,11 +18,11 @@ internal sealed class WriteDispatcher : IDisposable
     private WriteJob? _scheduled;
     private NativeDispatch? _native;
     private readonly Stack<CommandFrame> _commandFrames = new();
-    private bool _disabled;
+    private volatile bool _disposed;
     private bool _pumping;
     public bool Pending => _scheduled != null;
-    public bool Available => !_disabled;
-    public bool CameraAvailable => !_disabled && _views.Available;
+    public bool Available => !_disposed && _queue.IsolatedByOperationId == null;
+    public bool CameraAvailable => Available && _views.Available;
     public bool DocumentOperationRunning => _documents.ApplicationOperationRunning;
     private sealed class NativeDispatch
     {
@@ -82,7 +82,7 @@ internal sealed class WriteDispatcher : IDisposable
     public void Pump()
     {
         if (Environment.CurrentManagedThreadId != _uiThread) throw new InvalidOperationException("Write dispatch must stay on the host UI thread.");
-        if (_pumping || _disabled) return;
+        if (_pumping || !Available) return;
         _pumping = true;
         try { PumpCore(); }
         finally { _pumping = false; }
@@ -115,7 +115,7 @@ internal sealed class WriteDispatcher : IDisposable
             Trace(finished, "write_not_started_attempt_retired", CommandName);
             Clear(finished);
         }
-        if (_scheduled != null || _disabled) return;
+        if (_scheduled != null || !Available) return;
         var job = _queue.Take(); if (job == null) return;
         NativeDispatch? attempt = null;
         try
@@ -182,7 +182,7 @@ internal sealed class WriteDispatcher : IDisposable
         var known = deferred ? job.CommittedResult : attempt?.Outcome ?? job.CommittedResult;
         // Token provenance makes a not-started late entry harmless. A genuinely
         // started operation without a known outcome still requires isolation.
-        if (started && known == null) _disabled = true;
+        if (started && known == null) _queue.Isolate(job);
         job.Complete(known ?? job.Error(started ? "WRITE_OUTCOME_UNKNOWN" : code,
             started ? "Native command dispatch ended without a known write outcome; do not retry with a new ID." : message,
             started ? "unknown" : "not_started", cause: cause));
@@ -258,7 +258,7 @@ internal sealed class WriteDispatcher : IDisposable
             started ? "Native command ended after write entry without a known outcome; do not retry with a new ID."
                 : "Internal command ended without starting the write.",
             started ? "unknown" : "not_started"));
-        if (completion.Isolate) _disabled = true;
+        if (completion.Isolate) _queue.Isolate(job);
         Complete(attempt, completion.Outcome);
     }
     private void FinishDeferred(NativeDispatch attempt)
@@ -354,7 +354,7 @@ internal sealed class WriteDispatcher : IDisposable
     }
     public void Dispose()
     {
-        _disabled = true;
+        _disposed = true;
         try
         {
             if (_scheduled is { } job && NativePostCommandVerification422.Contains(job))

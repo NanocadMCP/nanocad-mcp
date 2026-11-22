@@ -14,8 +14,8 @@ public sealed class WriteJob
     private bool _cancelRequested;
     private Result? _committed;
     private IOperationArguments? _arguments;
-    private readonly CancellationToken _ownerCancellation;
-    private readonly CancellationToken _startCancellation;
+    private CancellationToken _ownerCancellation;
+    private CancellationToken _startCancellation;
     private readonly TimeSpan _executionBudget;
     private long _startedAt;
     private bool _ownerDetached;
@@ -81,6 +81,7 @@ public sealed class WriteJob
             // A later transport/cancel/shutdown error cannot overwrite a commit.
             if (_committed != null && !result.success) result = _committed;
             _phase = WritePhase.Finished; _arguments = null;
+            _ownerCancellation = default; _startCancellation = default;
             _completion.TrySetResult(result);
         }
     }
@@ -153,6 +154,8 @@ public sealed class WriteQueue : IDisposable
     private readonly object _gate = new();
     private readonly Dictionary<string, WriteJob> _ledger = new(StringComparer.Ordinal);
     private readonly Queue<WriteJob> _waiting = new();
+    private readonly List<WriteJob> _dispatched = new();
+    private string? _isolatedByOperationId;
     private readonly int _uiThread, _capacity;
     private readonly TimeSpan _executionBudget;
     private bool _disposed;
@@ -164,7 +167,32 @@ public sealed class WriteQueue : IDisposable
     }
     public int Count { get { lock (_gate) return _waiting.Count; } }
     public int LedgerCount { get { lock (_gate) return _ledger.Count; } }
-    public object[] ActiveExecutions { get { lock (_gate) return _ledger.Values.Where(j => j.Phase is WritePhase.Running or WritePhase.Committing).Select(j => j.ExecutionState()).ToArray(); } }
+    public object[] ActiveExecutions
+    {
+        get
+        {
+            lock (_gate)
+            {
+                _dispatched.RemoveAll(job => job.Phase == WritePhase.Finished);
+                return _dispatched.Where(job => job.Phase is WritePhase.Running or WritePhase.Committing)
+                    .Select(job => job.ExecutionState()).ToArray();
+            }
+        }
+    }
+    public string? IsolatedByOperationId { get { lock (_gate) return _isolatedByOperationId; } }
+    private static DomainError Isolated(string bridgeId, string operationId, string isolatedBy) =>
+        new("WRITES_ISOLATED_UNTIL_RESTART",
+            "New writes are disabled in this bridge lifetime after a native command with an unknown outcome. Read the isolating operation with get_operation_result and reconcile the drawing before resuming writes in a new session.",
+            false, new WriteErrorDetails(operationId, "not_started", false, "unchanged", new { bridge_instance_id = bridgeId, isolating_operation_id = isolatedBy }));
+    public void Isolate(WriteJob cause)
+    {
+        lock (_gate)
+        {
+            _isolatedByOperationId ??= cause.OperationId;
+            while (_waiting.TryDequeue(out var waiting))
+                waiting.Complete(Result.Fail(waiting.OriginalRequestId, Isolated(waiting.BridgeId, waiting.OperationId, _isolatedByOperationId)));
+        }
+    }
     public (WriteJob Job, bool Replay) Enqueue(Request request, CancellationToken ownerCancellation = default, CancellationToken startCancellation = default)
     {
         var arguments = WriteValidation.Parse(request.operation, request.arguments);
@@ -177,6 +205,11 @@ public sealed class WriteQueue : IDisposable
                 if (previous.Fingerprint != fingerprint)
                     throw new DomainException("OPERATION_ID_CONFLICT", "This operation_id was already reserved for another payload.", false, new { operation_id = arguments.OperationId });
                 return (previous, true);
+            }
+            if (_isolatedByOperationId is { } isolatingOperation)
+            {
+                var error = Isolated(arguments.BridgeId, arguments.OperationId, isolatingOperation);
+                throw new DomainException(error.code, error.message, error.retryable, error.details);
             }
             while (_waiting.TryPeek(out var expired) && expired.Phase == WritePhase.Finished) _waiting.Dequeue();
             if (_waiting.Count >= _capacity) throw new DomainException("BUSY", "Write queue is full; nothing was scheduled.", true);
@@ -238,7 +271,13 @@ public sealed class WriteQueue : IDisposable
         if (Environment.CurrentManagedThreadId != _uiThread) throw new InvalidOperationException("Write dispatch must stay on the host UI thread.");
         lock (_gate)
         {
-            while (_waiting.TryDequeue(out var job)) if (job.TrySchedule()) return job;
+            _dispatched.RemoveAll(job => job.Phase == WritePhase.Finished);
+            while (_waiting.TryDequeue(out var job))
+            {
+                if (!job.TrySchedule()) continue;
+                _dispatched.Add(job);
+                return job;
+            }
             return null;
         }
     }
@@ -247,8 +286,9 @@ public sealed class WriteQueue : IDisposable
         lock (_gate)
         {
             _disposed = true;
-            foreach (var job in _ledger.Values) job.Stop();
-            _waiting.Clear();
+            foreach (var job in _waiting) job.Stop();
+            foreach (var job in _dispatched) job.Stop();
+            _waiting.Clear(); _dispatched.Clear();
         }
     }
 }

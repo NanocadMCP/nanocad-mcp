@@ -16,7 +16,7 @@ internal sealed class CadReader
     private readonly string _instance;
     private readonly DocumentRegistry _documents;
     private readonly JsonLog _log;
-    private readonly HandlePages<EntitySummary> _snapshots = new();
+    private readonly HandlePages<EncodedPageItem> _snapshots = new(measure: item => item.Length);
     private sealed record SummaryItem(string Type, string Layer, QueryEnvelope? Bounds, string? NameMatchSource);
     private readonly HandlePages<SummaryItem> _summaryPages = new();
     private readonly StructureReader _structure;
@@ -251,17 +251,17 @@ internal sealed class CadReader
             }
             return (entity, summary);
         }
-        EntitySummary? Read(ulong handle)
+        EncodedPageItem? Read(ulong handle)
         {
             if (ReadMatch(handle) is not { } match) return null;
             if (!CadTargetedRead407.MatchBounds(match.entity, args.QueryBounds, cancellationToken.ThrowIfCancellationRequested, out var unavailable))
             { if (unavailable) unavailableBounds++; return null; }
-            return match.summary;
+            return EncodedPageItem.From(match.summary);
         }
-        object Convert(HandlePages<EntitySummary>.Page page)
+        object Convert(HandlePages<EncodedPageItem>.Page page)
         {
             if (args.QueryBounds == null && args.QueryText == null && args.QueryBlock == null && args.BodyName == null)
-                return new Page(page.items, page.total_count, page.returned_count, page.complete, page.next_cursor, page.selection_revision);
+                return page;
             return new
             {
                 page.items,

@@ -198,6 +198,22 @@ await Test("pagination ordering, revisions, filters, tamper and expiry", () =>
     Domain("CURSOR_EXPIRED", () => snapshots.Next(selected.next_cursor!, documentId, "1", "1", "selection", 1));
     return Task.CompletedTask;
 });
+await Test("transaction cleanup preserves recorded outcomes and reports disposal errors", NativeTransactionCompletionTests.Run);
+await Test("UI read batching yields to a waiting write and retains FIFO", () =>
+{
+    using var queue = new ReadQueue(Environment.CurrentManagedThreadId);
+    var requests = Enumerable.Range(0, 4).Select(_ => RequestOf()).ToArray();
+    var pending = requests.Select(request => queue.SubmitAsync(request, default)).ToArray();
+    var order = new List<string>();
+    Result Read(Request request, CancellationToken cancellation) { order.Add(request.requestId); return Result.Ok(request.requestId, new { }); }
+    queue.Pump(Read, TimeSpan.FromSeconds(1), () => order.Count == 2);
+    Check(order.Count == 2 && queue.Count == 2 && !pending[2].IsCompleted, "A queued write did not get its turn.");
+    queue.Pump(Read);
+    Check(queue.Count == 1, "A single-read callback consumed more work.");
+    queue.Pump(Read, TimeSpan.FromSeconds(1));
+    Check(pending.All(task => task.GetAwaiter().GetResult().success) && order.SequenceEqual(requests.Select(r => r.requestId)), "Batch changed the order or result.");
+    return Task.CompletedTask;
+});
 await Test("UI queue capacity, cancellation and no late execution", async () =>
 {
     // Dedicated thread models a host UI; no CAD assembly is loaded by these tests.

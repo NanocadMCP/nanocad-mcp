@@ -53,10 +53,20 @@
   </PropertyGroup>
   <ItemGroup>
     <NativeAccessibilityBuildInput Include="$(MSBuildProjectDirectory)\..\NanoCAD.NativeAccessibility\*.cpp;$(MSBuildProjectDirectory)\..\NanoCAD.NativeAccessibility\*.h;$(MSBuildProjectDirectory)\..\..\scripts\build-native-accessibility.ps1" />
-    <None Include="$(NativeAccessibilityOutput)" Link="NanoCAD.NativeAccessibility.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Condition="'$(NativeAccessibilityPrebuilt)' == ''" Include="$(NativeAccessibilityOutput)" Link="NanoCAD.NativeAccessibility.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Condition="'$(NativeAccessibilityPrebuilt)' != ''" Include="$(NativeAccessibilityPrebuilt)" Link="NanoCAD.NativeAccessibility.dll" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
   </ItemGroup>
+  <Target Name="VerifyPrebuiltNativeAccessibility" BeforeTargets="PrepareForBuild"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(NativeAccessibilityPrebuilt)' != ''">
+    <GetFileHash Files="$(NativeAccessibilityPrebuilt)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_VerifiedAccessibilityBinary" />
+    </GetFileHash>
+    <!-- Released ABI 1 binary, from the checked nanoCAD MCP 460 local package. -->
+    <Error Condition="'%(_VerifiedAccessibilityBinary.FileHash)' != '52B91E72970B6BFCFB95CF17AC28FFF8B6DD780224903625E92EE9D106A53056'"
+           Text="NativeAccessibilityPrebuilt must match the released nanoCAD MCP 460 accessibility DLL. Omit this property to build from source." />
+  </Target>
   <Target Name="BuildNativeAccessibility" BeforeTargets="PrepareForBuild"
-          Condition="'$(DesignTimeBuild)' != 'true'"
+          Condition="'$(DesignTimeBuild)' != 'true' and '$(NativeAccessibilityPrebuilt)' == ''"
           Inputs="@(NativeAccessibilityBuildInput)"
           Outputs="$(NativeAccessibilityOutput)">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\build-native-accessibility.ps1&quot; -Configuration $(Configuration) $(NativeAccessibilityMfcArgument)" />

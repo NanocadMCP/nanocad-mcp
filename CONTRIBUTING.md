@@ -32,3 +32,8 @@ Describe the engineering result you need, your current workflow and why it is di
 - Never include credentials, user drawings, proprietary SDK files or generated build output.
 
 By submitting original code or documentation for inclusion, you agree to license your contribution under this project's [MIT License](LICENSE). Identify third-party material and its license explicitly; do not relicense it as your own work.
+
+
+## Building the bridge without MFC
+
+For managed bridge changes, extract `bridge/NanoCAD.NativeAccessibility.dll` from the release 460 local package and add `-p:NativeAccessibilityPrebuilt="C:\path\to\NanoCAD.NativeAccessibility.dll"` to the bridge build. MSBuild verifies the released binary's SHA-256 before copying it to the output. Omit the property to compile the guard from source with the x64 MFC toolchain. The other native SDK components retain their usual build requirements.

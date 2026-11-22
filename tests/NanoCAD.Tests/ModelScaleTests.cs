@@ -31,6 +31,45 @@ internal static class ModelScaleTests
             try{pages.Next(next.next_cursor!,"doc","changed",null,"filter",100,Read);throw new Exception("Stale cursor accepted.");}catch(DomainException e)when(e.Error.code=="STALE_DOCUMENT"){}
             return Task.CompletedTask;
         });
+        await test("model scale page cache keeps interleaved cursors and expires them by retained bytes or idle time", () =>
+        {
+            var now = DateTime.UtcNow;
+            var pages = new HandlePages<Item>(() => now);
+            Item Read(ulong id) => new(id);
+            string Open(string filter, int n = 3) => pages.First("doc", "rev", null, filter,
+                Enumerable.Range(1, n).Select(id => (ulong)id), 1, Read).next_cursor!;
+            string[] filters = { "a", "b", "c", "d" };
+            var cursors = filters.Select(f => Open(f)).ToArray();
+            for (int i = 0; i < filters.Length; i++)
+                if (pages.Next(cursors[i], "doc", "rev", null, filters[i], 1, Read).items[0].Handle != 2)
+                    throw new Exception("Interleaved queries invalidated a live cursor.");
+            var large = Open("large", SerializedCapacity357.SnapshotBytes / sizeof(ulong) + 1);
+            // Even a completed query over a different filter must leave the outstanding large cursor intact.
+            if (!pages.First("doc", "rev", null, "immediate", new ulong[] { 1 }, 1, Read).complete ||
+                pages.Next(large, "doc", "rev", null, "large", 1, Read).items[0].Handle != 2)
+                throw new Exception("A large drawing could not continue its active query.");
+            void Expired(string cursor, string filter)
+            {
+                try { pages.Next(cursor, "doc", "rev", null, filter, 1, Read); throw new Exception("Expired cursor survived."); }
+                catch (DomainException e) when (e.Error.code == "CURSOR_EXPIRED") { }
+            }
+            Expired(cursors[0],"a");
+            now = now.AddMinutes(3);
+            Expired(large, "large");
+            return Task.CompletedTask;
+        });
+        await test("model scale query items reuse the exact UTF-8 bytes charged to the page", () =>
+        {
+            var pages = new HandlePages<EncodedPageItem>(measure: item => item.Length);
+            var source = new { label = "\u00d8 \U0001F603 \" A", point = new[] { 10.0, -0.0 } };
+            var encoded = EncodedPageItem.From(source);
+            var page = pages.First("doc", "rev", null, "filter", new ulong[] { 1, 2 }, 10, _ => encoded);
+            string expected = System.Text.Json.JsonSerializer.Serialize(source, Wire.Json);
+            if (encoded.Length != System.Text.Encoding.UTF8.GetByteCount(expected) ||
+                Wire.Element(page).GetProperty("items").EnumerateArray().Any(item => item.GetRawText() != expected))
+                throw new Exception("The serialized entity summary changed inside its page envelope.");
+            return Task.CompletedTask;
+        });
         await test("model scale filtered pagination yields continuations and exact final totals",()=>
         {
             var pages=new HandlePages<Item>();int reads=0;

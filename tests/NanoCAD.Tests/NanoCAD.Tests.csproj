@@ -10,4 +10,5 @@
   <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelParameterDimensionBinding.cs" Link="ModelParameterDimensionBinding.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelHolePlacementSlots.cs" Link="ModelHolePlacementSlots.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/NanoCADBridge/ModelParameterDimensionReceipt.cs" Link="ModelParameterDimensionReceipt.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/NanoCADBridge/NativeTransactionCompletion.cs" Link="NativeTransactionCompletion.cs" /></ItemGroup>
 </Project>

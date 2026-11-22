@@ -21,6 +21,18 @@ internal static class VisualCaptureTests
             var overflow = valid.DeepClone(); overflow["expected_revision"] = "18446744073709551616"; Deny(() => VisualCaptureSchema.Parse(Wire.Element(overflow)));
             var fraction = valid.DeepClone(); fraction["max_edge"] = 512.5; Deny(() => VisualCaptureSchema.Parse(Wire.Element(fraction))); return Task.CompletedTask;
         });
+        await test("visual capture identifies incomplete bridge frames and preserves identity checks", () =>
+        {
+            var reply = new { capture_id = "current", process_id = 12, width = 40, height = 20, source_width = 80, source_height = 40 };
+            if (VisualCaptureService.ReadFrame(Wire.Element(reply), "current", 12) != (40, 20, 80, 40))
+                throw new Exception("Dimensions changed in presentation.");
+            Deny(() => VisualCaptureService.ReadFrame(Wire.Element(reply), "different", 12), "CAPTURE_FAILED");
+            Deny(() => VisualCaptureService.ReadFrame(Wire.Element(new { }), "current", 12), "PROTOCOL_MISMATCH");
+            var missing = JsonSerializer.SerializeToNode(reply)!.AsObject();
+            missing.Remove("source_height");
+            Deny(() => VisualCaptureService.ReadFrame(Wire.Element(missing), "current", 12), "PROTOCOL_MISMATCH");
+            return Task.CompletedTask;
+        });
         await test("visual capture rejects stale document and changes during observation", () =>
         {
             var args = VisualCaptureSchema.Parse(Wire.Element(Input()));
@@ -148,6 +160,30 @@ internal static class VisualCaptureTests
             Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds! with { Z = 0 }, region)), "CAPTURE_BOUNDS_UNAVAILABLE");
             Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds, region, 41)), "CAPTURE_BOUNDS_UNAVAILABLE");
             Deny(() => VisualCaptureService.RequireCaptureArea(args, Reply(args.Bounds, new(80, 15, 120, 45))), "CAPTURE_BOUNDS_UNAVAILABLE");
+            return Task.CompletedTask;
+        });
+        await test("capture presentation preserves the actual MCP byte budget in both client modes", () =>
+        {
+            const string mode = "NANOCAD_MCP_RESPONSE_MODE";
+            string? saved = Environment.GetEnvironmentVariable(mode);
+            try
+            {
+                var png = new byte[VisualCaptureService.MaxPngBytes];
+                foreach (var presentation in new[] { "default", "structured" })
+                {
+                    Environment.SetEnvironmentVariable(mode, presentation);
+                    var normal = Result.Ok("capture", new { caption = "A & B" });
+                    var (_, shown) = ToolService.Present(normal, "capture_view", png, null, null, null);
+                    if (!JsonSerializer.SerializeToUtf8Bytes(shown).AsSpan().SequenceEqual(
+                        JsonSerializer.SerializeToUtf8Bytes(ToolService.Wrap(normal, png))))
+                        throw new Exception("An in-budget capture changed at presentation.");
+                    var over = Result.Ok("capture", new { caption = new string('&', Wire.PayloadBudget) });
+                    var (failure, smaller) = ToolService.Present(over, "capture_view", png, null, null, null);
+                    if (failure.error?.code != "RESPONSE_LIMIT_EXCEEDED" || smaller.Content.Count != 1)
+                        throw new Exception("An oversized capture did not return the bounded error without an image.");
+                }
+            }
+            finally { Environment.SetEnvironmentVariable(mode, saved); }
             return Task.CompletedTask;
         });
         await test("visual capture inline image crosses the real IPC text-page budget", async () =>

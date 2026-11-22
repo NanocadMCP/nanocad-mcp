@@ -16,6 +16,10 @@ internal sealed class NativeAccessibilityGuard : IDisposable
     private bool _startAttempted;
     private bool _disposed;
 
+    internal sealed record StartObservation(string state, string? reason, uint? annotated_windows_at_start);
+    private StartObservation _lastStart = new("not_started", null, null);
+    internal StartObservation LastStart => Volatile.Read(ref _lastStart);
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Report
     {
@@ -61,6 +65,7 @@ internal sealed class NativeAccessibilityGuard : IDisposable
             if (host == IntPtr.Zero)
             {
                 _retryPending = allowRetry;
+                Volatile.Write(ref _lastStart, new(allowRetry ? "pending" : "unavailable", "host_module_unavailable", null));
                 _log.Write("native_accessibility_guard", "", allowRetry ? "host_module_pending" : "host_module_unavailable");
                 return;
             }
@@ -70,11 +75,16 @@ internal sealed class NativeAccessibilityGuard : IDisposable
             _startAttempted = true;
             int status = api.Start(provider, Path.Combine(Discovery.Root, "logs", $"accessibility-{Environment.ProcessId}.log"), ref report);
             _retryPending = status == Pending && allowRetry;
+            // Native ABI phase 1 means Started. The count is a snapshot taken during Start, not a live coverage guarantee.
+            bool started = status >= 0 && report.Version == Abi && report.Phase == 1;
+            Volatile.Write(ref _lastStart, new(started ? "started" : _retryPending ? "pending" : "unavailable",
+                started ? null : $"HRESULT_0x{unchecked((uint)status):X8}_phase_{report.Phase}", started ? report.AnnotatedWindowCount : null));
             Log("start", status, report);
         }
         catch (Exception error) when (error is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException
             or IOException or UnauthorizedAccessException)
         {
+            Volatile.Write(ref _lastStart, new("unavailable", error.GetType().Name, null));
             _log.Write("native_accessibility_guard", "", "unavailable_" + error.GetType().Name);
         }
     }

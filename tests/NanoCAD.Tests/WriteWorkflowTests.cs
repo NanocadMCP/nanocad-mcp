@@ -50,7 +50,12 @@ internal static class WriteWorkflowTests
                 ["operation_id"] = Operation,
                 ["entities"] = new[] { new { type = "Point", position = new[] { 1, 2, 0 } } }
             };
-            var bound = await Bind(args);
+            int selections = 0;
+            var bound = await WriteRequestOptions.BindAsync("create_entities", Wire.Element(args),
+                _ => { selections++; return Local; },
+                (chosen, _) => Task.FromResult(new DocumentList(chosen.bridge_instance_id, Document,
+                    [new(Document, "active", null, false, false, true, "42")])), default);
+            Check(selections == 1 && ReferenceEquals(bound.SelectedBridge, Local), "A qualified write must retain the single selected bridge.");
             Check(bound.Arguments.GetProperty("document_id").GetString() == Document &&
                   bound.Arguments.GetProperty("bridge_instance_id").GetString() == Bridge &&
                   bound.Arguments.GetProperty("expected_revision").GetString() == "42", "Qualified revision must bind the same drawing.");

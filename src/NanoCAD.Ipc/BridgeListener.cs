@@ -65,7 +65,8 @@ public sealed class BridgeListener : IDisposable
                 deadline.Cancel();
             }
             catch (OperationCanceledException) { }
-            catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException or DomainException or ArgumentException or System.ComponentModel.Win32Exception)
+            // A failed connection or handler owns this iteration, not the listener worker.
+            catch (Exception e) when (e is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
             {
                 _log.Write("ipc", "", e.GetType().Name);
                 if (!_stop.IsCancellationRequested)
