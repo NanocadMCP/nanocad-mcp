@@ -59,8 +59,8 @@ public sealed class BridgeListener : IDisposable
                 catch (DomainException e) { response = Result.Fail(request.requestId ?? "", e.Error); }
                 // Inline PNG is an internal binary payload, not a public JSON object page.
                 int responseBudget = request.operation == "capture_window" ? Wire.MaxResponseBytes : Wire.PayloadBudget;
-                WriteResponseBudget432.TryFit(response,request.operation,responseBudget,
-                    value=>JsonSerializer.SerializeToUtf8Bytes(value,Wire.Json).Length,out response,_descriptor.bridge_instance_id);
+                WriteResponseBudget432.TryFit(response, request.operation, responseBudget,
+                    value => JsonSerializer.SerializeToUtf8Bytes(value, Wire.Json).Length, out response, _descriptor.bridge_instance_id);
                 await Framing.WriteAsync(pipe, response, Wire.MaxResponseBytes, deadline.Token).ConfigureAwait(false);
                 deadline.Cancel();
             }

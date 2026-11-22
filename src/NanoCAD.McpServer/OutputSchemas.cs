@@ -712,7 +712,8 @@ internal static class OutputSchemas
         AddBodyNameProvenance(definitions["summary"]!["properties"]!);
         definitions["summary"]!["properties"]!["body_name_match_source"] = new JsonObject
         {
-            ["type"] = "string", ["enum"] = new JsonArray("native_part_name", "native_tree", "dwg_group_description")
+            ["type"] = "string",
+            ["enum"] = new JsonArray("native_part_name", "native_tree", "dwg_group_description")
         };
         AddBodyNameProvenance(definitions["entity"]!["properties"]!);
         if (operation == "inspect_objects")

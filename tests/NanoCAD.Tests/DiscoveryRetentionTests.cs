@@ -4,27 +4,27 @@ using NanoCAD.Ipc;
 
 internal static class DiscoveryRetentionTests
 {
-    public static async Task Run(Func<string,Func<Task>,Task> test)
+    public static async Task Run(Func<string, Func<Task>, Task> test)
     {
-        await test("discovery finds a live bridge beyond 64 stale lifetime descriptors",()=>
+        await test("discovery finds a live bridge beyond 64 stale lifetime descriptors", () =>
         {
-            string prior=Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!;
+            string prior = Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!;
             try
             {
-                Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME",Path.Combine(prior,"stale-discovery"));
+                Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", Path.Combine(prior, "stale-discovery"));
                 Directory.CreateDirectory(Discovery.Instances);
-                for(int i=0;i<100;i++)
+                for (int i = 0; i < 100; i++)
                 {
-                    string id=Guid.NewGuid().ToString("D");
-                    var stale=Discovery.Describe(id,"test") with{process_start_utc_ticks=1};
-                    File.WriteAllText(Path.Combine(Discovery.Instances,id+".json"),JsonSerializer.Serialize(stale,Wire.Json));
+                    string id = Guid.NewGuid().ToString("D");
+                    var stale = Discovery.Describe(id, "test") with { process_start_utc_ticks = 1 };
+                    File.WriteAllText(Path.Combine(Discovery.Instances, id + ".json"), JsonSerializer.Serialize(stale, Wire.Json));
                 }
                 // Choose the actual 81st entry; no filesystem sorting assumption.
-                string path=Directory.EnumerateFiles(Discovery.Instances,"*.json").ElementAt(80);
-                var live=Discovery.Describe(Path.GetFileNameWithoutExtension(path),"test");
-                File.WriteAllText(path,JsonSerializer.Serialize(live,Wire.Json));
-                var found=Discovery.List();
-                if(found.Length!=1 || found[0]!=live)throw new Exception("Live bridge hidden by stale discovery entries.");
+                string path = Directory.EnumerateFiles(Discovery.Instances, "*.json").ElementAt(80);
+                var live = Discovery.Describe(Path.GetFileNameWithoutExtension(path), "test");
+                File.WriteAllText(path, JsonSerializer.Serialize(live, Wire.Json));
+                var found = Discovery.List();
+                if (found.Length != 1 || found[0] != live) throw new Exception("Live bridge hidden by stale discovery entries.");
                 if (Directory.GetFiles(Discovery.Instances, "*.json").Length != 100) throw new Exception("Read-only discovery removed files.");
                 string foreignName = Path.Combine(Discovery.Instances, "unrelated.json");
                 File.WriteAllText(foreignName, JsonSerializer.Serialize(live with { process_start_utc_ticks = 1 }, Wire.Json));
@@ -43,14 +43,14 @@ internal static class DiscoveryRetentionTests
                 if (!remaining.SetEquals(new[] { path, published, foreignName, otherPath, malformed }) || File.Exists(retiredPath))
                     throw new Exception("Startup cleanup must remove only proven retired descriptors in the same session.");
             }
-            finally{Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME",prior);}
+            finally { Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", prior); }
             return Task.CompletedTask;
         });
         await test("routine log slot rotation preserves legacy files and concurrent writes", async () =>
         {
             string prior = Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!;
             string root = Path.Combine(prior, "log-slots");
-            Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME",root);
+            Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", root);
             try
             {
                 var logs = Enumerable.Range(0, 8).Select(_ => new JsonLog("server")).ToArray();
@@ -82,7 +82,7 @@ internal static class DiscoveryRetentionTests
                 Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", logUnavailable);
                 new JsonLog("server").Write("test", "no-directory", "ok");
             }
-            finally { Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME",prior); }
+            finally { Environment.SetEnvironmentVariable("NANOCAD_MCP_HOME", prior); }
         });
     }
 }

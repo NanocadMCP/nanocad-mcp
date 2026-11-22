@@ -24,11 +24,11 @@ internal static class ModelSketchParameter411
         var captured = Capture(body.Handle, sketch.ToString(), args, state, tx, cancel);
         DrawingViewSketchWriteScope282.RequireSupported(captured.Sketch.Sketch); return captured;
     }
-    internal static NativeSketchConstraintState385.Snapshot Capture(string handle,string sketch,ModelParameterArguments args,
-        DocumentState state,Db.Transaction tx,Action cancel)
+    internal static NativeSketchConstraintState385.Snapshot Capture(string handle, string sketch, ModelParameterArguments args,
+        DocumentState state, Db.Transaction tx, Action cancel)
     {
-        var value=NativeSketchConstraintState385.Capture(handle,sketch,Context(args),state,tx,cancel);
-        return value with { ProjectedDatums=ModelSketchProjectedDatum.Capture(value,state,tx,cancel) };
+        var value = NativeSketchConstraintState385.Capture(handle, sketch, Context(args), state, tx, cancel);
+        return value with { ProjectedDatums = ModelSketchProjectedDatum.Capture(value, state, tx, cancel) };
     }
     internal static Control Resolve(NativeSketchConstraintState385.Snapshot state, McObjectId variable, Action cancel)
     {

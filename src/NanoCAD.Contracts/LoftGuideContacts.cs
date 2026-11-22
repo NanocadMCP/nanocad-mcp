@@ -20,7 +20,10 @@ public static class LoftGuideContacts
                     if (field.Value.ValueKind != JsonValueKind.String) throw Invalid("guide_handle must be a handle string.");
                     guide = Validation.NormalizeHandle(field.Value.GetString()!);
                     break;
-                case "bridge_instance_id": case "document_id": case "expected_revision": case "handles":
+                case "bridge_instance_id":
+                case "document_id":
+                case "expected_revision":
+                case "handles":
                     readFields.Add(field.Name, field.Value);
                     break;
                 case "mode": break;

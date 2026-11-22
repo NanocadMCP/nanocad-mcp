@@ -21,8 +21,15 @@ internal static class CurveShapeEditingTests
                 new { operation = "set_curve_geometry", handles = new[] { handle }, expected_geometry = expected, geometry = replacement };
             var edits = new[] { Change("A", Segment(0, 0, 40, 0), Segment(0, 0, 50, 0)),
                 Change("B", RoundEnd(40), RoundEnd(50)), Change("C", Segment(40, 20, 0, 20), Segment(50, 20, 0, 20)) };
-            var request = ModifyValidation.Parse(Wire.Element(new { bridge_instance_id = id, document_id = id, operation_id = id,
-                expected_revision = "1", units = "Millimeters", operations = edits }));
+            var request = ModifyValidation.Parse(Wire.Element(new
+            {
+                bridge_instance_id = id,
+                document_id = id,
+                operation_id = id,
+                expected_revision = "1",
+                units = "Millimeters",
+                operations = edits
+            }));
             var curves = request.Operations.Cast<CurveGeometrySpec>().ToArray();
             if (!curves.Select(op => op.Handles.Single()).SequenceEqual(new[] { "A", "B", "C" }) ||
                 curves.Any(op => op.Workplane != null) ||

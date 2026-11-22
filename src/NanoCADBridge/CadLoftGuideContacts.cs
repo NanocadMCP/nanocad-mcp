@@ -45,9 +45,13 @@ internal static class CadLoftGuideContacts
         }
         return new
         {
-            mode = LoftGuideContacts.Mode, coordinate_system = "WCS", solver = "native_kernel",
+            mode = LoftGuideContacts.Mode,
+            coordinate_system = "WCS",
+            solver = "native_kernel",
             units = new { name = db.Insunits.ToString(), value = (int)db.Insunits },
-            guide = new EntityRef(instance, state.Id, args.GuideHandle!), sections, overlap_evaluated = false
+            guide = new EntityRef(instance, state.Id, args.GuideHandle!),
+            sections,
+            overlap_evaluated = false
         };
     }
 

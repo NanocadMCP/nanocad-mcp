@@ -114,6 +114,7 @@ public static class ModelParameterValidation
             Need(dimensions.Distinct(StringComparer.Ordinal).Count() == dimensions.Length, "Duplicate dimension handle.");
         }
         return new(bridge, document, ulong.Parse(revision, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture), operation,
-            units, handle.ToString("X", CultureInfo.InvariantCulture), variable.ToString("B").ToUpperInvariant(), expected, value, expression, propagate, ModelParameterScope.Parse(input, handle.ToString("X", CultureInfo.InvariantCulture))) { ObserveDimensionHandles = dimensions };
+            units, handle.ToString("X", CultureInfo.InvariantCulture), variable.ToString("B").ToUpperInvariant(), expected, value, expression, propagate, ModelParameterScope.Parse(input, handle.ToString("X", CultureInfo.InvariantCulture)))
+        { ObserveDimensionHandles = dimensions };
     }
 }

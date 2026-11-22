@@ -51,10 +51,17 @@ internal static class ModelManufacturingHistory
             { referenceFailure = error.GetType().Name; }
             return new
             {
-                placement_type, support_face_id, offset1 = p.Param1, offset2 = p.Param2, sector = p.Sector,
-                reference_slots = references, reference_slots_unavailable_reason = referenceFailure,
+                placement_type,
+                support_face_id,
+                offset1 = p.Param1,
+                offset2 = p.Param2,
+                sector = p.Sector,
+                reference_slots = references,
+                reference_slots_unavailable_reason = referenceFailure,
                 complex_path_and_viewport_observed = false,
-                center_wcs = frame.Center, support_normal_wcs = frame.Normal, position_unavailable_reason = frame.Unavailable
+                center_wcs = frame.Center,
+                support_normal_wcs = frame.Normal,
+                position_unavailable_reason = frame.Unavailable
             };
         }
         return new { placement_type, support_face_id };

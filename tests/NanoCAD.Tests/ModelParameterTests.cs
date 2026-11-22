@@ -49,13 +49,23 @@ internal static class ModelParameterTests
                 bool real = true, double? parameter = 0, bool hasSheet = true)
                 => NanoCADBridge.ModelParameterDimensionBinding.Read("D", "B", Wire.Element(new
                 {
-                    links_complete = linked, stored_anchor_parameters_available = linked, dimension_mc_id = "dimension",
+                    links_complete = linked,
+                    stored_anchor_parameters_available = linked,
+                    dimension_mc_id = "dimension",
                     links = new[] { new { healthy = true, source_mc_ids = new[] { body }, source_refs = new[] { new { handle = "F" } },
                         view_mc_id = "view", view_ref = new { handle = "A" } } },
-                    measurement = new { sheet_geometry = hasSheet ? (double?)sheet : null, sheet_unit = "drawing_units",
-                        physical_length_from_projection = hasSheet ? (double?)(sheet * 2) : null, text_mode = text, native_nominal_length = nominal ?? sheet * 2,
-                        view_scale_denominator = 2, native_measurement_factor = factor, native_value_is_valid = real,
-                        unavailable_reason = hasSheet ? null : "tilted_rotated_dimension_sheet_geometry_unavailable" },
+                    measurement = new
+                    {
+                        sheet_geometry = hasSheet ? (double?)sheet : null,
+                        sheet_unit = "drawing_units",
+                        physical_length_from_projection = hasSheet ? (double?)(sheet * 2) : null,
+                        text_mode = text,
+                        native_nominal_length = nominal ?? sheet * 2,
+                        view_scale_denominator = 2,
+                        native_measurement_factor = factor,
+                        native_value_is_valid = real,
+                        unavailable_reason = hasSheet ? null : "tilted_rotated_dimension_sheet_geometry_unavailable"
+                    },
                     anchors = new[] { new { is_null = false, slot = 0, source_mc_id = "view", gs_marker = marker, parameter, data = "0" } }
                 }));
             var previous = Read(40);
@@ -64,14 +74,23 @@ internal static class ModelParameterTests
                 grown.current is { projected_model_length: 100, sheet_length: 50 });
             Require(grown.current is { nominal_vs_projected_model: "match", factor_vs_view_scale: "match" });
             var wrongNominal = previous.Compare(Read(50, nominal: 50));
-            Require(wrongNominal is { association_status: "same_stored_anchors", current: { native_nominal_length: 50, projected_model_length: 100,
-                sheet_length: 50, view_scale_denominator: 2, native_measurement_factor: 2, native_value_is_valid: true,
-                nominal_vs_projected_model: "mismatch", factor_vs_view_scale: "match" } });
+            Require(wrongNominal is
+            {
+                association_status: "same_stored_anchors", current:
+                {
+                    native_nominal_length: 50, projected_model_length: 100,
+                    sheet_length: 50, view_scale_denominator: 2, native_measurement_factor: 2, native_value_is_valid: true,
+                    nominal_vs_projected_model: "mismatch", factor_vs_view_scale: "match"
+                }
+            });
             Require(previous.Compare(Read(50, factor: 1)).current is { nominal_vs_projected_model: "match", factor_vs_view_scale: "mismatch" });
             Require(previous.Compare(Read(50, real: false)).current is { native_nominal_length: 100, nominal_vs_projected_model: "unavailable" });
             Require(previous.Compare(Read(50, nominal: 100.00000009)).current?.nominal_vs_projected_model == "match");
-            Require(previous.Compare(Read(50, hasSheet: false)).current is { sheet_length: null, projected_model_length: null,
-                nominal_vs_projected_model: "unavailable", sheet_length_unavailable_reason: "tilted_rotated_dimension_sheet_geometry_unavailable" });
+            Require(previous.Compare(Read(50, hasSheet: false)).current is
+            {
+                sheet_length: null, projected_model_length: null,
+                nominal_vs_projected_model: "unavailable", sheet_length_unavailable_reason: "tilted_rotated_dimension_sheet_geometry_unavailable"
+            });
             var incomplete = Read(50, parameter: null);
             Require(incomplete.Compare(incomplete) is { association_status: "unavailable", unavailable_code: "ANCHOR_PARAMETER_UNAVAILABLE", current: not null });
             Require(previous.Compare(Read(40)).association_status == "same_stored_anchors");
@@ -88,7 +107,7 @@ internal static class ModelParameterTests
             var rows = Enumerable.Range(0, 12).Select(i => new ParameterDimensionObservation(i.ToString("X"),
                 "same_stored_anchors", reading, reading with { sheet_length = 50, projected_model_length = 100, native_nominal_length = 100 }, null)).ToArray();
             var data = new ModelParameterResult(op, "committed", false, new(bridge, document, "150"), null, variable, "80", "100", 100, "Millimeters", 42, "not_tested")
-                { observed_dimensions = rows, model_healthy = true };
+            { observed_dimensions = rows, model_healthy = true };
             var result = Result.Ok("size-check", data, null, "Existing model diagnostic");
             int Size(Result value) => JsonSerializer.SerializeToUtf8Bytes(value, Wire.Json).Length;
             Result Fit(int bytes) => NanoCADBridge.ModelParameterDimensionReceipt.Fit(result, bytes);

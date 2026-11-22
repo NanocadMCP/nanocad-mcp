@@ -121,9 +121,16 @@ public sealed class WriteJob
     }
     public object ExecutionState()
     {
-        lock (_gate) return new { operation_id = OperationId, operation = Operation, phase = _phase.ToString().ToLowerInvariant(),
-            continues_after_response_timeout = _ownerDetached, execution_elapsed_ms = Math.Round(ElapsedMs),
-            execution_budget_ms = (long)_executionBudget.TotalMilliseconds, execution_budget_expired = ExecutionExpired };
+        lock (_gate) return new
+        {
+            operation_id = OperationId,
+            operation = Operation,
+            phase = _phase.ToString().ToLowerInvariant(),
+            continues_after_response_timeout = _ownerDetached,
+            execution_elapsed_ms = Math.Round(ElapsedMs),
+            execution_budget_ms = (long)_executionBudget.TotalMilliseconds,
+            execution_budget_expired = ExecutionExpired
+        };
     }
     public static Result ForCaller(Result result, string requestId, bool replayed)
     {
@@ -225,7 +232,7 @@ public sealed class WriteQueue : IDisposable
         var (job, replay) = Enqueue(request, cancellationToken, deadline.Token);
         if (job.Completion.IsCompleted) return WriteJob.ForCaller(await job.Completion.ConfigureAwait(false), request.requestId, replay);
         if (replay && job.CommittedResult is { } known) return WriteJob.ForCaller(known with
-            { warnings = new[] { "COMMAND_COMPLETION_PENDING: commit is recorded; refresh document state before a new write." } }, request.requestId, true);
+        { warnings = new[] { "COMMAND_COMPLETION_PENDING: commit is recorded; refresh document state before a new write." } }, request.requestId, true);
         using var registration = replay ? default : deadline.Token.Register(job.ResponseWaitExpired);
         try { return WriteJob.ForCaller(await job.Completion.WaitAsync(deadline.Token).ConfigureAwait(false), request.requestId, replay); }
         catch (OperationCanceledException)
@@ -240,7 +247,7 @@ public sealed class WriteQueue : IDisposable
             // if already available, otherwise ask for a replay of this same ID.
             if (job.Completion.IsCompleted) return WriteJob.ForCaller(await job.Completion.ConfigureAwait(false), request.requestId, replay);
             if (job.CommittedResult is { } committed) return WriteJob.ForCaller(committed with
-                { warnings = new[] { "COMMAND_COMPLETION_PENDING: commit is recorded; refresh document state before a new write." } }, request.requestId, replay);
+            { warnings = new[] { "COMMAND_COMPLETION_PENDING: commit is recorded; refresh document state before a new write." } }, request.requestId, replay);
             return WriteJob.ForCaller(job.Error("WRITE_OUTCOME_PENDING", "Native execution is still pending; the response wait does not cancel already-started work. Repeat exactly the same operation_id and payload in this bridge lifetime to retrieve the result. Do not start dependent edits or restart nanoCAD.", "unknown", cause: job.ExecutionState()), request.requestId, replay);
         }
     }

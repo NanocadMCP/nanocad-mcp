@@ -155,8 +155,11 @@ internal static class EntityAdapter
             "WCS", geometry, includeAppearance ? StoredProperties(entity) : new Dictionary<string, object>(), mtextContents != null && plainText == null
                 ? new[] { "MTEXT_PLAIN_TEXT_UNAVAILABLE: unsupported formatting; use contents." } : Array.Empty<string>())
         {
-            body_name = summary.body_name, body_name_source = summary.body_name_source, part_name = summary.part_name,
-            native_tree_name = summary.native_tree_name, body_name_group = summary.body_name_group,
+            body_name = summary.body_name,
+            body_name_source = summary.body_name_source,
+            part_name = summary.part_name,
+            native_tree_name = summary.native_tree_name,
+            body_name_group = summary.body_name_group,
             body_name_group_ambiguous = summary.body_name_group_ambiguous
         };
     }

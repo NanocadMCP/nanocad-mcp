@@ -26,8 +26,15 @@ internal static class ModelHistoryTests
         await test("part chain follows only a selected native history ID in one part", () =>
         {
             var sketchId = Guid.NewGuid().ToString("B");
-            object Request(string? focus, string[] handles) => new { bridge_instance_id = bridge, document_id = doc,
-                expected_revision = "9", handles, history_focus = focus, include_downstream_history = true };
+            object Request(string? focus, string[] handles) => new
+            {
+                bridge_instance_id = bridge,
+                document_id = doc,
+                expected_revision = "9",
+                handles,
+                history_focus = focus,
+                include_downstream_history = true
+            };
             var args = Validation.Parse("inspect_model_history", Wire.Element(Request(sketchId, ["A"])));
             if (!args.IncludeDownstreamHistory || args.HistoryFocus != sketchId.ToUpperInvariant()) throw new Exception("Lost the selected native source.");
             if (Validation.Parse("inspect_model_history", Wire.Element(Input(["A"]))).IncludeDownstreamHistory) throw new Exception("Unexpected traversal.");

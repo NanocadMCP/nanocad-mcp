@@ -48,9 +48,17 @@ public sealed class JsonLog
                     if (File.Exists(path + ".1")) File.Move(path + ".1", path + ".2", true);
                     File.Move(path, path + ".1", true);
                 }
-                File.AppendAllText(path, JsonSerializer.Serialize(new { utc = DateTime.UtcNow.ToString("O"),
-                    process_id = Environment.ProcessId, operation, request_id = requestId, operation_id = operationId,
-                    outcome, elapsed_ms = elapsedMs, transaction }, Wire.Json) + Environment.NewLine);
+                File.AppendAllText(path, JsonSerializer.Serialize(new
+                {
+                    utc = DateTime.UtcNow.ToString("O"),
+                    process_id = Environment.ProcessId,
+                    operation,
+                    request_id = requestId,
+                    operation_id = operationId,
+                    outcome,
+                    elapsed_ms = elapsedMs,
+                    transaction
+                }, Wire.Json) + Environment.NewLine);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* Routine logging is best effort. */ }
         }

@@ -33,8 +33,11 @@ internal static class QuerySummaryTests
             var group = new ModelBodyNameGroup("FORMER_LABEL", body with { handle = "3B" }) { description = "Former label" };
             var item = new EntitySummary(body, "Solid3d", "Solid3d", null, "model", "supported")
             {
-                body_name = "Mounting plate", body_name_source = "native_part_name", part_name = "Mounting plate",
-                native_tree_name = "Box 1", body_name_group = group
+                body_name = "Mounting plate",
+                body_name_source = "native_part_name",
+                part_name = "Mounting plate",
+                native_tree_name = "Box 1",
+                body_name_group = group
             };
             if (item.BodyNameMatchSource("MOUNTING PLATE") != "native_part_name" || item.BodyNameMatchSource("Box 1") != null ||
                 item.BodyNameMatchSource("Former label") != "dwg_group_description" || item.BodyNameMatchSource(group.name) != null ||

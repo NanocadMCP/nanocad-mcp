@@ -57,7 +57,8 @@ public static class Discovery
                     }
                 }
                 catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException or
-                    InvalidOperationException or System.ComponentModel.Win32Exception) { }
+                    InvalidOperationException or System.ComponentModel.Win32Exception)
+                { }
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
@@ -87,7 +88,7 @@ public static class Discovery
         var found = new List<Descriptor>();
         // Forced host restarts can leave stale descriptors. Limiting the first
         // 64 directory entries hid a live bridge behind those stale files.
-        var paths=Directory.EnumerateFiles(Instances,"*.json");var capacity=new SerializedCapacity357(Wire.PayloadBudget-8192);
+        var paths = Directory.EnumerateFiles(Instances, "*.json"); var capacity = new SerializedCapacity357(Wire.PayloadBudget - 8192);
         foreach (var path in paths)
         {
             try
@@ -99,7 +100,7 @@ public static class Discovery
                     d.pipe_name != $"NanoCADMcp-{d.process_id}-{d.bridge_instance_id}" || d.session_id != own.SessionId) continue;
                 using var process = Process.GetProcessById(d.process_id);
                 if (!process.HasExited && process.StartTime.ToUniversalTime().Ticks == d.process_start_utc_ticks && process.SessionId == own.SessionId)
-                {capacity.Add(d);found.Add(d);}
+                { capacity.Add(d); found.Add(d); }
             }
             catch (Exception e) when (e is IOException or JsonException or ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception or UnauthorizedAccessException) { }
         }

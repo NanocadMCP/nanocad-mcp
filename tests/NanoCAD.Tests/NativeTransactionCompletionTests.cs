@@ -15,9 +15,18 @@ internal static class NativeTransactionCompletionTests
         foreach (bool recorded in new[] { false, true })
         {
             using var queue = new WriteQueue(Environment.CurrentManagedThreadId);
-            var arguments = Wire.Element(new { bridge_instance_id = Guid.NewGuid().ToString("D"), document_id = Guid.NewGuid().ToString("D"),
-                operation_id = Guid.NewGuid().ToString("D"), expected_revision = "1", units = "Millimeters", handle = "A",
-                variable_id = Guid.NewGuid().ToString("B"), expected_expression = "10", value = 11 });
+            var arguments = Wire.Element(new
+            {
+                bridge_instance_id = Guid.NewGuid().ToString("D"),
+                document_id = Guid.NewGuid().ToString("D"),
+                operation_id = Guid.NewGuid().ToString("D"),
+                expected_revision = "1",
+                units = "Millimeters",
+                handle = "A",
+                variable_id = Guid.NewGuid().ToString("B"),
+                expected_expression = "10",
+                value = 11
+            });
             var request = new Request(Wire.Version, Guid.NewGuid().ToString("D"), "set_model_parameter", 5000, arguments);
             var (job, _) = queue.Enqueue(request);
             if (queue.Take() != job || !job.TryStart()) throw new Exception("Could not start fixture write.");

@@ -15,8 +15,12 @@ internal static class LoftTests
         {
             var input = new Dictionary<string, object?>
             {
-                ["type"] = "Solid3d", ["kind"] = "loft", ["interpolation"] = "smooth", ["section_handles"] = new[] { "A", "B" },
-                ["guide_handles"] = new[] { "C", "D" }, ["path_handle"] = null
+                ["type"] = "Solid3d",
+                ["kind"] = "loft",
+                ["interpolation"] = "smooth",
+                ["section_handles"] = new[] { "A", "B" },
+                ["guide_handles"] = new[] { "C", "D" },
+                ["path_handle"] = null
             };
             var original = Parse(input);
             if (Wire.Element((CurveSolidSpec)original.Entities.Single()).TryGetProperty("NormalOption", out _))
@@ -39,8 +43,12 @@ internal static class LoftTests
         {
             var input = new Dictionary<string, object?>
             {
-                ["bridge_instance_id"] = bridge, ["document_id"] = doc, ["expected_revision"] = "2",
-                ["mode"] = LoftGuideContacts.Mode, ["guide_handle"] = "0f", ["handles"] = new[] {"b", "a"}
+                ["bridge_instance_id"] = bridge,
+                ["document_id"] = doc,
+                ["expected_revision"] = "2",
+                ["mode"] = LoftGuideContacts.Mode,
+                ["guide_handle"] = "0f",
+                ["handles"] = new[] { "b", "a" }
             };
             GeometryAnalysisArguments Read() => GeometryAnalysisValidation.Parse(Wire.Element(input));
             void InvalidRead()
