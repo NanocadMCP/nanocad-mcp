@@ -22,8 +22,11 @@ internal static class NativeSketchConstraintWriter385
         {
             Need(add.ExpectedBindingToken != null && value.Inputs.Token == add.ExpectedBindingToken, "PRECONDITION_FAILED", "Read the current native_inputs.binding_token from inspect_model_history(sketch_ids).");
             NativeSketchMembers385.ValidateInputs(add.Constraints, value.Inputs);
-            using var manager = NativeSketchMembers385.Manager(value.Sketch.Sketch); var currentIds = manager.GetAllConstraints(); Need(currentIds != null, "CONSTRAINTS_UNAVAILABLE", "The exact current constraint inventory is unavailable.");
-            foreach (var spec in add.Constraints)
+            var plan = NativeSketchMobility.Plan(value, add.Constraints, cancel, preserve: add.PreserveMotion);
+            var effective = plan.EffectiveCandidates(add.Constraints, add.RequireVerifiedConstraints);
+            value = value with { MobilityPlan = plan };
+            using var manager = NativeSketchMembers385.Manager(value.Sketch.Sketch); var currentIds = NativeSketchInventory.CompleteIds(manager, cancel, value.Sketch.Sketch); Need(currentIds != null, "CONSTRAINTS_UNAVAILABLE", "The exact current constraint inventory is unavailable.");
+            foreach (var spec in effective)
             {
                 using var expected = NativeSketchMembers385.Info(spec, value.Inputs);
                 foreach (var id in currentIds)
@@ -54,7 +57,10 @@ internal static class NativeSketchConstraintWriter385
             var edit = (ModelSketchConstraintParameterSpec379)args.Operations[0]; var control = NativeSketchConstraintState385.ControlOf(value, edit.ConstraintId, cancel);
             Need(edit.ExpectedParameterToken == ParameterToken(control) && edit.ExpectedVariableId.Equals(Key(control.Variable), StringComparison.OrdinalIgnoreCase), "PRECONDITION_FAILED", "Read the fresh actual relation/parameter token and variable ID.");
             Need(edit.Value > 0 && (control.Kind != "angle" || edit.Value < Math.PI), "INVALID_ARGUMENT", "Use a positive millimeter control or an angle strictly between zero and pi radians.");
-            ControlSpec(control, edit.Value);
+            var proposal = new[] { ControlSpec(control, edit.Value) };
+            var plan = NativeSketchMobility.Plan(value, proposal, cancel, control.Constraint);
+            plan.RequireCompatibleReplacement();
+            value = value with { MobilityPlan = plan };
         }
         return value;
     }
@@ -193,7 +199,7 @@ internal static class NativeSketchConstraintWriter385
         using var manager = NativeSketchMembers385.Manager(sketch); // Auto; never force MCS outside editing.
         Need(manager.DocumentId == owner.ID && manager.PlanarSketchId == sketch.ID && !manager.ScopeId.IsNull,
             "CONSTRAINT_SCOPE_MISMATCH", "The persistent manager lost its exact current sketch scope.");
-        var inventory = manager.GetAllConstraints() ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "The persistent pre-add inventory is unavailable, not observed empty.");
+        var inventory = NativeSketchInventory.CompleteIds(manager, cancel, sketch) ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "The persistent pre-add inventory is unavailable, not observed empty.");
         var baseline = NativeSketchRelations410.Capture(manager, before.Inputs, cancel, inventory);
         Need(baseline.Complete && ModelFeatureReorderState345.Equivalent(baseline.Relations, before.Relations, cancel),
             "PRECONDITION_FAILED", "The exact complete persistent relation baseline changed before AddConstraint.");
@@ -227,10 +233,10 @@ internal static class NativeSketchConstraintWriter385
             if (correspondenceReceipt.HasValue && correspondenceReceipt.Value.EnumerateObject().Any(phase => phase.Value.GetProperty("items").EnumerateArray().Any(item => !NativeSketchConstraintState385.Same(item.GetProperty("original_id").GetString(), item.GetProperty("current_id").GetString()))))
                 warnings.Add("NATIVE_SKETCH_MEMBER_IDS_UPDATED: The native editor updated sketch input or relation IDs through observed native bindings; inspect current history for persistent input and relation IDs.");
             if (project) warnings.AddRange([ModelFeatureReorderState345.ValidityWarning, ModelSketchConstraintObservation353.Warning, ModelSketchConstraintMetadata379.Warning]); else if (storageChanged) warnings.Add(ModelSketchConstraintMetadata379.Warning);
-            if (selected == null) return Result.Ok(job.OriginalRequestId, new ModifiedEntities(args.OperationId, "committed", false, [body], replaced ? [source] : [], replaced ? [body] : [], [], "not_guaranteed", sketch_constraint_changes: changes), context, warnings.Distinct().ToArray());
+            if (selected == null) return Result.Ok(job.OriginalRequestId, new ModifiedEntities(args.OperationId, "committed", false, [body], replaced ? [source] : [], replaced ? [body] : [], [], "not_guaranteed", sketch_constraint_changes: changes) { sketch_mobility_plan = before?.MobilityPlan, sketch_mobility_after = project ? null : NativeSketchMobility.Plan(after, [], job.CheckCancellation) }, context, warnings.Distinct().ToArray());
             var currentControl = project ? selected : NativeSketchConstraintState385.ControlOf(after, Key(selected.Constraint), job.CheckCancellation);
             var actualMember = currentControl.Member;
-            var edit = (ModelSketchConstraintParameterSpec379)args.Operations[0]; var change = new ModelSketchConstraintParameterChange379(0, source, body, Key(after.Part.Body.ID), Sketch(args), Key(selected.Constraint), Key(selected.Variable), Key(actualMember), selected.Kind, selected.Value, edit.Value, selected.Kind == "angle" ? "radians" : "millimeters", selected.Expression, edit.Value, null, null, after.Sketch.Profiles.EnumerateArray().Select(p => p.GetProperty("profile_id").GetString()!).ToArray(), Consumers(after), replaced, storageChanged ? "unverified_native_storage_changes" : "exact_observed_storage", project ? Wire.Element(new { reservation = new string('X', 5120) }) : details == null ? null : Wire.Element(details)) with { control_observation = Wire.Element(new { before = originalControlLinks, after = ControlLinks(currentControl, job.CheckCancellation), smooth_relations = SmoothObservations(after, job.CheckCancellation), solver_status = "not_evaluated" }) };
+            var edit = (ModelSketchConstraintParameterSpec379)args.Operations[0]; var change = new ModelSketchConstraintParameterChange379(0, source, body, Key(after.Part.Body.ID), Sketch(args), Key(selected.Constraint), Key(selected.Variable), Key(actualMember), selected.Kind, selected.Value, edit.Value, selected.Kind == "angle" ? "radians" : "millimeters", selected.Expression, edit.Value, null, null, after.Sketch.Profiles.EnumerateArray().Select(p => p.GetProperty("profile_id").GetString()!).ToArray(), Consumers(after), replaced, storageChanged ? "unverified_native_storage_changes" : "exact_observed_storage", project ? Wire.Element(new { reservation = new string('X', 5120) }) : details == null ? null : Wire.Element(details)) with { control_observation = Wire.Element(new { before = originalControlLinks, after = ControlLinks(currentControl, job.CheckCancellation), mobility_plan = before?.MobilityPlan, mobility = project ? null : NativeSketchMobility.Plan(after, [], job.CheckCancellation), smooth_relations = SmoothObservations(after, job.CheckCancellation), solver_status = "not_evaluated" }) };
             var afterControls = project ? beforeControls : NumericControls(after, job.CheckCancellation);
             var previousIds = beforeControls.Where(row => row.eligible).Select(row => completedLiteralTransition?.Mapping.Map(row.constraint_id) ?? row.constraint_id).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var currentIds = afterControls.Where(row => row.eligible).Select(row => row.constraint_id).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -254,7 +260,15 @@ internal static class NativeSketchConstraintWriter385
         try
         {
             using (var tx = state.Document.Database.TransactionManager.StartTransaction()) before = Resolve(args, state, tx, job.CheckCancellation);
-            SketchConstraintSpec[] specs = args.Operations[0] is SketchConstraintsEdit add ? add.Constraints : [ControlSpec(selected = NativeSketchConstraintState385.ControlOf(before, ((ModelSketchConstraintParameterSpec379)args.Operations[0]).ConstraintId, job.CheckCancellation), ((ModelSketchConstraintParameterSpec379)args.Operations[0]).Value)];
+            SketchConstraintSpec[] specs = args.Operations[0] is SketchConstraintsEdit add ? before.MobilityPlan!.EffectiveCandidates(add.Constraints, add.RequireVerifiedConstraints) : [ControlSpec(selected = NativeSketchConstraintState385.ControlOf(before, ((ModelSketchConstraintParameterSpec379)args.Operations[0]).ConstraintId, job.CheckCancellation), ((ModelSketchConstraintParameterSpec379)args.Operations[0]).Value)];
+            if (specs.Length == 0)
+            {
+                job.CheckCancellation();
+                var data = new ModifiedEntities(args.OperationId, "committed", false, [], [], [], [], "not_applicable", sketch_constraint_changes: [])
+                    { sketch_mobility_plan = before.MobilityPlan, sketch_mobility_after = NativeSketchMobility.Plan(before, [], job.CheckCancellation) };
+                var noOp = Result.Ok(job.OriginalRequestId, data, context, "All requested geometric relations already follow from the existing constraints. No native relation was added.");
+                Bytes(noOp, job.CheckCancellation); job.BeginCommit(); job.RecordCommit(noOp); return noOp;
+            }
             if (selected != null) { beforeControls = NumericControls(before, job.CheckCancellation); originalControlLinks = ControlLinks(selected, job.CheckCancellation); }
             var reserve = specs.Select(s => new SketchConstraintChange(Sketch(args), "{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}", s.Kind, s.First, s.Second, "{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}", s.Value, s.Third)).ToArray(); Bytes(Outcome(before, reserve, project: true), job.CheckCancellation);
             if (selected == null)
@@ -315,7 +329,7 @@ internal static class NativeSketchConstraintWriter385
                         actual_edit_mode = activeEditor?.IsInEditMode
                     });
                 using var manager = NativeSketchMembers385.Manager(activeEditor, allowUnlinkedEditScope: true);
-                var inventory = manager.GetAllConstraints() ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "The actual editor sketch baseline is unavailable, not observed empty.");
+                var inventory = NativeSketchInventory.CompleteIds(manager, job.CheckCancellation, activeEditor) ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "The actual editor sketch baseline is unavailable, not observed empty.");
                 NativeSketchMembers385.Snapshot inputs; using (var tx = state.Document.Database.TransactionManager.StartTransaction()) inputs = NativeSketchMembers385.Capture(activeEditor, state, tx, job.CheckCancellation, manager, inventory);
                 var editorRelations = NativeSketchConstraintState385.Relations(manager, job.CheckCancellation, inventory: inventory);
                 enteredMapping = NativeSketchCorrespondence410.Resolve(nativeMarkers, inputs, editorRelations, job.CheckCancellation, "editor_before_add", preserveGeometry: true, observedManager: manager); correspondenceReceipt = Wire.Element(new { entered = enteredMapping.Receipt });
@@ -325,9 +339,13 @@ internal static class NativeSketchConstraintWriter385
                 var priorIds = NativeSketchRelations410.Retained(NativeSketchRelations410.Capture(mappedBeforeRelations, mappedBeforeInputs, job.CheckCancellation), writeBaseline.Relations, inputs, job.CheckCancellation, allowNetworkTransfer: true).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 foreach (var row in writeBaseline.Relations.GetProperty("constraints").EnumerateArray().Where(row => !priorIds.Contains(row.GetProperty("id").GetString()!)))
                     Need(row.GetProperty("type").GetString() == "GeomFix" && row.GetProperty("first").ValueKind == JsonValueKind.Object && inputs.Construction.Any(point => Key(point.Id) == row.GetProperty("first").GetProperty("object_id").GetString()), "CONSTRAINT_BASELINE_CHANGED", "Editor entry created a relation outside its witnessed native construction point.");
-                foreach (var original in specs)
+                var editorSpecs = specs.Select(original => NativeSketchCorrespondence410.Spec(original, enteredMapping)).ToArray();
+                var originalMotion = ((SketchConstraintsEdit)args.Operations[0]).PreserveMotion;
+                var editorMotion = originalMotion?.Select(m => m with { object_ids = m.object_ids.Select(id => enteredMapping.Map(id)).ToArray() }).ToArray();
+                var editorPlan = NativeSketchMobility.Plan(inputs, manager, inventory, true, editorSpecs, job.CheckCancellation, preserve: editorMotion);
+                Need(editorPlan.EffectiveCandidates(editorSpecs, args.Operations[0] is SketchConstraintsEdit { RequireVerifiedConstraints: true }).Length == editorSpecs.Length, "CONSTRAINT_BASELINE_CHANGED", "Editor entry changed the independence of the requested relations. Refresh the sketch before adding constraints.");
+                foreach (var spec in editorSpecs)
                 {
-                    var spec = NativeSketchCorrespondence410.Spec(original, enteredMapping);
                     job.CheckCancellation(); using var info = NativeSketchMembers385.Info(spec, inputs); Trace("constraint_add_before"); var id = manager.AddConstraint(info, false);
                     if (!id.IsNull) submittedRelations.Add(id); Need(!id.IsNull, "CONSTRAINT_REJECTED", "The native editor sketch manager returned no relation ID.");
                     Need(Multicad.Mc3D.Service.GetActiveEditSketchID() == activeEditor.ID, "CONSTRAINT_SCOPE_MISMATCH", "The active editable sketch changed during its relation batch.");
@@ -409,7 +427,7 @@ internal static class NativeSketchConstraintWriter385
                     using var persistent = NativeSketchMembers385.Manager(after.Sketch.Sketch); added.Clear(); added.AddRange(NativeSketchRelations410.RequestedPersistent(persistent, currentSpecs, after.Inputs, baselineIds, job.CheckCancellation));
                     if (persistentAdd) Need(added.SequenceEqual(submittedRelations), "CONSTRAINT_PERSISTENCE_UNAVAILABLE", "The persistent AddConstraint result IDs do not match the exact requested actual relations.");
                     else foreach (var construction in after.Inputs.Construction.Where(c => !expectedBefore.Inputs.Construction.Any(prior => prior.Id == c.Id))) systemNative.Add(construction.Id);
-                    foreach (var id in persistent.GetAllConstraints() ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "Persistent network inventory became unavailable.")) if (systemIds.Contains(Key(id)))
+                    foreach (var id in NativeSketchInventory.CompleteIds(persistent, job.CheckCancellation, after.Sketch.Sketch) ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "Persistent network inventory became unavailable.")) if (systemIds.Contains(Key(id)))
                     { systemNative.Add(id); using var info = persistent.GetConstraintInfo(id); Need(info != null && info.Type == ConstraintType.GeomFix, "CONSTRAINT_BASELINE_CHANGED", "A newly materialized baseline relation is not a native fixed construction anchor."); if (!info.DimId.IsNull) systemNative.Add(info.DimId); if (!info.VarId.IsNull) systemNative.Add(info.VarId); }
                 }
                 var oldVariables = comparisonBefore.Part.Preserved.GetProperty("variables").EnumerateArray().Select(v => v.GetProperty("mc_id").GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase); var newVariables = after.Part.Preserved.GetProperty("variables").EnumerateArray().Where(v => !oldVariables.Contains(v.GetProperty("mc_id").GetString()!)).ToArray(); var addedIds = added.Select(Key).ToArray(); var changes = new List<SketchConstraintChange>();
@@ -438,7 +456,8 @@ internal static class NativeSketchConstraintWriter385
                     Need(newVariables.Length == 0 && control.Variable == selected.Variable && ModelParameterSnapshot.Near(control.Value, requested) && (!control.ParameterValue.HasValue || ModelParameterSnapshot.Near(control.ParameterValue.Value, requested)), "CONSTRAINT_SCOPE_MISMATCH", "Existing control edit created/rebound a driver or did not reconcile the requested literal/bound evaluated value.");
                 }
                 NativeSketchMembers385.ValidateSolved(currentSpecs, after.Inputs); NativeSketchMembers385.FixedRequested(currentSpecs, expectedBefore.Inputs, after.Inputs); NativeSketchConstraintState385.FixedAnchors(expectedBefore, after, job.CheckCancellation);
-                var oldDesign = NativeSketchConstraintState385.Protected(comparisonBefore.Part, comparisonBefore.Sketch, comparisonBefore.Inputs, [], selected == null ? null : Key(selected.Variable), job.CheckCancellation, affected: comparisonBefore.Affected);
+                var boundaries = NativeSketchClosedProfile.Pair(comparisonBefore, after, job.CheckCancellation);
+                var oldDesign = NativeSketchConstraintState385.Protected(comparisonBefore.Part, comparisonBefore.Sketch, comparisonBefore.Inputs, [], selected == null ? null : Key(selected.Variable), job.CheckCancellation, affected: comparisonBefore.Affected, boundaries: boundaries.Before);
                 var expectedContents = comparisonBefore.Part.Contents.Select(id => persistentMapping?.Map(id) ?? id).ToHashSet();
                 var expectedAffected = comparisonBefore.Affected.Select(id => persistentMapping?.Map(id) ?? id).ToHashSet(StringComparer.OrdinalIgnoreCase);
                 if (persistentMapping != null) oldDesign = NativeSketchCorrespondence410.Identities(oldDesign, persistentMapping, job.CheckCancellation);
@@ -449,7 +468,7 @@ internal static class NativeSketchConstraintWriter385
                 var afterClosure = ModelDependencyGraph410.OwnedClosure(after.Part.Body, comparisonBefore.GraphRoots, job.CheckCancellation, after.Part.Views);
                 afterClosure.ExceptWith(newObjects);
                 Need(comparisonBefore.GraphRoots.ToHashSet().SetEquals(after.GraphRoots) && expectedAffected.SetEquals(afterClosure), "MODEL_DEPENDENCY_CHANGED", "Native sketch rebuild changed the observed same-part dependency closure.");
-                var newDesign = NativeSketchConstraintState385.Protected(after.Part, after.Sketch, after.Inputs, newVariables.Select(v => v.GetProperty("mc_id").GetString()!).ToArray(), selected == null ? null : Key(selected.Variable), job.CheckCancellation, newObjects.ToArray(), expectedAffected);
+                var newDesign = NativeSketchConstraintState385.Protected(after.Part, after.Sketch, after.Inputs, newVariables.Select(v => v.GetProperty("mc_id").GetString()!).ToArray(), selected == null ? null : Key(selected.Variable), job.CheckCancellation, newObjects.ToArray(), expectedAffected, boundaries: boundaries.After);
                 if (persistentMapping != null) newDesign = NativeSketchCorrespondence410.Identities(newDesign, new NativeSketchCorrespondence410.Mapping(new Dictionary<McObjectId, McObjectId>(), Wire.Element(new { })), job.CheckCancellation);
                 var actualBindings = after.Storage;
                 if (selected == null) using (var tx = state.Document.Database.TransactionManager.StartTransaction())

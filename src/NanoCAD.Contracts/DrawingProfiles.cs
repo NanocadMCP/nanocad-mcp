@@ -4,7 +4,11 @@ namespace NanoCAD.Contracts;
 
 public sealed record DrawingProfileEdit(string Action,string[] Targets,SketchConstraintSpec[]? Constraints=null,
     string? ConstraintId=null,string? ExpectedExpression=null,double? ExpectedValue=null,double? Value=null,
-    double? Distance=null,string? Direction=null,string? Name=null,string? VariableId=null,string? ExpectedName=null,string? Expression=null,string? AxisHandle=null,string[]? ConstraintIds=null,double? AngleDegrees=null,SketchPlaneSpec? Workplane=null):EditSpec(Action,Targets);
+    double? Distance=null,string? Direction=null,string? Name=null,string? VariableId=null,string? ExpectedName=null,string? Expression=null,string? AxisHandle=null,string[]? ConstraintIds=null,double? AngleDegrees=null,SketchPlaneSpec? Workplane=null):EditSpec(Action,Targets)
+{
+    public SketchMobilityMotion[]? PreserveMotion { get; init; }
+    public bool RequireVerifiedConstraints { get; init; }
+}
 public sealed record DrawingVariableChange(string variable_id,string name,string expression,double value,string value_unit);
 public sealed record DrawingRelationChange(string constraint_id,string kind,string first_handle,string? second_handle,string? variable_id,double? value,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? third_handle=null,
@@ -16,7 +20,9 @@ public sealed record DrawingProfileChange(string operation,EntityRef[] source_re
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] DrawingVariableChange[]? variable_changes=null,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string[]? removed_constraint_ids=null,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string[]? removed_variable_ids=null,
-    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] DrawingRetainedSweepPart366[]? retained_sweep_parts=null);
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] DrawingRetainedSweepPart366[]? retained_sweep_parts=null,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility=null,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility_after=null);
 
 public static partial class ModifyValidation
 {
@@ -57,12 +63,17 @@ public static partial class ModifyValidation
             if(!Guid.TryParseExact(Text(item,"constraint_id",path,38),"B",out var id)||id==Guid.Empty)throw Invalid(path,"Use a current opaque constraint ID.");
             return new(action,handles,ConstraintId:id.ToString("B").ToUpperInvariant(),ExpectedExpression:Text(item,"expected_expression",path,8192),ExpectedValue:Size("expected_value"),Value:Size("value"));
         }
-        Shape(item,path,"operation","handles","constraints");var array=Required(item,"constraints",path);
+        Shape(item,path,"operation","handles","constraints","preserve_motion","require_verified_constraints");var array=Required(item,"constraints",path);
+        return new(action,handles,ParseDrawingRelations(array,path+".constraints",handles))
+        { RequireVerifiedConstraints = SketchMotionInput.RequireProof(item), PreserveMotion = SketchMotionInput.Drawing(item.TryGetProperty("preserve_motion", out var motion) ? motion : null, handles) };
+    }
+    internal static SketchConstraintSpec[] ParseDrawingRelations(JsonElement array,string path,string[] handles)
+    {
         if(array.ValueKind!=JsonValueKind.Array||array.GetArrayLength()<1)throw Invalid(path,"Use at least one drawing constraint.");
         var selected=handles.ToHashSet(StringComparer.OrdinalIgnoreCase);var specs=new List<SketchConstraintSpec>();var unique=new HashSet<string>();
         foreach(var entry in array.EnumerateArray())
         {
-            string p=path+".constraints["+specs.Count+"]";Shape(entry,p,"kind","first","second","third","first_point","second_point","value","first_segment_index","second_segment_index","third_segment_index");
+            string p=path+"["+specs.Count+"]";Shape(entry,p,"kind","first","second","third","first_point","second_point","value","first_segment_index","second_segment_index","third_segment_index");
             string Ref(string field){var h=Validation.NormalizeHandle(Text(entry,field,p,16));if(!selected.Contains(h))throw Invalid(p,"Every constraint source must be listed in handles.");return h;}
             string Point(string field){var v=Text(entry,field,p,8);if(v is not "start" and not "end" and not "center")throw Invalid(p,"Use start/end of Line/Arc/open Spline or center of Circle/Arc.");return v;}
             string kind=Text(entry,"kind",p,24),first=Ref("first");string? second=null,third=null,fp=null,sp=null;double? value=null;
@@ -90,7 +101,7 @@ public static partial class ModifyValidation
             if(!unique.Add(kind+"|"+one+"|"+two+"|"+third+":"+thirdSegment))throw Invalid(p,"Duplicate relation.");
             specs.Add(new(kind,first,second,fp,sp,value,third,firstSegment,secondSegment,thirdSegment));
         }
-        return new(action,handles,specs.ToArray());
+        return specs.ToArray();
     }
 }
 

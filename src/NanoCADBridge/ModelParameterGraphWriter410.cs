@@ -164,6 +164,18 @@ internal static class ModelParameterGraphWriter410
             }
             if (controls.TryGetValue(key, out var bound)) Need(consumers!.Contains(bound.ID), "MODEL_STATE_UNAVAILABLE", "The native variable does not retain its actual control owner as a consumer.");
         }
+        foreach (var group in controls.Values.Select(c => c.Sketch).OfType<ModelSketchParameter411.Control>().GroupBy(c => c.State.Sketch.Sketch.ID))
+        {
+            var rowsToChange = group.ToArray();
+            var sketchState = rowsToChange[0].State;
+            var replacement = rowsToChange.Select(c => c.Spec with { Value = plan.ExpectedValues[c.Variable.ToString()] }).ToArray();
+            var excluded = rowsToChange.Select(c => c.Constraint).ToHashSet();
+            using var sketchManager = NativeSketchMembers385.Manager(sketchState.Sketch.Sketch);
+            var relationIds = sketchState.Relations.GetProperty("constraints").EnumerateArray()
+                .Select(r => new McObjectId(Guid.Parse(r.GetProperty("id").GetString()!))).ToArray();
+            NativeSketchMobility.Plan(sketchState.Inputs, sketchManager, relationIds, true, replacement, cancel, excluded)
+                .RequireCompatibleReplacement();
+        }
         var affected = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var body in bodies)
         {

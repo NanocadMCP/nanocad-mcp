@@ -93,6 +93,24 @@ internal static class AuditServerRoutingTests
                     }
                     if (tool.Name is not ("nanocad.modify_entities" or "nanocad.modify_structure"))
                     {
+                        if (tool.Name is "nanocad.inspect_sketch_constraints" or "nanocad.inspect_constraints")
+                        {
+                            var fullInput = WithoutDescriptions(tool.InputSchema);
+                            var shortInput = WithoutDescriptions(published.InputSchema);
+                            var fullPreview = fullInput["properties"]!["proposed_constraints"]!;
+                            var shortPreview = shortInput["properties"]!["proposed_constraints"]!;
+                            var fields = fullPreview["items"]!["oneOf"]!.AsArray()
+                                .SelectMany(branch => branch!["properties"]!.AsObject().Select(field => field.Key))
+                                .ToHashSet(StringComparer.Ordinal);
+                            if (!fields.SetEquals(shortPreview["items"]!["properties"]!.AsObject().Select(field => field.Key)) ||
+                                !published.InputSchema.GetProperty("description").GetString()!.Contains("topic=schema, operation=" + tool.Name["nanocad.".Length..]))
+                                throw new Exception("Constraint preview lost a callable operand or focused guidance.");
+                            fullPreview.AsObject().Remove("items");
+                            shortPreview.AsObject().Remove("items");
+                            if (!JsonNode.DeepEquals(fullInput, shortInput))
+                                throw new Exception("Compact constraint preview changed its call envelope.");
+                            continue;
+                        }
                         if (tool.Name is "nanocad.inspect_model_history" or "nanocad.set_model_parameter" or "nanocad.analyze_point_cloud")
                         {
                             var operationName = tool.Name["nanocad.".Length..];

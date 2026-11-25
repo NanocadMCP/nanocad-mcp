@@ -39,7 +39,7 @@ internal static class ModelSketchParameterGraph411
                 {
                     bool hasRelations, updatedByEditor = false;
                     using (var manager = NativeSketchMembers385.Manager(sketch))
-                    { var relations = manager.GetAllConstraints(); hasRelations = relations != null && relations.Any(); }
+                    { var relations = NativeSketchInventory.Read(manager, sketch, cancel); hasRelations = relations.Ids.Count > 0; }
                     // A geometry-only peer can have no materialized network.
                     // Its existing unavailable observation is retained by the
                     // supplemental snapshot; body rebuild still follows.
@@ -128,9 +128,9 @@ internal static class ModelSketchParameterGraph411
         else if (node is JsonArray array) foreach (var value in array) Frame(value, cancel);
     }
     static JsonElement Protected(NativeSketchConstraintState385.Snapshot value, IReadOnlySet<string> affected, IReadOnlySet<string> stationary,
-        IReadOnlySet<string> controlledSketches, IEnumerable<ModelFeatureVariable> features, Action cancel)
+        IReadOnlySet<string> controlledSketches, IEnumerable<ModelFeatureVariable> features, NativeSketchClosedProfile.Comparison boundaries, Action cancel)
     {
-        var result = JsonNode.Parse(NativeSketchConstraintState385.Protected(value.Part, value.Sketch, value.Inputs, [], null, cancel, affected: affected, stationaryRoots: stationary).GetRawText())!.AsObject();
+        var result = JsonNode.Parse(NativeSketchConstraintState385.Protected(value.Part, value.Sketch, value.Inputs, [], null, cancel, affected: affected, stationaryRoots: stationary, boundaries: boundaries).GetRawText())!.AsObject();
         var part = result["part"]!.AsObject(); part.Remove("variables"); // Generic graph verifies every formula/value/type/owner/dependency.
         part["nodes"] = JsonNode.Parse(ModelDependencyGraph410.ProtectedNodes(Wire.Element(part), affected, features, cancel: cancel).GetRawText());
         // One expression may drive several exact same-part sketch controls.
@@ -250,7 +250,9 @@ internal static class ModelSketchParameterGraph411
             Anchors(before, after, scope, stationary.Contains(Key(first.ID)), cancel);
             Need(before.Part.Constraints.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(after.Part.Constraints.Keys), "CONSTRAINT_BASELINE_CHANGED", "A retained peer constraint network disappeared.");
             foreach (var pair in before.Part.Constraints) Need(ModelSketchConstraintObservation353.Equivalent(PeerIntent(pair.Value, changed, scope.Contains(pair.Key), cancel), PeerIntent(after.Part.Constraints[pair.Key], changed, scope.Contains(pair.Key), cancel), cancel), "CONSTRAINT_BASELINE_CHANGED", "A retained peer relation/control binding changed.");
-            var oldDesign = Protected(before, scope, stationary, controlledSketches, features, cancel); var newDesign = Protected(after, scope, stationary, controlledSketches, features, cancel);
+            var boundaries = NativeSketchClosedProfile.Pair(before, after, cancel);
+            var oldDesign = Protected(before, scope, stationary, controlledSketches, features, boundaries.Before, cancel);
+            var newDesign = Protected(after, scope, stationary, controlledSketches, features, boundaries.After, cancel);
             var storage = ModelSketchConstraintMetadata379.Compare(oldDesign, newDesign, before.Part.BodyMetadata, after.Part.BodyMetadata, before.Storage, after.Storage, cancel);
             bool designRetained = ModelParameterSnapshot.Equivalent(oldDesign, storage.design), bodyMetadataRetained = ModelParameterSnapshot.Equivalent(before.Part.BodyMetadata, storage.body);
             if (!storage.retained || !designRetained || !bodyMetadataRetained)

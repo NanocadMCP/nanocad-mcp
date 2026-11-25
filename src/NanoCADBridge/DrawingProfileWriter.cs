@@ -20,7 +20,8 @@ internal static partial class DrawingProfileWriter
     internal sealed record Source(Db.ObjectId Id,McObjectId Native,SketchConstraintCurve Curve,string Layer,SketchPlaneSpec Workplane,DrawingConstraints431.Parent? Parent=null);
     private sealed record Relation(McObjectId Id,string Type,SketchConstraintSpec? Spec,McObjectId Variable,string? Name,string? Expression,double? Value,string References);
     private sealed record Network(bool Available,Dictionary<string,Source> Sources,Relation[] Relations);
-    private sealed record Binding(McDocument Sheet,Dictionary<string,Source> Selected,Network Network);
+    private sealed record Binding(McDocument Sheet,Dictionary<string,Source> Selected,Network Network,
+        SketchMobilityReport? Plan = null, SketchConstraintSpec[]? Effective = null);
     internal static bool Handles(ModifyArguments args)=>args.Operations.Any(e=>e is DrawingProfileEdit);
     private static Db.ObjectId Model(DocumentState state,Db.Transaction tx)=>((Db.BlockTable)tx.GetObject(state.Document.Database.BlockTableId,Db.OpenMode.ForRead))[Db.BlockTableRecord.ModelSpace];
     private static void Layer(Db.Entity entity,Db.Transaction tx)
@@ -69,8 +70,10 @@ internal static partial class DrawingProfileWriter
     }
     private static Network ReadNetwork(McDocument sheet,Dictionary<string,Source> selected,DocumentState state,Db.Transaction tx,Action cancel)
     {
-        var frame=selected.Values.First().Workplane;using var manager=Manager(sheet,frame);var ids=manager?.GetAllConstraints();
-        if(ids==null)return new(false,new(selected,StringComparer.OrdinalIgnoreCase),Array.Empty<Relation>());
+        var frame=selected.Values.First().Workplane;using var manager=Manager(sheet,frame);
+        if(manager==null)return new(false,new(selected,StringComparer.OrdinalIgnoreCase),Array.Empty<Relation>());
+        var inventory=NativeConstraintInventory.Read(manager,()=>selected.Values.Select(s=>s.Native),cancel);
+        var ids=inventory.Ids;
         ModelInventoryBudget.Ids(ids,cancel);var inventoryBudget=new ModelInventoryBudget(cancel);
         var index=new Dictionary<McObjectId,Db.ObjectId>();
         foreach(Db.ObjectId id in (Db.BlockTableRecord)tx.GetObject(Model(state,tx),Db.OpenMode.ForRead))
@@ -80,15 +83,6 @@ internal static partial class DrawingProfileWriter
         {
             Need(index.TryGetValue(id,out var raw),"OUT_OF_SCOPE","Network references a source outside top-level Model Space.");string h=raw.Handle.ToString();
             if(!sources.TryGetValue(h,out var s)){s=SourceOf(raw,state,tx,false,frame,cancel);inventoryBudget.Add(s.Curve);sources.Add(h,s);}return s;
-        }
-        string PointName(Source s,IConstraintObjectInfo info)
-        {
-            int? segment=DrawingConstraints431.Segment(s.Curve,info);var curve=DrawingConstraintOperands431.Resolve(s.Curve,segment);
-            var p=info.PointRefOnObject;var xy=DrawingWorkplane.Local(frame,new(p.X,p.Y,p.Z));
-            var roles=curve.Kind is "line" or "spline"?new[]{"start","end"}:curve.Kind=="arc"?new[]{"start","end","center"}:new[]{"center"};
-            var matches=roles.Where(name=>DrawingProfileGeometry.Same(DrawingConstraintOperands431.Point(s.Curve,segment,name),xy)).ToArray();
-            if(matches.Length==1)return matches[0];
-            throw new DomainException("OUT_OF_SCOPE","Constraint reference is not a supported line endpoint or circle center.");
         }
         foreach(var id in ids.OrderBy(v=>v.ToString(),StringComparer.Ordinal))
         {
@@ -107,33 +101,13 @@ internal static partial class DrawingProfileWriter
             SketchConstraintSpec? spec=null;
             if(touched)
             {
-                // Native endpoint/center constraints have persistent subentity IDs
-                // even on exact Lines/Circles. Bind those IDs AND precise endpoint
-                // coordinates; a nonnull ID does not imply a polyline segment.
-                Need(refs.Length is >0 and <=3,"OUT_OF_SCOPE","Unexpected number of actual native relation operands.");
-                var first=Source(info.FirstObject.ObjectId);Source? second=info.SecondObject==null||info.SecondObject.ObjectId.IsNull?null:Source(info.SecondObject.ObjectId);
-                Source? third=info.ThirdObject==null||info.ThirdObject.ObjectId.IsNull?null:Source(info.ThirdObject.ObjectId);
-                int? fs=DrawingConstraints431.Segment(first.Curve,info.FirstObject),ss=second==null?null:DrawingConstraints431.Segment(second.Curve,info.SecondObject!),ts=third==null?null:DrawingConstraints431.Segment(third.Curve,info.ThirdObject!);
-                string kind=info.Type.ToString() switch
-                {"GeomHorizontal"=>"horizontal","GeomVertical"=>"vertical","GeomParallel"=>"parallel","GeomPerpendicular"=>"perpendicular","GeomEqual"=>"equal",
-                    "GeomConcentric"=>"concentric","GeomCoincident"=>"coincident","GeomCollinear"=>"collinear","GeomTangent"=>"tangent","GeomSmooth"=>"smooth","GeomSymmetric"=>"symmetric","GeomFix"=>DrawingConstraints431.WholeObject(info.FirstObject)?"fix":"fix_point",
-                    "DimRadial"=>"radius","DimDiametrical"=>"diameter","DimAligned"=>first.Curve.Kind!="polyline"&&second?.Native==first.Native?"length":"distance","DimHorizontal"=>"distance_x","DimVertical"=>"distance_y","DimAngular"=>"angle",
-                    _=>throw new DomainException("OUT_OF_SCOPE","Selected component contains an unsupported native constraint type: "+info.Type)};
-                string? fp=null,sp=null;
-                if(kind is not "coincident" and not "smooth" and not "distance" and not "distance_x" and not "distance_y" and not "fix_point" and not "length")
-                    Need(refs.All(p=>p!.SubentId.IsNull||Source(p.ObjectId).Curve.Kind=="polyline"&&p.PolylineSegmentIndex>=0),"OUT_OF_SCOPE","Whole-curve relation unexpectedly references an unbound subentity.");
-                if(kind is "coincident" or "smooth" or "distance" or "distance_x" or "distance_y" or "fix_point")fp=PointName(first,info.FirstObject);
-                if(kind is "coincident" or "smooth" or "distance" or "distance_x" or "distance_y"){Need(second!=null,"CONSTRAINTS_UNAVAILABLE","Second source missing.");sp=PointName(second,info.SecondObject!);}
-                if(kind=="length")Need(DrawingConstraintOperands431.Resolve(first.Curve,fs).Kind=="line"&&fs==DrawingConstraints431.Segment(first.Curve,info.SecondObject!)&&PointName(first,info.FirstObject)!=PointName(first,info.SecondObject!),"OUT_OF_SCOPE","Length must reference distinct endpoints of one line or straight Polyline segment.");
-                Need(kind=="symmetric"?third!=null:third==null,"CONSTRAINT_SCOPE_MISMATCH","Unexpected third operand in an ordinary drawing relation.");
-                spec=new(kind,first.Curve.Id,kind=="length"?null:second?.Curve.Id,fp,sp,value,third?.Curve.Id,fs,kind=="length"?null:ss,ts);
-                spec=DrawingConstraintOperands431.Canonical(spec,sources.ToDictionary(row=>row.Key,row=>row.Value.Curve,StringComparer.OrdinalIgnoreCase));
+                spec=DecodeConstraint(info,value,Source,frame);
             }
             string references=string.Join("|",refs.Select(p=>p!.ObjectId+":"+p.SubentId+":"+p.PolylineSegmentIndex));
             inventoryBudget.Add(new{id=id.ToString(),type=info.Type.ToString(),variable=info.VarId.ToString(),name,expression,value,references,spec});
             relations.Add(new(id,info.Type.ToString(),spec,info.VarId,name,expression,value,references));
         }
-        return new(true,sources,relations.ToArray());
+        return new(inventory.Complete,sources,relations.ToArray());
     }
     private static Binding Resolve(DrawingProfileEdit edit,DocumentState state,Db.Transaction tx,Action cancel)
     {
@@ -161,8 +135,6 @@ internal static partial class DrawingProfileWriter
             foreach(var spec in edit.Constraints!)foreach(var reference in new[]{(spec.First,spec.FirstPoint),(spec.Second,spec.SecondPoint)})
                 if(reference.Item1!=null&&reference.Item2 is "start" or "end"&&selected[reference.Item1].Curve is {Kind:"spline",Start:{} first,End:{} last})
                     Need(!DrawingProfileGeometry.Same(first,last),"CONSTRAINT_SCOPE_MISMATCH","This ordinary drawing Spline has coincident start/end positions whose pick roles cannot be uniquely observed by this adapter; no relation has been written.");
-            DrawingProfileGeometry.Validate(edit.Constraints!,selected.Values.Select(s=>s.Curve).ToArray());
-            foreach(var spec in edit.Constraints!)Need(!network.Relations.Any(r=>r.Spec is {} old&&SameRelation(old,spec,selected)),"DUPLICATE_CONSTRAINT","A matching relation already exists.");
         }
         else if(edit.Action=="set_drawing_dimension")
         {
@@ -181,8 +153,33 @@ internal static partial class DrawingProfileWriter
             else DrawingProfileGeometry.Profile(curves,cancel);
         }
         var binding=new Binding(sheet,selected,network);
+        if(edit.Action is "add_drawing_constraints" or "set_drawing_dimension")
+        {
+            var replaced=edit.Action=="set_drawing_dimension"?FindDimension(edit,network):null;
+            var proposed=replaced==null?edit.Constraints!:new[]{replaced.Spec! with{Value=edit.Value}};
+            var plan=Assess(binding.Selected.Values.Select(source=>source.Curve),network,proposed,replaced==null?null:new(){replaced.Id},cancel,edit.PreserveMotion);
+            var effective=replaced==null?plan.EffectiveCandidates(proposed, edit.RequireVerifiedConstraints):proposed;
+            if(replaced!=null)plan.RequireCompatibleReplacement();
+            if(edit.Action=="add_drawing_constraints")
+                DrawingProfileGeometry.Validate(proposed,selected.Values.Select(s=>s.Curve).ToArray());
+            binding=binding with{Plan=plan,Effective=effective};
+        }
         if(IsRemoval(edit))PrepareRemoval(edit,binding,cancel);
-        if(DrawingVariablePlanning.IsAction(edit.Action))PrepareVariables(edit,binding,state,cancel);
+        if(DrawingVariablePlanning.IsAction(edit.Action))
+        {
+            var variables=PrepareVariables(edit,binding,state,cancel);
+            if(edit.Action=="set_drawing_expression")
+            {
+                var changed=network.Relations.Where(r=>r.Spec!=null&&!r.Variable.IsNull&&variables.Affected.Contains(Key(r.Variable))&&
+                    r.Value.HasValue&&variables.Values[Key(r.Variable)]!=r.Value.Value).ToArray();
+                if(changed.Length!=0)
+                {
+                    var proposed=changed.Select(r=>r.Spec! with{Value=variables.Values[Key(r.Variable)]}).ToArray();
+                    var plan=Assess(selected.Values.Select(s=>s.Curve),network,proposed,changed.Select(r=>r.Id).ToHashSet(),cancel);
+                    plan.RequireCompatibleReplacement();binding=binding with{Plan=plan};
+                }
+            }
+        }
         return binding;
     }
     private static bool SameRelation(SketchConstraintSpec a,SketchConstraintSpec b,Dictionary<string,Source> sources)
@@ -207,6 +204,6 @@ internal static partial class DrawingProfileWriter
         var loaded=AppDomain.CurrentDomain.GetAssemblies().Select(a=>a.GetName().Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Need(loaded.Contains("mapimgd")&&loaded.Contains("MapiBaseTypes"),"CAPABILITY_UNAVAILABLE","MultiCAD must already be loaded.");
         var edit=(DrawingProfileEdit)args.Operations.Single();var binding=Resolve(edit,state,tx,cancel);
-        if(edit.Action!="extrude_drawing_profile")RequireRetainedSweepEdit366(edit,binding,Consumers(binding.Selected,state,tx,cancel));
+        if(edit.Action!="extrude_drawing_profile"&&binding.Effective is not {Length:0})RequireRetainedSweepEdit366(edit,binding,Consumers(binding.Selected,state,tx,cancel));
     }
 }

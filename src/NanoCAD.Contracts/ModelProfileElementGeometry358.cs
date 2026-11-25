@@ -45,12 +45,20 @@ public static class ModelProfileElementGeometry358
             else
             {
                 if(curve.Kind is not ("circle" or "arc"))return false;
+                double epsilon=E/Math.Max(.001,curve.Radius);
                 foreach(var other in candidates)
                 {
                     cancel();if(other.Kind is not ("circle" or "arc")||DrawingProfileGeometry.Distance(curve.Center!,other.Center!)>E||Math.Abs(curve.Radius-other.Radius)>E)continue;
-                    intervals.AddRange(Angular(other));
+                    // Distances at the angular cut are periodic. A native arc can start
+                    // at 2*pi minus roundoff in the contour and at 0 in the sketch.
+                    foreach (var span in Angular(other))
+                    {
+                        intervals.Add(span);
+                        if (span.From <= epsilon) intervals.Add((span.From + Tau, span.To + Tau));
+                        if (span.To >= Tau - epsilon) intervals.Add((span.From - Tau, span.To - Tau));
+                    }
                 }
-                foreach(var span in Angular(curve))if(!Covered(span,intervals,E/Math.Max(.001,curve.Radius),cancel))return false;
+                foreach(var span in Angular(curve))if(!Covered(span,intervals,epsilon,cancel))return false;
             }
         }
         return true;

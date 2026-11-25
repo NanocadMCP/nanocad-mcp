@@ -6,6 +6,12 @@ nanoCAD MCP connects an AI assistant to a running nanoCAD session. You describe 
 
 See [installation](installation.md) for requirements and connection instructions, and the [user guide](user-guide.md) for the working process.
 
+## Sketch degrees of freedom
+
+Part sketches and ordinary drawing geometry can report their remaining local degrees of freedom with driving dimensions held fixed. Preview a group of proposed constraints to see which conditions are independent, already implied or in conflict. Each decision identifies the affected proposal and its reason. A sliding direction can be protected explicitly. An additional geometric condition already implied by the current set is omitted. An overlapping driving dimension requires a decision about which dimension should control the geometry.
+
+The calculation uses the actual selected geometry, its relations and the sketch plane. Where the native inventory, references or equations are incomplete, the affected count is unavailable. A fully constrained flag alone cannot supply a count. Sketch angles use radians and ordinary drawing angles use degrees.
+
 ## Part names and model history
 
 Naming a parametric body sets its top-level caption in the 3D History panel and retains it in the DWG. In nanoCAD 26, a nonparametric solid can show a new caption during the session but reverts to its generated caption on reopen, including when it was renamed in nanoCAD itself. The bridge reports BODY_NAME_PERSISTENCE_UNAVAILABLE before changing any body in a naming request that includes such a solid. The construction history item and its sketches and features keep their individual names. Drawings created with older versions can still be searched by their existing history item names and DWG group labels. Parts that share a name appear as separate search results.

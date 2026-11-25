@@ -35,7 +35,7 @@ internal static class ModelSketchParameter411
         var sketch = state.Sketch.Sketch; var body = state.Part.Body; var owner = body.DbEntity.Document;
         Need(sketch.HostSolidID == body.ID && state.Part.Contents.Contains(sketch.ID) && sketch.DbEntity.Document.ID == owner.ID,
             "OUT_OF_SCOPE", "A writable internal dimension must belong to the selected part's exact sketch and MCS document.");
-        using var manager = NativeSketchMembers385.Manager(sketch); var inventory = manager.GetAllConstraints(); Need(inventory != null, "CONSTRAINTS_UNAVAILABLE", "The exact internal relation inventory is unavailable."); ModelInventoryBudget.Ids(inventory, cancel);
+        using var manager = NativeSketchMembers385.Manager(sketch); var inventory = NativeSketchInventory.CompleteIds(manager, cancel, sketch); Need(inventory != null, "CONSTRAINTS_UNAVAILABLE", "The exact internal relation inventory is unavailable."); ModelInventoryBudget.Ids(inventory, cancel);
         var matches = new List<McObjectId>();
         foreach (var id in inventory) { cancel(); using var row = manager.GetConstraintInfo(id); Need(row != null, "CONSTRAINTS_UNAVAILABLE", "A current native relation is unreadable."); if (row.VarId == variable) matches.Add(id); }
         Need(!variable.IsNull && matches.Count == 1, "PARAMETER_HAS_SHARED_RELATIONS", "The exact variable must bind one current dimensional relation."); var relation = matches[0]; using var info = manager.GetConstraintInfo(relation); Need(info != null, "CONSTRAINTS_UNAVAILABLE", "The exact dimensional relation is unavailable.");
@@ -71,7 +71,7 @@ internal static class ModelSketchParameter411
         // this same document already has native relation/VarId unit evidence;
         // first forming consumption must not change these read annotations.
         if (sketch == null || sketch.ID != host || sketch.DbEntity.Document.ID != body.DbEntity.Document.ID) return new Dictionary<McObjectId, UnitBinding>();
-        using var manager = NativeSketchMembers385.Manager(sketch); var ids = manager.GetAllConstraints(); if (ids == null) return new Dictionary<McObjectId, UnitBinding>(); ModelInventoryBudget.Ids(ids, cancel); var matches = new List<(McObjectId Variable, UnitBinding Binding)>();
+        using var manager = NativeSketchMembers385.Manager(sketch); var ids = NativeSketchInventory.CompleteIds(manager, cancel, sketch); if (ids == null) return new Dictionary<McObjectId, UnitBinding>(); ModelInventoryBudget.Ids(ids, cancel); var matches = new List<(McObjectId Variable, UnitBinding Binding)>();
         foreach (var id in ids)
         {
             cancel(); using var info = manager.GetConstraintInfo(id); Need(info != null, "CONSTRAINTS_UNAVAILABLE", "A listed dimension is unreadable."); if (!info.IsDimensional || info.VarId.IsNull) continue;

@@ -34,15 +34,11 @@ internal static class DrawingCircleWriter
         var loaded=AppDomain.CurrentDomain.GetAssemblies().Select(a=>a.GetName().Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Need(loaded.Contains("mapimgd")&&loaded.Contains("MapiBaseTypes"),"CAPABILITY_UNAVAILABLE","MultiCAD must already be loaded.");
         var edit=(DrawingCircleEdit)args.Operations.Single();var source=Resolve(edit,state,tx);
-        if(edit.Action=="add_drawing_radius")
-        {
-            using var existing=source.Sheet.Get2dConstraintsManager(Constraint2dNetType.ACAD,source.Sheet.ID,MPlane.XYPlane);
-            if(existing!=null&&existing.GetAllConstraints()!=null)
-                Need(Attached(existing,source,cancel).Length==0,"OUT_OF_SCOPE","Source already has drawing constraints.");
-        }
+        if(edit.Action is "add_drawing_radius" or "set_drawing_radius")
+            RadiusPlan(source,edit,cancel??(()=>{}));
         if(edit.Action=="set_drawing_radius")
         {
-            using var manager=ReadManager(source);FindConstraint(manager,source,edit,cancel);Consumers(source,state,tx,cancel??(()=>{}));
+            Consumers(source,state,tx,cancel??(()=>{}));
         }
     }
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -61,26 +57,71 @@ internal static class DrawingCircleWriter
         Need(native!=null&&native.ID==identity,"OBJECT_IDENTITY_MISMATCH","Circle has no matching native identity.");
         return new(id,identity,sheet,new(circle.Center.X,circle.Center.Y,0),circle.Radius,circle.Layer);
     }
-    private static Constraints2D ReadManager(Source source)
-    {
-        var manager=source.Sheet.Get2dConstraintsManager(Constraint2dNetType.ACAD,source.Sheet.ID,MPlane.XYPlane);
-        Need(manager!=null,"CONSTRAINTS_UNAVAILABLE","ACAD drawing network is unavailable.");
-        if(manager.DocumentId!=source.Sheet.ID||!manager.PlanarSketchId.IsNull||manager.ConstraintsNetworkType!=Constraint2dNetType.ACAD)
-        {manager.Dispose();throw new DomainException("CONSTRAINT_SCOPE_MISMATCH","Constraint manager resolved another scope.");}
-        return manager;
-    }
     private static McObjectId[] Attached(Constraints2D manager,Source source,Action? cancel=null)
     {
-        var ids=manager.GetAllConstraints();Need(ids!=null,"CONSTRAINTS_UNAVAILABLE","Complete native constraint inventory required.");
-        ModelInventoryBudget.Ids(ids!,cancel);
+        var inventory=NativeConstraintInventory.Read(manager,()=>new[]{source.Native},cancel??(()=>{}));
+        Need(inventory.Complete,"CONSTRAINTS_UNAVAILABLE","Complete native constraint inventory required.");
         var attached=new List<McObjectId>();
-        foreach(var id in ids)
+        foreach(var id in inventory.Ids)
         {
             cancel?.Invoke();
             using var info=manager.GetConstraintInfo(id);Need(info!=null,"CONSTRAINTS_UNAVAILABLE","Constraint details unavailable.");
             if(new[]{info.FirstObject,info.SecondObject,info.ThirdObject}.Any(p=>p!=null&&p.ObjectId==source.Native))attached.Add(id);
         }
         return attached.ToArray();
+    }
+    private static (SketchMobilityReport Report,bool PriorAvailable) RadiusPlan(Source source,DrawingCircleEdit edit,Action cancel)
+    {
+        string handle=source.Id.Handle.ToString();
+        var curve=new SketchConstraintCurve(handle,"circle",Center:new(source.Center.X,source.Center.Y),Radius:source.Radius);
+        var drawingSource=new DrawingProfileWriter.Source(source.Id,source.Native,curve,source.Layer,DrawingWorkplane.XY);
+        var prior=new List<SketchMobilityRelation>();
+        using var manager=source.Sheet.Get2dConstraintsManager(Constraint2dNetType.ACAD,source.Sheet.ID,MPlane.XYPlane);
+        Need(manager==null||manager.DocumentId==source.Sheet.ID&&manager.PlanarSketchId.IsNull&&manager.ConstraintsNetworkType==Constraint2dNetType.ACAD,
+            "CONSTRAINT_SCOPE_MISMATCH","The radius constraint manager resolved another drawing or network.");
+        var inventory=manager==null?null:NativeConstraintInventory.Read(manager,()=>new[]{source.Native},cancel);
+        bool hasAttached=false;
+        foreach(var id in inventory?.Ids??new())
+        {
+            cancel();
+            using var info=manager!.GetConstraintInfo(id);
+            Need(info!=null,"CONSTRAINTS_UNAVAILABLE","A native constraint has no observable operands.");
+            var refs=new[]{info.FirstObject,info.SecondObject,info.ThirdObject}.Where(p=>p!=null&&!p.ObjectId.IsNull).ToArray();
+            if(!refs.Any(p=>p!.ObjectId==source.Native))continue;
+            hasAttached=true;
+            if(edit.Action=="set_drawing_radius"&&id.ToString().Equals(edit.ConstraintId,StringComparison.OrdinalIgnoreCase))continue;
+            SketchConstraintSpec? spec=null;
+            if(refs.Length==1&&info.FirstObject?.ObjectId==source.Native)
+            {
+                double? value=null;
+                if(info.IsDimensional&&!info.VarId.IsNull&&DrawingVariablesAccess.TryConstraintValue(source.Sheet,info.VarId,info.VarName,
+                        info.VarExpression,false,out var actual))value=actual;
+                if(info.Type==ConstraintType.GeomFix||value.HasValue&&(info.Type is ConstraintType.DimRadial or ConstraintType.DimDiametrical))
+                {
+                    try { spec=DrawingProfileWriter.DecodeConstraint(info,value,_=>drawingSource,DrawingWorkplane.XY); }
+                    catch(DomainException error) when(error.Error.code is "OUT_OF_SCOPE" or "CONSTRAINT_SCOPE_MISMATCH" or "DRAWING_RELATION_MISMATCH") { }
+                }
+            }
+            prior.Add(new(id.ToString(),spec,[handle]));
+        }
+        var proposed=new[]{new SketchConstraintSpec("radius",handle,null,null,null,edit.Radius??source.Radius)};
+        bool replacing=edit.Action=="set_drawing_radius";
+        var report=SketchMobility.Plan([curve],prior,proposed,inventory?.Complete==true,cancel:cancel,replacingDrivers:replacing);
+        if(edit.Action=="set_drawing_radius")
+        {
+            report.RequireCompatibleReplacement();
+            Need(manager!=null,"CONSTRAINTS_UNAVAILABLE","The existing driving radius is unavailable.");
+            FindConstraint(manager,source,edit,cancel);
+            prior.Add(new(edit.ConstraintId!,proposed[0] with{Value=source.Radius}));
+            var before=SketchMobility.Plan([curve],prior,inventoryComplete:inventory?.Complete==true,cancel:cancel);
+            report=DrawingProfileWriter.CompareDriverState(before,report);
+        }
+        else
+        {
+            report.EffectiveCandidates(proposed, edit.RequireVerifiedConstraints);
+            Need(!hasAttached,"OUT_OF_SCOPE","The single-circle radius command requires an unattached source. Use add_drawing_constraints with the entire connected selection.");
+        }
+        return (report,inventory?.Complete==true);
     }
     private static McObjectId FindConstraint(Constraints2D manager,Source source,DrawingCircleEdit edit,Action? cancel=null)
     {
@@ -187,6 +228,12 @@ internal static class DrawingCircleWriter
             // Match the accepted native143 command lifecycle. McUndoPoint controls
             // reactors as well as Undo state; no recovery guarantee is offered here.
             double radius=edit.Radius??source.Radius;job.CheckCancellation();
+            SketchMobilityReport? plan=null;
+            if(edit.Action is "add_drawing_radius" or "set_drawing_radius")
+            {
+                var assessment=RadiusPlan(source,edit,job.CheckCancellation);
+                plan=assessment.Report;initialInventoryUnavailable=!assessment.PriorAvailable;
+            }
             if(edit.Action=="extrude_drawing_circle")
             {
                 started=true;Trace("projection_create_before");var body=new Mc3dSolid();body.DbEntity.Layer=source.Layer;body.DbEntity.AddToCurrentDocument();
@@ -215,10 +262,8 @@ internal static class DrawingCircleWriter
                     // null even after constructing the manager. Do not call that
                     // an empty inventory. Verify the actual created association
                     // and unambiguous resulting source inventory instead.
-                    initialInventoryUnavailable=manager.GetAllConstraints()==null;
                     if(!initialInventoryUnavailable)Need(Attached(manager,source,job.CheckCancellation).Length==0,"OUT_OF_SCOPE","Source already has drawing constraints.");
                     constraint=manager.AddDimRadial(source.Native);Need(!constraint.IsNull,"MODEL_UPDATE_FAILED","Native radius creation failed.");
-                    var attached=Attached(manager,source,job.CheckCancellation);Need(attached.Length==1&&attached[0]==constraint,"CONSTRAINT_SCOPE_MISMATCH","New radius is not the sole verified source constraint.");
                 }
                 else
                 {constraint=FindConstraint(manager,source,edit,job.CheckCancellation);Need(manager.SetConstraintParamValue(constraint,radius)&&manager.ApplyAllConstraints(),"MODEL_UPDATE_FAILED","Native radius update or solve failed.");}
@@ -241,9 +286,22 @@ internal static class DrawingCircleWriter
             }
             Trace("verify");job.CheckCancellation();VerifySource(source,state,radius);consumers=VerifyConsumers(source,state,consumers,job.CheckCancellation);
             if(created!=null)created=consumers.Single(c=>c.Body.ID==created.Body.ID);
+            SketchMobilityReport? observed=null;
+            if(plan!=null)
+            {
+                using var network=source.Sheet.Get2dConstraintsManager(Constraint2dNetType.ACAD,source.Sheet.ID,MPlane.XYPlane);
+                Need(network!=null&&network.DocumentId==source.Sheet.ID&&network.PlanarSketchId.IsNull&&network.ConstraintsNetworkType==Constraint2dNetType.ACAD,
+                    "CONSTRAINT_SCOPE_MISMATCH","Could not verify final ACAD radius scope.");
+                var attached=Attached(network,source,job.CheckCancellation);
+                Need(attached.Length==1&&attached[0]==constraint,"CONSTRAINT_SCOPE_MISMATCH","The resulting native radius scope changed.");
+                var handle=source.Id.Handle.ToString();
+                var curve=new SketchConstraintCurve(handle,"circle",Center:new(source.Center.X,source.Center.Y),Radius:radius);
+                var actual=new SketchMobilityRelation(constraint.ToString(),new("radius",handle,null,null,null,radius));
+                observed=SketchMobility.Plan([curve],[actual],cancel:job.CheckCancellation);
+            }
             job.BeginCommit();
             EntityRef Ref(Db.ObjectId id)=>new(args.BridgeId,args.DocumentId,id.Handle.ToString());var sourceRef=Ref(source.Id);var rebuilt=consumers.Select(v=>Ref(v.Id)).ToArray();
-            var change=new DrawingCircleChange(edit.Action,sourceRef,constraint.IsNull?null:constraint.ToString(),variable.IsNull?null:variable.ToString(),radius,created==null?null:Ref(created.Id),created?.Sketch.ID.ToString(),created?.Projection.ID.ToString(),created?.Feature.ID.ToString(),edit.Action=="set_drawing_radius"?rebuilt:Array.Empty<EntityRef>());
+            var change=new DrawingCircleChange(edit.Action,sourceRef,constraint.IsNull?null:constraint.ToString(),variable.IsNull?null:variable.ToString(),radius,created==null?null:Ref(created.Id),created?.Sketch.ID.ToString(),created?.Projection.ID.ToString(),created?.Feature.ID.ToString(),edit.Action=="set_drawing_radius"?rebuilt:Array.Empty<EntityRef>(),plan,observed);
             var warnings=initialInventoryUnavailable?new[]{WriteRecovery.Warning,"CONSTRAINT_INVENTORY_INITIALIZED: Prior native inventory was unavailable. The created driver and sole resulting source association were verified; no prior-empty-network claim is made."}:new[]{WriteRecovery.Warning};
             var result=Result.Ok(job.OriginalRequestId,new ModifiedEntities(args.OperationId,"committed",false,edit.Action=="extrude_drawing_circle"?Array.Empty<EntityRef>():new[]{sourceRef}.Concat(rebuilt).ToArray(),Array.Empty<EntityRef>(),created==null?Array.Empty<EntityRef>():new[]{Ref(created.Id)},Array.Empty<CopyMapping>(),"not_guaranteed",drawing_circle_changes:new[]{change}),context,warnings);
             job.RecordCommit(result);Trace("commit_recorded");return result;
@@ -252,7 +310,7 @@ internal static class DrawingCircleWriter
         {
             if(job.CommittedResult is {} result)return result;
             bool unknown=started;string cause=error is DomainException d?d.Error.code:error is OperationCanceledException?"CANCELLED":"MODEL_UPDATE_FAILED";
-            return job.Error(unknown?"WRITE_OUTCOME_UNKNOWN":cause,unknown?"Drawing circle operation was not verified; inspect partial source/model changes. No rollback is claimed; inspect the affected source and model before dependent edits.":error.Message,unknown?"unknown":"not_started",context,new{cause,stage,message=error.Message,constraint_id=constraint.IsNull?null:constraint.ToString()}) with{warnings=new[]{WriteRecovery.Warning}};
+            return job.Error(unknown?"WRITE_OUTCOME_UNKNOWN":cause,unknown?"Drawing circle operation was not verified; inspect partial source/model changes. No rollback is claimed; inspect the affected source and model before dependent edits.":error.Message,unknown?"unknown":"not_started",context,new{cause,stage,message=error.Message,verification_details=(error as DomainException)?.Error.details,constraint_id=constraint.IsNull?null:constraint.ToString()}) with{warnings=new[]{WriteRecovery.Warning}};
         }
     }
 }

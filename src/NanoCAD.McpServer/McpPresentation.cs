@@ -15,6 +15,9 @@ internal static class McpPresentation
     {
         string? compactDescription = structured ? null : tool.Name switch
         {
+            "nanocad.inspect_constraints" => "Preview drawing constraints and remaining degrees of freedom on selected handles.",
+            "nanocad.inspect_sketch_constraints" => "Preview sketch constraints and remaining degrees of freedom on actual sketch members.",
+            "nanocad.inspect_objects" => "Inspect selected identities, geometry, appearance or editing tokens. Omit sections for full detail. Use erase_assessment=true for the complete Model Space erase set. " + NanoCAD.Contracts.WriteResponseBudget432.SplitMassGuidance,
             "nanocad.modify_entities" => "Edit native geometry, annotations or part history, or add a feature. Read get_guidance(topic=operation, operation=modify_entities, variant=the exact item operation). For Model Space erase, request inspect_objects with erase_assessment=true for the whole set. " + ToolUsage.ModifyEntitiesHostLimits,
             "nanocad.modify_structure" => "Edit layers, styles, blocks, views, layouts or viewports. Read get_guidance(topic=operation, operation=modify_structure, variant=the exact item operation) for its batching and ownership rules.",
             "nanocad.inspect_model_history" => "Read current native part history in the active named DWG. Use history_focus with a feature ID or issues for dependencies, native status and parameter links. include_downstream_history follows a selected item's consumers. Use exact IDs for sketch, profile, datum or extent observations. Read get_guidance(topic=operation, operation=inspect_model_history) for editing prerequisites.",
@@ -23,7 +26,7 @@ internal static class McpPresentation
             _ => null
         };
         var input = SchemaCompactor.PublishFlatInput(tool.InputSchema);
-        if (!structured && tool.Name is "nanocad.inspect_model_history" or "nanocad.set_model_parameter" or "nanocad.analyze_point_cloud")
+        if (!structured && tool.Name is "nanocad.inspect_model_history" or "nanocad.set_model_parameter" or "nanocad.analyze_point_cloud" or "nanocad.inspect_sketch_constraints" or "nanocad.inspect_constraints")
             input = SchemaCompactor.PublishSelectionHelp(tool.Name["nanocad.".Length..], input);
         if (!structured && tool.Name == "nanocad.create_entities") input = SchemaCompactor.ShareCreationKindAlternatives(input);
         if (!structured && tool.Name is "nanocad.modify_entities" or "nanocad.modify_structure") input = SchemaCompactor.PublishOperationIndex(input);

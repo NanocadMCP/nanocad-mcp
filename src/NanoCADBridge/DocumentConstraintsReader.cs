@@ -40,11 +40,14 @@ internal static class DocumentConstraintsReader
         // Unlike the public constructor used to CREATE a network, this explicit
         // read getter passes forceCreateReqData=false in the installed wrapper.
         using var plane=DrawingWorkplaneNative.Plane(args.Workplane??DrawingWorkplane.XY);using var manager=sheet.Get2dConstraintsManager(Constraint2dNetType.ACAD,sheet.ID,plane);Budget();
-        if(manager==null)throw new DomainException("CONSTRAINTS_UNAVAILABLE","No readable ACAD network for the requested workplane; no empty-network claim is made.");
-        if(manager.DocumentId!=sheet.ID||!manager.PlanarSketchId.IsNull||manager.ConstraintsNetworkType!=Constraint2dNetType.ACAD)
+        if(manager!=null&&(manager.DocumentId!=sheet.ID||!manager.PlanarSketchId.IsNull||manager.ConstraintsNetworkType!=Constraint2dNetType.ACAD))
             throw new DomainException("CONSTRAINT_SCOPE_MISMATCH","Native manager resolved a different drawing or constraint network.");
-        var ids=manager.GetAllConstraints();Budget();
-        if(ids==null)throw new DomainException("CONSTRAINTS_UNAVAILABLE","Native constraint inventory is unavailable; not interpreted as empty.");
+        var selected=args.Handles!.Select(handle=>McObjectId.FromHandle(unchecked((long)Convert.ToUInt64(handle,16)),doc.ID)).ToArray();
+        var inventoryIds=manager==null?new NativeConstraintInventory.Result([],false,"native_manager_unavailable","complete_native_inventory_unavailable"):
+            NativeConstraintInventory.Read(manager,()=>selected,Budget);
+        var ids=inventoryIds.Ids;
+        var operands=new Dictionary<McObjectId,McObjectId[]>();
+        var graphBudget=new ModelInventoryBudget(Budget);
         string? Id(McObjectId id)=>id.IsNull?null:id.ToString();
         string? Text(string? value)=>value==null||value.Length<=8192?value:throw new DomainException("ENTITY_TOO_LARGE","Constraint text exceeds8192 characters.");
         // Resolve external endpoints to usable handles without expanding the
@@ -76,9 +79,12 @@ internal static class DocumentConstraintsReader
         var variableConstraints=new Dictionary<string,List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach(var id in ids.OrderBy(v=>v.ToString(),StringComparer.Ordinal))
         {
-            Budget();using var info=manager.GetConstraintInfo(id);
-            if(info==null)throw new DomainException("CONSTRAINTS_UNAVAILABLE","Constraint details are unavailable.");
+            Budget();using var info=manager!.GetConstraintInfo(id);
+            if(info==null){operands.Add(id,[]);continue;}
             var participants=new[]{info.FirstObject,info.SecondObject,info.ThirdObject};
+            var exact=participants.Where(p=>p!=null&&!p.ObjectId.IsNull).Select(p=>p!.ObjectId).Distinct().ToArray();
+            graphBudget.Add(new{id=id.ToString(),objects=exact.Select(value=>value.ToString())});
+            operands.Add(id,exact);
             if(args.IncludeVariables&&!info.VarId.IsNull)
             {
                 var key=info.VarId.ToString();if(!variableSources.TryGetValue(key,out var handles)){variableSources[key]=handles=new(StringComparer.OrdinalIgnoreCase);variableConstraints[key]=new();}
@@ -118,9 +124,12 @@ internal static class DocumentConstraintsReader
                     source_refs=variableSources.TryGetValue(v.Id.ToString(),out var hs)?hs.Select(h=>new EntityRef(bridge,state.Id,h)).ToArray():Array.Empty<EntityRef>()}).ToArray()};
         }
         var frame=args.Workplane??DrawingWorkplane.XY;double[] Vector(Point3 p)=>new[]{p.X,p.Y,p.Z};
+        bool complete=inventoryIds.Complete&&operands.Values.All(members=>members.Length>0);
+        var mobility=DrawingProfileWriter.InspectMobility(args,state,tx,sheet,manager,selected,operands,Handle,complete,Budget);
         Budget();var output=new{source_refs=args.Handles!.Select(h=>new EntityRef(bridge,state.Id,h)).ToArray(),network="ACAD",plane=args.Workplane==null?"WCS_XY":"explicit_workplane",workplane=new{origin=Vector(frame.Origin),x_axis=Vector(frame.XAxis),y_axis=Vector(frame.YAxis)},
-            manager_document_id=sheet.ID.ToString(),scope_id=Id(manager.ScopeId),identity_scope="bridge_document_revision",
+            manager_document_id=manager?.DocumentId.ToString(),scope_id=manager==null?null:Id(manager.ScopeId),identity_scope="bridge_document_revision",
             reference_coordinate_system="native_constraint_reference",solver_status="not_evaluated",scanned_constraints=ids.Count,
-            complete=true,completeness_scope="constraints_in_selected_workplane_network_referencing_any_selected_object; other planes and internal sketches are not inspected",constraints=result,variable_inventory=inventory};SerializedCapacity357.Check(output,Wire.PayloadBudget-4096,Budget);return output;
+            complete,completeness_scope="constraints_in_selected_workplane_network_referencing_any_selected_object; mobility includes connected source geometry on this plane",
+            inventory_source=inventoryIds.Source,inventory_routes=inventoryIds.Routes,inventory_unavailable_reason=complete?null:inventoryIds.Reason??"constraint_operands_unavailable",mobility,constraints=result,variable_inventory=inventory};SerializedCapacity357.Check(output,Wire.PayloadBudget-4096,Budget);return output;
     }
 }

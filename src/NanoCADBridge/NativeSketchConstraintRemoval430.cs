@@ -85,7 +85,7 @@ internal static class NativeSketchConstraintRemoval430
     // all-selected/actually-empty observation may admit its missing linkage;
     // all ordinary managers and every nonempty/partly-retained network remain
     // subject to the existing strict selected-sketch scope checks.
-    static JsonElement FinalRelations(Binding before, NativeSketchMembers385.Snapshot inputs, Action cancel)
+    static JsonElement FinalRelations(Binding before, NativeSketchMembers385.Snapshot inputs, Action cancel, out SketchMobilityReport mobility)
     {
         var sketch = before.Sketch; var owner = sketch.DbEntity.Document;
         Need(!sketch.IsInEditMode && owner != null && Key(owner.ID) == before.Inputs.Stored.GetProperty("owner_document_id").GetString() &&
@@ -95,7 +95,7 @@ internal static class NativeSketchConstraintRemoval430
         using var manager = owner.Get2dConstraintsManager(Constraint2dNetType.Auto, sketch.ID, plane);
         Need(manager != null && manager.DocumentId == owner.ID && manager.ConstraintsNetworkType.ToString() == before.Relations.GetProperty("network").GetString(),
             "CONSTRAINT_SCOPE_MISMATCH", "The final native relation manager is not the selected sketch's actual owner/network.");
-        var ids = manager.GetAllConstraints(); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The final selected-sketch relation inventory is unavailable, not observed empty.");
+        var ids = NativeSketchInventory.CompleteIds(manager, cancel, sketch); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The final selected-sketch relation inventory is unavailable, not observed empty.");
         ModelInventoryBudget.Ids(ids, cancel);
         bool allSelected = before.Relations.GetProperty("constraints").GetArrayLength() == before.Selected.Length;
         if (ids.Count == 0 && allSelected)
@@ -104,10 +104,12 @@ internal static class NativeSketchConstraintRemoval430
             // sketch. A different nonnull linkage is never an empty result.
             Need(manager.PlanarSketchId == sketch.ID || manager.PlanarSketchId.IsNull && manager.ScopeId.IsNull,
                 "CONSTRAINT_SCOPE_MISMATCH", "The empty native network is linked to another sketch or an unexplained scope.");
+            mobility = NativeSketchMobility.Plan(inputs, manager, ids, true, null, cancel);
             return NativeSketchConstraintState385.Relations(manager, cancel, inventory: ids);
         }
         NativeSketchMembers385.RequireManagerScope(manager, sketch, owner);
         Need(Key(manager.ScopeId) == before.NetworkScope, "CONSTRAINT_SCOPE_MISMATCH", "The retained native relation network changed identity.");
+        mobility = NativeSketchMobility.Plan(inputs, manager, ids, true, null, cancel);
         return NativeSketchRelations410.Capture(manager, inputs, cancel, ids).Relations;
     }
     static Binding Resolve(ModifyArguments args, DocumentState state, Db.Transaction tx, Action cancel)
@@ -127,7 +129,7 @@ internal static class NativeSketchConstraintRemoval430
         Need(used && (sketch.HostSolidID.IsNull || sketch.HostSolidID == body.ID), "SKETCH_OWNERSHIP_MISMATCH", "The selected sketch is not acquired or consumed by this part.");
         var inputs = NativeSketchMembers385.Capture(sketch, state, tx, cancel);
         Need(inputs.Token.Equals(edit.ExpectedBindingToken, StringComparison.Ordinal), "PRECONDITION_FAILED", "Refresh the selected sketch's native_inputs.binding_token.");
-        using var manager = NativeSketchMembers385.Manager(sketch); var ids = manager.GetAllConstraints(); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The current selected-sketch relation inventory is unavailable.");
+        using var manager = NativeSketchMembers385.Manager(sketch); var ids = NativeSketchInventory.CompleteIds(manager, cancel, sketch); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The current selected-sketch relation inventory is unavailable.");
         var selected = edit.ConstraintIds.Select(text => new McObjectId(Guid.Parse(text))).ToArray();
         Need(selected.All(ids.Contains), "PRECONDITION_FAILED", "One selected relation is not in this sketch's current native network.");
         var relations = NativeSketchRelations410.Capture(manager, inputs, cancel, ids).Relations;
@@ -195,7 +197,7 @@ internal static class NativeSketchConstraintRemoval430
                 {
                     job.CheckCancellation(); stage = "native_delete_constraint"; started = true;
                     log.Write(job.Operation, job.OriginalRequestId, "native_sketch_constraint_delete", transaction: Key(id), operationId: job.OperationId);
-                    bool accepted = manager.DeleteConstraint(id); var remaining = manager.GetAllConstraints();
+                    bool accepted = manager.DeleteConstraint(id); var remaining = NativeSketchInventory.CompleteIds(manager, job.CheckCancellation, before.Sketch);
                     Need(remaining != null && !remaining.Contains(id), "SKETCH_CONSTRAINT_DELETE_FAILED", "The native sketch manager retained a requested relation.", new { constraint_id = Key(id), native_accepted = accepted });
                 }
             }
@@ -206,13 +208,13 @@ internal static class NativeSketchConstraintRemoval430
             job.BeginCommit(); Close(); stage = "post_command_verification";
             return NativePostCommandVerification422.Defer(job, () =>
             {
-                Db.ObjectId raw; NativeSketchMembers385.Snapshot inputs; JsonElement relations;
+                Db.ObjectId raw; NativeSketchMembers385.Snapshot inputs; JsonElement relations; SketchMobilityReport mobility;
                 using (var tx = state.Document.Database.TransactionManager.StartTransaction())
                 {
                     raw = ModelHistoryEditGuard.CurrentRepresentation(before.Body, state, tx, job.CheckCancellation);
                     CadSolidEditor.CheckGeometry((Db.Solid3d)tx.GetObject(raw, Db.OpenMode.ForRead), job.CheckCancellation);
                     inputs = NativeSketchMembers385.Capture(before.Sketch, state, tx, job.CheckCancellation);
-                    relations = FinalRelations(before, inputs, job.CheckCancellation);
+                    relations = FinalRelations(before, inputs, job.CheckCancellation, out mobility);
                 }
                 var selected = before.Edit.ConstraintIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 Need(!relations.GetProperty("constraints").EnumerateArray().Any(row => selected.Contains(row.GetProperty("id").GetString()!)), "SKETCH_CONSTRAINT_DELETE_FAILED", "A selected native relation remains after command completion.");
@@ -226,7 +228,7 @@ internal static class NativeSketchConstraintRemoval430
                 var unresolved = ModelInventoryBudget.History(before.Body, job.CheckCancellation).Where(id => { var item = id.GetObjectOfType<HistoryItem>(); return item != null && !item.IsSuppressed && item.Status.ToString() != "Ok"; }).Select(Key).ToArray();
                 bool healthy = before.Body.Status.ToString() == "Ok" && unresolved.Length == 0;
                 var oldRef = new EntityRef(args.BridgeId, args.DocumentId, before.Edit.Handles.Single()); var current = new EntityRef(args.BridgeId, args.DocumentId, Validation.NormalizeHandle(raw.Handle.ToString())); bool replaced = oldRef.handle != current.handle;
-                var change = new ModelSketchConstraintDeletion430(Key(before.Sketch.ID), before.Edit.ConstraintIds, before.Retirable.Where(id => !byId.ContainsKey(id)).ToArray(), before.Retirable.Where(byId.ContainsKey).ToArray(), rebuild, healthy, unresolved);
+                var change = new ModelSketchConstraintDeletion430(Key(before.Sketch.ID), before.Edit.ConstraintIds, before.Retirable.Where(id => !byId.ContainsKey(id)).ToArray(), before.Retirable.Where(byId.ContainsKey).ToArray(), rebuild, healthy, unresolved, mobility);
                 var data = new ModelSketchConstraintRemovalOutput430(args.OperationId, "committed", false, [current], replaced ? [oldRef] : [], replaced ? [current] : [], [], "not_guaranteed", [change]);
                 var warnings = new List<string> { WriteRecovery.Warning, "NATIVE_SKETCH_RELATIONS_REMOVED: Selected relations are absent; retained sketch geometry, other relations, profile/feature/support identities and independent formulas were observed. Freed geometry can be changed by a subsequent supported edit." };
                 if (!healthy) warnings.Add("MODEL_NEEDS_CORRECTION: Selected relations were removed, but remaining history is not fully solved; inspect reported unresolved IDs before dependent changes.");

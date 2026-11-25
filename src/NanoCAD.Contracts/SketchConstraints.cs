@@ -26,6 +26,13 @@ public static class SketchConstraintsValidation
                 throw new DomainException("INVALID_ARGUMENT", "sketch_scope must be body_history or document.");
             documentScope = scope.GetString() == "document";
         }
-        return ModelVariablesValidation.Parse(Wire.Element(values)) with { ModelObjectId = id.ToString("B").ToUpperInvariant(), MeasureSmooth = measure, DocumentSketchScope = documentScope };
+        var proposed = values.Remove("proposed_constraints", out var candidates)
+            ? SketchConstraintValidation385.Parse(candidates, "proposed_constraints") : null;
+        var motion = SketchMotionInput.Read(values.Remove("preserve_motion", out var directions) ? directions : null, SketchMotionInput.NativeId);
+        return ModelVariablesValidation.Parse(Wire.Element(values)) with
+        {
+            ModelObjectId = id.ToString("B").ToUpperInvariant(), MeasureSmooth = measure,
+            DocumentSketchScope = documentScope, ProposedConstraints = proposed, PreserveMotion = motion
+        };
     }
 }

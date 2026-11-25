@@ -59,8 +59,36 @@ internal static class SketchConstraintsReader
                     actual_scope_id = manager.ScopeId.IsNull ? null : manager.ScopeId.ToString(),
                     actual_document_id = manager.DocumentId.IsNull ? null : manager.DocumentId.ToString()
                 });
-        var ids = manager.GetAllConstraints(); Budget();
-        if (ids == null) throw new DomainException("CONSTRAINTS_UNAVAILABLE", "Native constraint inventory is null; no empty-inventory claim is made.");
+        var inventory = NativeSketchInventory.Read(manager, sketch, Budget);
+        var ids = inventory.Ids;
+        SketchMobilityReport? mobility = null;
+        string? mobilityError = null;
+        object? proposalBinding = null;
+        if (args.ProposedConstraints is { Length: > 0 } proposed)
+        {
+            try
+            {
+                var inputs = NativeSketchMembers385.Capture(sketch, state, tx, Budget, manager, inventory.Ids);
+                var memberIds = inputs.Members.Select(m => m.Id.ToString()).ToHashSet(StringComparer.Ordinal);
+                bool match = proposed.SelectMany(s => new[] { s.First, s.Second, s.Third }.OfType<string>()).All(memberIds.Contains);
+                if (!match) throw new DomainException("SKETCH_BINDING_UNAVAILABLE", "At least one operand has no exact native edit binding in this sketch.");
+                NativeSketchMembers385.ValidateInputs(proposed, inputs);
+                mobility = NativeSketchMobility.Plan(inputs, manager, inventory.Ids, inventory.Complete, proposed, Budget, preserve: args.PreserveMotion);
+                proposalBinding = new { editable = inventory.Complete, reason = inventory.Complete ? null : inventory.Reason };
+            }
+            catch (DomainException error) when (error.Error.code is not ("RESPONSE_LIMIT_EXCEEDED" or "INVALID_ARGUMENT"))
+            { proposalBinding = new { editable = false, reason = error.Message }; }
+            catch (Teigha.Runtime.Exception error)
+            { proposalBinding = new { editable = false, reason = error.Message }; }
+        }
+        try { mobility ??= NativeSketchMobilityReader.Read(sketch, manager, inventory, args.ProposedConstraints, args.PreserveMotion, Budget); }
+        catch (DomainException error) when (error.Error.code is not ("RESPONSE_LIMIT_EXCEEDED" or "INVALID_ARGUMENT")) { mobilityError = error.Message; }
+        catch (Teigha.Runtime.Exception error) { mobilityError = error.Message; }
+        bool? nativeFullyConstrained = null;
+        try { nativeFullyConstrained = sketch.IsFullyConstrained(); }
+        catch (Exception error) when (error is Teigha.Runtime.Exception or NotSupportedException or NotImplementedException or System.Runtime.InteropServices.COMException) { }
+        string agreement = nativeFullyConstrained is bool flag && mobility?.remaining_dof is int currentDof
+            ? (flag == (currentDof == 0) ? "agrees" : "differs") : "unavailable";
         string? Id(Multicad.McObjectId id) => id.IsNull ? null : id.ToString();
         object? Reference(Multicad.DatabaseServices.Constraints.IConstraintObjectInfo? info)
         {
@@ -84,6 +112,7 @@ internal static class SketchConstraintsReader
         foreach (var id in ids)
         {
             Budget(); using var info = manager.GetConstraintInfo(id);
+            if (info == null && !inventory.Complete) continue;
             if (info == null) throw new DomainException("CONSTRAINTS_UNAVAILABLE", "Constraint details are unavailable.");
             if (smooth != null && info.Type == ConstraintType.GeomSmooth)
             {
@@ -132,6 +161,15 @@ internal static class SketchConstraintsReader
             identity_scope = "bridge_document_revision",
             reference_coordinate_system = "native_constraint_reference",
             solver_status = "not_evaluated",
+            constraints_complete = inventory.Complete,
+            native_fully_constrained = nativeFullyConstrained,
+            native_mobility_agreement = agreement,
+            inventory_source = inventory.Source,
+            inventory_routes = inventory.Routes,
+            proposal_binding = proposalBinding,
+            inventory_unavailable_reason = inventory.Reason,
+            mobility,
+            mobility_unavailable_reason = mobilityError,
             constraints,
             smooth_measurements = smooth,
             presentation = SketchVisibilityState436.Observe(body, sketch, Budget)

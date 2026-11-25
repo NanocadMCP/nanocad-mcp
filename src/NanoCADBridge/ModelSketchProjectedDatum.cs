@@ -45,7 +45,7 @@ internal static class ModelSketchProjectedDatum
             try
             {
                 using var manager = NativeSketchMembers385.Manager(sketch);
-                var ids = manager.GetAllConstraints();
+                var ids = NativeSketchInventory.CompleteIds(manager, cancel, sketch);
                 if (ids == null) continue;
                 var byId = ids.GroupBy(v => v.ToString(), StringComparer.OrdinalIgnoreCase).Where(g => g.Count() == 1)
                     .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);

@@ -22,8 +22,35 @@ internal static class DrawingProfileSchema
                 op["description"]=op["description"]!.GetValue<string>()+" An existing ordinary ACAD radius/diameter on one Circle can also drive its one retained native part with distinct selected Circle profiles and typed sweep consumers sharing one sketch. Select that source Circle and its exact current constraint/expression/value. Create source constraints before consumption; this route does not add or edit internal PlanarSketch constraints. Native projections and consumed profile selections update through the same part rebuild, without Clear/reselection/body recreation. Peer Circle centers/radii, actual profile/sweep/ordered Line-path IDs, native taper drivers/formulas, feature order/dependencies and readable owned metadata remain protected; returned retained_sweep_parts exposes their actual current bindings and radii. The initial shared-sketch scope uses projected Circle profiles, existing extrusion/sweep construction, resident drawing Line paths and healthy associative views; other downstream feature types need their source-edit adapter. Unknown private constraint/association internals remain explicitly unobserved. Refresh actual history/source dimensions after the edit and inspect the useful resulting shape.";
             if(op["properties"]!["operation"]!["const"]!.GetValue<string>()=="add_drawing_constraints")
                 op["description"]=op["description"]!.GetValue<string>()+" fix anchors one complete Line/Circle/Arc/Polyline, including its size; omit point selectors. fix_point anchors only the selected endpoint/center. symmetric retains two exact Lines or two exact Circles mirrored about the separate Line handle in third; it creates a persistent geometric relation, not mirrored copies. Include all three source handles. Attach these relations only when the current shape already satisfies the intended relation; adding incompatible or redundant anchors is not a way to repair geometry. Existing anchors are checked on later dimensional edits. Optional first_segment_index/second_segment_index/third_segment_index address actual straight or arc segments of retained native lightweight Polylines. Point names follow the original Polyline traversal, including clockwise arcs; dimensions and formulas use the same real ACAD controls. Selected parents retain their handle, normal, elevation, topology and widths. No Polyline-to-3D consuming-profile adapter is implied.";
+            if (op["properties"]!["operation"]!["const"]!.GetValue<string>() == "add_drawing_constraints")
+            {
+                op["properties"]!["preserve_motion"] = NativeSketchSchema385.PreserveMotion();
+                op["properties"]!["require_verified_constraints"] = NativeSketchSchema385.RequireVerified();
+            }
             yield return op;
         }
+    }
+    internal static JsonObject Relations()
+    {
+        var specs=new JsonArray(
+            Object(new(){["kind"]=Kinds("horizontal","vertical"),["first"]=Handle()}),
+            Object(new(){["kind"]=Kinds("fix"),["first"]=Handle()}),
+            Object(new(){["kind"]=Kinds("symmetric"),["first"]=Handle(),["second"]=Handle(),["third"]=Handle()}),
+            Object(new(){["kind"]=Kinds("parallel","perpendicular","equal","concentric","collinear","tangent"),["first"]=Handle(),["second"]=Handle()}),
+            Object(new(){["kind"]=Kinds("coincident"),["first"]=Handle(),["second"]=Handle(),["first_point"]=Point(),["second_point"]=Point()}),
+            Object(new(){["kind"]=Kinds("smooth"),["first"]=Handle(),["second"]=Handle(),["first_point"]=Kinds("start","end"),["second_point"]=Kinds("start","end")}),
+            Object(new(){["kind"]=Kinds("fix_point"),["first"]=Handle(),["first_point"]=Point()}),
+            Object(new(){["kind"]=Kinds("radius","diameter","length"),["first"]=Handle(),["value"]=Size()}),
+            Object(new(){["kind"]=Kinds("angle"),["first"]=Handle(),["second"]=Handle(),["value"]=new JsonObject{["type"]="number",["minimum"]=DrawingAngularGeometry.MinimumDegrees,["maximum"]=DrawingAngularGeometry.MaximumDegrees}}),
+            Object(new(){["kind"]=Kinds("distance","distance_x","distance_y"),["first"]=Handle(),["second"]=Handle(),["first_point"]=Point(),["second_point"]=Point(),["value"]=Size()}));
+        foreach(var spec in specs.OfType<JsonObject>())
+        {
+            var properties=spec["properties"]!.AsObject();
+            if(properties["kind"]!["enum"]!.AsArray().Any(value=>value!.GetValue<string>()=="fix"))continue;
+            foreach(string role in new[]{"first","second","third"})if(properties.ContainsKey(role))
+                properties[role+"_segment_index"]=new JsonObject{["type"]="integer",["minimum"]=0,["description"]="Optional exact zero-based segment of this retained native Polyline; omit for an ordinary Line/Circle/Arc. Read current vertex order; no explosion or tessellation."};
+        }
+        return new JsonObject{["type"]="array",["minItems"]=1,["items"]=new JsonObject{["oneOf"]=specs}};
     }
     private static IEnumerable<JsonObject> CoreOperations()
     {
@@ -62,25 +89,7 @@ internal static class DrawingProfileSchema
             }
             if(action=="add_drawing_constraints")
             {
-                var specs=new JsonArray(
-                    Object(new(){["kind"]=Kinds("horizontal","vertical"),["first"]=Handle()}),
-                    Object(new(){["kind"]=Kinds("fix"),["first"]=Handle()}),
-                    Object(new(){["kind"]=Kinds("symmetric"),["first"]=Handle(),["second"]=Handle(),["third"]=Handle()}),
-                    Object(new(){["kind"]=Kinds("parallel","perpendicular","equal","concentric","collinear","tangent"),["first"]=Handle(),["second"]=Handle()}),
-                    Object(new(){["kind"]=Kinds("coincident"),["first"]=Handle(),["second"]=Handle(),["first_point"]=Point(),["second_point"]=Point()}),
-                    Object(new(){["kind"]=Kinds("smooth"),["first"]=Handle(),["second"]=Handle(),["first_point"]=Kinds("start","end"),["second_point"]=Kinds("start","end")}),
-                    Object(new(){["kind"]=Kinds("fix_point"),["first"]=Handle(),["first_point"]=Point()}),
-                    Object(new(){["kind"]=Kinds("radius","diameter","length"),["first"]=Handle(),["value"]=Size()}),
-                    Object(new(){["kind"]=Kinds("angle"),["first"]=Handle(),["second"]=Handle(),["value"]=new JsonObject{["type"]="number",["minimum"]=DrawingAngularGeometry.MinimumDegrees,["maximum"]=DrawingAngularGeometry.MaximumDegrees}}),
-                    Object(new(){["kind"]=Kinds("distance","distance_x","distance_y"),["first"]=Handle(),["second"]=Handle(),["first_point"]=Point(),["second_point"]=Point(),["value"]=Size()}));
-                foreach(var spec in specs.OfType<JsonObject>())
-                {
-                    var properties=spec["properties"]!.AsObject();
-                    if(properties["kind"]!["enum"]!.AsArray().Any(value=>value!.GetValue<string>()=="fix"))continue;
-                    foreach(string role in new[]{"first","second","third"})if(properties.ContainsKey(role))
-                        properties[role+"_segment_index"]=new JsonObject{["type"]="integer",["minimum"]=0,["description"]="Optional exact zero-based segment of this retained native Polyline; omit for an ordinary Line/Circle/Arc. Read current vertex order; no explosion or tessellation."};
-                }
-                fields["constraints"]=new JsonObject{["type"]="array",["minItems"]=1,["items"]=new JsonObject{["oneOf"]=specs}};
+                fields["constraints"]=Relations();
             }
             else if(action=="set_drawing_dimension")
             {

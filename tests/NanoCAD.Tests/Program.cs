@@ -59,6 +59,7 @@ await CountCapacity357Tests.Run(Test);
 await PublishedDiscriminator412Tests.Run(Test);
 await ModelSketchSelection412Tests.Run(Test);
 await NativeSmooth445Tests.Run(Test);
+await SketchMobilityTests.Run(Test);
 await SplineConstraint445Tests.Run(Test);
 await NativeSketchCurves445Tests.Run(Test);
 await ProfileConsumers446Tests.Run(Test);

@@ -6,12 +6,17 @@ public sealed record NativeSketchPrimitive385(string Key,string Kind,Point3[] Po
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] NativeSketchSpline445? Spline=null,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] NativeSketchEllipse445? Ellipse=null);
 public sealed record NativeSketchInitialization385(NativeSketchPrimitive385[] Geometry,SketchConstraintSpec[] Constraints,
-    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string[]? ReferenceIds=null);
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string[]? ReferenceIds=null)
+{
+    public SketchMobilityMotion[]? PreserveMotion { get; init; }
+    public bool RequireVerifiedConstraints { get; init; }
+}
 public sealed record NativeSketchMember385(string member_id,string object_id,string native_type,int? segment_index,
     JsonElement geometry,bool independently_owned,string? unavailable_reason,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool reference_only=false);
 public sealed record NativeSketchBindings385(bool complete,string? unavailable_reason,string binding_token,NativeSketchMember385[] members,
-    string identity_scope,string scope);
+    string identity_scope,string scope,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility=null);
 public sealed record NativeSketchCreated385(string key,string object_id,string[] member_ids);
 
 public static class NativeSketchValidation385
@@ -19,7 +24,7 @@ public static class NativeSketchValidation385
     static DomainException Invalid(string path,string message)=>new("INVALID_ARGUMENT",message,false,new{path});
     static string Text(JsonElement value,string field,string path)
     {if(!value.TryGetProperty(field,out var v)||v.ValueKind!=JsonValueKind.String||string.IsNullOrWhiteSpace(v.GetString()))throw Invalid(path+"."+field,"Expected a nonempty string.");return v.GetString()!;}
-    public static NativeSketchInitialization385 Parse(JsonElement value,JsonElement constraints,SketchPlaneSpec? plane,string path,string[]? referenceIds=null)
+    public static NativeSketchInitialization385 Parse(JsonElement value,JsonElement constraints,SketchPlaneSpec? plane,string path,string[]? referenceIds=null, JsonElement? preserveMotion=null, bool requireVerifiedConstraints=false)
     {
         if(value.ValueKind!=JsonValueKind.Array||value.GetArrayLength()==0)throw Invalid(path,"Supply native sketch geometry.");
         var result=new List<NativeSketchPrimitive385>();var keys=new HashSet<string>(StringComparer.Ordinal);
@@ -72,8 +77,43 @@ public static class NativeSketchValidation385
                 throw Invalid(path,"At least one initial relation operand must be own native_geometry; projected references are not driven directly.");
             if(!distinct.Add(SketchConstraintValidation385.BindingKey(spec)))throw Invalid(path,"Duplicate initial relation binding after native reference normalization; keep one control for each binding.");
         }
-        return new(result.ToArray(),specs,referenceIds==null?null:references.ToArray());
+        var initialization = new NativeSketchInitialization385(result.ToArray(), specs, referenceIds == null ? null : references.ToArray())
+        {
+            RequireVerifiedConstraints = requireVerifiedConstraints, PreserveMotion = SketchMotionInput.Read(preserveMotion, Operand)
+        };
+        if (plane != null) CheckInitialPlan(initialization, plane, path);
+        return initialization;
     }
+    // Use the input keys and the declared or observed plane before creating host geometry.
+    // Projected members become measurable only when the host supplies their actual geometry.
+    private static void CheckInitialPlan(NativeSketchInitialization385 input, SketchPlaneSpec plane, string path)
+    {
+        if (input.Constraints.Length == 0 && input.PreserveMotion is not { Length: > 0 }) return;
+        SketchConstraintCurve LocalCurve(NativeSketchPrimitive385 row)
+        {
+            Point2 Point(int i) => DrawingWorkplane.Local(plane, row.Points[i]);
+            if (row.Kind == "arc")
+            {
+                var arc = NativeSketchArcGeometry390.Curve(row.Points, plane, path + "." + row.Key);
+                return arc with { Id = row.Key, Start = Point(0), End = Point(2) };
+            }
+            return row.Kind switch
+            {
+                "line" => new(row.Key, row.Kind, Start: Point(0), End: Point(1)),
+                "circle" => new(row.Key, row.Kind, Center: Point(0), Radius: row.Radius!.Value),
+                _ => new(row.Key, row.Kind)
+            };
+        }
+        var requests = input.Constraints.Select(spec => spec.Kind == "angle"
+            ? spec with { Value = spec.Value * (180 / Math.PI) } : spec).ToArray();
+        var curves = input.Geometry.Select(LocalCurve).ToArray();
+        // Unknown external geometry remains an unknown operand in its component.
+        // Explicit motion involving an external reference is checked against its actual frame by the bridge.
+        var sketchPlan = SketchMobility.Plan(curves, Array.Empty<SketchMobilityRelation>(), requests,
+            fixedGeometry: input.ReferenceIds, preserve: input.ReferenceIds is { Length: > 0 } ? null : input.PreserveMotion);
+        sketchPlan.EffectiveCandidates(requests, input.RequireVerifiedConstraints && input.ReferenceIds is not { Length: > 0 });
+    }
+
     // Supported requests have no guessed plane in the normalized contract.
     // Validate their geometry against the observed native support before any
     // setter, and again against the actual sketch frame before initialization.
@@ -85,6 +125,7 @@ public static class NativeSketchValidation385
             if(row.Kind=="arc")NativeSketchArcGeometry390.Curve(row.Points,plane,path+"."+row.Key);
             if(row.Kind is "spline" or "ellipse")NativeSketchCurveValidation445.RequirePlane(row,plane,path+"."+row.Key);
         }
+        CheckInitialPlan(value, plane, path);
     }
 }
 

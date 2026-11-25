@@ -12,5 +12,10 @@ public static class ModelSketchConstraintRemovalSchema430
         op["description"]="Remove selected existing internal native sketch relations through their actual sketch constraint manager. Read current relation IDs and native_inputs.binding_token; never infer constraint IDs from labels or drawing dimensions. Removes the selected geometric/dimensional controls, not their sketch geometry, profile or forming operations. Existing independent source drawing constraints use their own adapter. Native-owned control variables can retire only within the observed exclusive scope; user variables and other formulas remain protected. All selected relations on the sketch share one request. Rebuild is attempted and actual model health/unresolved IDs are returned; deleting a conflict does not promise that every remaining construction is solved. Undo/rollback is not guaranteed and is only a recovery warning.";
         return op;
     }
-    public static JsonObject Change()=>Object(new(){["sketch_id"]=Id(),["deleted_constraint_ids"]=Ids(),["retired_control_variable_ids"]=Ids(),["retained_control_variable_ids"]=Ids(),["native_rebuild_accepted"]=new JsonObject{["type"]="boolean"},["model_healthy"]=new JsonObject{["type"]="boolean"},["unresolved_history_ids"]=Ids()});
+    public static JsonObject Change()
+    {
+        var data = Object(new(){["sketch_id"]=Id(),["deleted_constraint_ids"]=Ids(),["retired_control_variable_ids"]=Ids(),["retained_control_variable_ids"]=Ids(),["native_rebuild_accepted"]=new JsonObject{["type"]="boolean"},["model_healthy"]=new JsonObject{["type"]="boolean"},["unresolved_history_ids"]=Ids()});
+        data["properties"]!["mobility_after"] = OutputSchemas.Mobility();
+        return data;
+    }
 }

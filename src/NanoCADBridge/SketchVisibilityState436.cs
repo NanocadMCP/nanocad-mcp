@@ -40,7 +40,7 @@ internal static class SketchVisibilityState436
         {
             using var manager=NativeSketchMembers385.Manager(sketch);
             scope=new{document_id=Id(manager.DocumentId),scope_id=Id(manager.ScopeId),sketch_id=Id(manager.PlanarSketchId),network=manager.ConstraintsNetworkType.ToString()};
-            var ids=manager.GetAllConstraints();Need(ids!=null,"CONSTRAINTS_UNAVAILABLE","The native relation inventory is unavailable.");
+            var ids=NativeSketchInventory.CompleteIds(manager,cancel,sketch);Need(ids!=null,"CONSTRAINTS_UNAVAILABLE","The native relation inventory is unavailable.");
             foreach(var id in ids.OrderBy(Key,StringComparer.OrdinalIgnoreCase))
             {
                 cancel();using var info=manager.GetConstraintInfo(id);

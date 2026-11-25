@@ -89,12 +89,14 @@ internal static class ModelSketchGeometryBindingsReader365
             Need(manager.DocumentId == owner.ID && manager.PlanarSketchId == sketch.ID && !manager.ScopeId.IsNull,
                 "Actual readonly constraint manager differs from the selected owner/sketch scope.");
             Need(constraints.GetProperty("document_id").GetString() == Key(owner.ID) && constraints.GetProperty("sketch_id").GetString() == Key(sketch.ID) &&
-                constraints.GetProperty("scope_id").GetString() == Key(manager.ScopeId) && constraints.GetProperty("network").GetString() == scope.network && constraints.GetProperty("constraints_complete").GetBoolean(),
-                "The retained native constraint inventory is unavailable or has a different actual scope.");
-            var inventory = constraints.GetProperty("constraints").EnumerateArray().ToDictionary(value => value.GetProperty("id").GetString()!, StringComparer.OrdinalIgnoreCase);
+                constraints.GetProperty("scope_id").GetString() == Key(manager.ScopeId) && constraints.GetProperty("network").GetString() == scope.network,
+                "The retained constraint observation belongs to a different native scope.");
+            var retained = constraints.GetProperty("constraints");
+            var inventory = (retained.ValueKind == JsonValueKind.Array ? retained.EnumerateArray().ToArray() : [])
+                .ToDictionary(value => value.GetProperty("id").GetString()!, StringComparer.OrdinalIgnoreCase);
             var map = manager.GetAllObjectsToConstraints(); cancel(); Need(map != null, "Native solver object-to-constraint map returned null; no empty-map claim.");
             var values = new List<ModelSketchSolverMember365>(); var mappedConstraints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var memberConstraints = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); bool complete = true;
+            var memberConstraints = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase); bool complete = constraints.GetProperty("constraints_complete").GetBoolean();
             foreach (var pair in map.OrderBy(pair => Key(pair.Key), StringComparer.OrdinalIgnoreCase))
             {
                 cancel(); Need(!pair.Key.IsNull && pair.Value != null, "Native solver mapping contains a null object or unavailable constraint list.");

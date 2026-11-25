@@ -12,6 +12,20 @@ internal static class NativeSketchSchema385
     static JsonObject Nullable(JsonObject value)=>new(){["anyOf"]=new JsonArray(value,new JsonObject{["type"]="null"})};
     static JsonObject Any()=>new(){["type"]="object",["additionalProperties"]=true};
     static JsonObject Vector()=>new(){["type"]="array",["minItems"]=3,["maxItems"]=3,["items"]=new JsonObject{["type"]="number",["minimum"]=-1e6,["maximum"]=1e6}};
+    internal static JsonObject RequireVerified() => new()
+    {
+        ["type"] = "boolean",
+        ["description"] = "Set true for automatic selection. The entire group requires proven independence for each new driving condition. A geometric relation already proved redundant can be omitted."
+    };
+    internal static JsonObject PreserveMotion() => new()
+    {
+        ["type"] = "array",
+        ["description"] = "Optional in-plane translations that must remain possible. Give a name, the moving members and their nonzero direction. Use drawing handles, retained sketch member IDs or initial geometry keys according to the operation. Unlisted members stay still during this specified motion.",
+        ["items"] = Object(new() { ["name"] = Text(), ["object_ids"] = Array(Text(), 1),
+            ["dx"] = new JsonObject { ["type"] = "number" }, ["dy"] = new JsonObject { ["type"] = "number" } },
+            "name", "object_ids", "dx", "dy")
+    };
+
     internal static JsonObject Constraint(bool nativeIds=true)
     {
         JsonObject Member()=>nativeIds?Id():new(){["type"]="string",["minLength"]=1,["maxLength"]=64};
@@ -40,7 +54,7 @@ internal static class NativeSketchSchema385
             :"Initial first/second/third operands are own native_geometry keys from this request. fix fixes one complete owned Line/Circle/Arc without point selectors. symmetric relates two Lines or two Circles about a separate actual Line supplied as third. Point selectors use actual start/end/center geometry in the observed native sketch frame; linear controls millimeters and angles radians.";
         return value;
     }
-    internal static JsonObject Read()=>Object(new(){["complete"]=new JsonObject{["type"]="boolean"},["unavailable_reason"]=Nullable(Text()),["binding_token"]=Text(),["members"]=Array(Object(new(){["member_id"]=Id(),["object_id"]=Id(),["native_type"]=Text(),["segment_index"]=Nullable(new JsonObject{["type"]="integer",["minimum"]=0}),["geometry"]=Any(),["independently_owned"]=new JsonObject{["type"]="boolean"},["reference_only"]=new JsonObject{["type"]="boolean",["default"]=false,["description"]="True for a proved immutable same-sketch native projection operand. At least one relation operand must be independently owned; reference geometry/source are retained, never directly driven or rewritten by the internal solver."},["unavailable_reason"]=Nullable(Text())},"member_id","object_id","native_type","segment_index","geometry","independently_owned","unavailable_reason")),["identity_scope"]=Text(),["scope"]=Text()},"complete","unavailable_reason","binding_token","members","identity_scope","scope");
+    internal static JsonObject Read()=>Object(new(){["mobility"]=OutputSchemas.Mobility(),["complete"]=new JsonObject{["type"]="boolean"},["unavailable_reason"]=Nullable(Text()),["binding_token"]=Text(),["members"]=Array(Object(new(){["member_id"]=Id(),["object_id"]=Id(),["native_type"]=Text(),["segment_index"]=Nullable(new JsonObject{["type"]="integer",["minimum"]=0}),["geometry"]=Any(),["independently_owned"]=new JsonObject{["type"]="boolean"},["reference_only"]=new JsonObject{["type"]="boolean",["default"]=false,["description"]="True for a proved immutable same-sketch native projection operand. At least one relation operand must be independently owned; reference geometry/source are retained, never directly driven or rewritten by the internal solver."},["unavailable_reason"]=Nullable(Text())},"member_id","object_id","native_type","segment_index","geometry","independently_owned","unavailable_reason")),["identity_scope"]=Text(),["scope"]=Text()},"complete","unavailable_reason","binding_token","members","identity_scope","scope");
     internal static JsonObject Created()=>Array(Object(new(){["key"]=Text(),["object_id"]=Id(),["member_ids"]=Array(Id(),1)},"key","object_id","member_ids"));
     internal static JsonObject Changes()
     {

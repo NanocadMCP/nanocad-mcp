@@ -243,6 +243,24 @@ internal static class SchemaCompactor
         schema["description"] = $"Full field definitions and supported cases: get_guidance(topic=schema, operation={operation}).";
         switch (operation)
         {
+            case "inspect_sketch_constraints":
+            case "inspect_constraints":
+                // Share the compact call-site vocabulary. Focused guidance and the
+                // structured client retain the per-kind operand and unit validation.
+                var proposed = properties["proposed_constraints"]!;
+                bool drawing = operation == "inspect_constraints";
+                var relation = new JsonObject();
+                foreach (string name in new[] { "kind", "first", "second", "third", "first_point", "second_point" })
+                    relation[name] = new JsonObject { ["type"] = "string" };
+                relation["value"] = new JsonObject { ["type"] = "number" };
+                if (drawing)
+                    foreach (string role in new[] { "first", "second", "third" })
+                        relation[role + "_segment_index"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 };
+                proposed["items"] = new JsonObject { ["type"] = "object", ["properties"] = relation,
+                    ["required"] = new JsonArray("kind", "first"), ["additionalProperties"] = false };
+                Hint("proposed_constraints", drawing ? "Drawing handles, angles in degrees." : "Native sketch member IDs, angles in radians.");
+                Hint("preserve_motion", "Members moving together along the given sketch-plane direction.");
+                break;
             case "inspect_model_history":
                 Hint("include_downstream_history", "Include direct and indirect consumers inside the part for the selected native history ID.");
                 Hint("history_focus", "One part. Request its issues or a current feature ID and its dependencies, consumers and controls.");

@@ -18,6 +18,7 @@ internal static class NativeSketchConstraintState385
         JsonElement Relations, JsonElement Protected, ModelSketchConstraintMetadata379.Binding[] Storage, string Token, McObjectId[] GraphRoots, HashSet<string> Affected,
         NativeBodyTransparency445.Witness? BodyTransparency = null)
     {
+        internal SketchMobilityReport? MobilityPlan { get; init; }
         internal ModelSketchProjectedDatum.Datum[] ProjectedDatums { get; init; } = [];
     }
     internal sealed record Control(Snapshot State, McObjectId Constraint, McObjectId Variable, string Kind, double Value, string Expression, McObjectId Member, JsonElement VariableState,
@@ -27,7 +28,7 @@ internal static class NativeSketchConstraintState385
     internal static bool Same(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
     internal static JsonElement Relations(Constraints2D manager, Action cancel, Action<McObjectId, ConstraintInfo>? observed = null, IEnumerable<McObjectId>? inventory = null)
     {
-        var ids = inventory ?? manager.GetAllConstraints(); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The actual constraint inventory is unavailable, not observed empty."); ModelInventoryBudget.Ids(ids, cancel); var rows = new List<object>(); var budget = new ModelInventoryBudget(cancel);
+        var ids = inventory ?? NativeSketchInventory.CompleteIds(manager, cancel); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The actual constraint inventory is unavailable, not observed empty."); ModelInventoryBudget.Ids(ids, cancel); var rows = new List<object>(); var budget = new ModelInventoryBudget(cancel);
         object? Ref(IConstraintObjectInfo? r)
         { if (r == null || r.ObjectId.IsNull) return null; var p = r.PointRefOnObject; return new { object_id = Key(r.ObjectId), subentity_id = r.SubentId.IsNull ? null : r.SubentId.ToString(), subentity_type = r.SubentId.IsNull ? null : ConstraintInfo.GetSubentSubType(r.SubentId).ToString(), segment = r.PolylineSegmentIndex, point = double.IsFinite(p.X) && double.IsFinite(p.Y) && double.IsFinite(p.Z) ? new[] { p.X, p.Y, p.Z } : null, point_coordinate_basis = "native_reference_frame_unspecified" }; }
         foreach (var id in ids.OrderBy(Key, StringComparer.OrdinalIgnoreCase))
@@ -45,7 +46,7 @@ internal static class NativeSketchConstraintState385
         preserved["nodes"] = JsonNode.Parse(ModelDependencyGraph410.Nodes(part.Preserved.GetProperty("nodes"), part.Contents, cancel).GetRawText());
         part = part with { Preserved = Wire.Element(preserved) };
         using var manager = NativeSketchMembers385.Manager(sketch.Sketch);
-        var inventory = manager.GetAllConstraints() ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "The actual constraint inventory is unavailable, not observed empty.");
+        var inventory = NativeSketchInventory.CompleteIds(manager, cancel, sketch.Sketch) ?? throw new DomainException("CONSTRAINTS_UNAVAILABLE", "The actual constraint inventory is unavailable, not observed empty.");
         var inputs = NativeSketchMembers385.Capture(sketch.Sketch, state, tx, cancel, manager, inventory);
         Need(inputs.Members.Any(m => m.Owned) && inputs.Members.All(m => m.Owned || m.ReferenceOnly), "OUT_OF_SCOPE", "Native solver motion requires owned internal inputs; same-sketch projections can participate only as immutable references.");
         // A line control can drive another sketch in the same captured part.
@@ -73,7 +74,7 @@ internal static class NativeSketchConstraintState385
     }
     static void Shape(JsonNode? value, Action cancel)
     { if (value != null) NativeSketchGeometry385.Motion(value, cancel); }
-    internal static JsonElement Protected(ModelFeatureReorderState345.Snapshot part, ModelSketchLifecycleReader362.Snapshot sketch, NativeSketchMembers385.Snapshot inputs, string[] newVariables, string? selectedVariable, Action cancel, string[]? newObjects = null, IReadOnlySet<string>? affected = null, IReadOnlySet<string>? stationaryRoots = null)
+    internal static JsonElement Protected(ModelFeatureReorderState345.Snapshot part, ModelSketchLifecycleReader362.Snapshot sketch, NativeSketchMembers385.Snapshot inputs, string[] newVariables, string? selectedVariable, Action cancel, string[]? newObjects = null, IReadOnlySet<string>? affected = null, IReadOnlySet<string>? stationaryRoots = null, NativeSketchClosedProfile.Comparison? boundaries = null)
     {
         string selected = Key(sketch.Sketch.ID); var profiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var stationary = stationaryRoots ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase) { selected };
@@ -90,6 +91,7 @@ internal static class NativeSketchConstraintState385
         {
             cancel(); if (!Same(profile!["parent_sketch_id"]!.GetValue<string>(), selected)) continue; profiles.Add(profile["profile_id"]!.GetValue<string>());
             Shape(profile["geometry"], cancel); Shape(profile["profile_geometry"], cancel); profile.AsObject().Remove("constraint_observation");
+            NativeSketchClosedProfile.Normalize(profile["profile_geometry"], boundaries, profile["profile_id"]!.GetValue<string>(), false, cancel);
         }
         foreach (var row in root["sketches"]!.AsArray())
         { cancel(); if (!Same(row!["id"]!.GetValue<string>(), selected)) continue; Shape(row["geometry"], cancel); if (row["retained"] is JsonObject retained) Shape(retained["geometry"], cancel); }
@@ -102,7 +104,11 @@ internal static class NativeSketchConstraintState385
         // their real headers, properties, metadata, ownership and selected-loop
         // topology while allowing the same intended solver motion.
         foreach (var row in own["profiles"]!.AsArray())
-        { cancel(); var profile = row!["state"]!.AsObject(); Shape(profile["geometry"], cancel); Shape(profile["selected_profile_geometry"], cancel); profile.Remove("constraints"); }
+        {
+            cancel(); var profile = row!["state"]!.AsObject();
+            Shape(profile["geometry"], cancel); Shape(profile["selected_profile_geometry"], cancel); profile.Remove("constraints");
+            NativeSketchClosedProfile.Normalize(profile["selected_profile_geometry"], boundaries, row["profile_id"]!.GetValue<string>(), true, cancel);
+        }
         var members = JsonNode.Parse(inputs.Stored.GetRawText())!.AsObject();
         foreach (var member in members["members"]!.AsArray())
         { cancel(); string id = member!["member_id"]!.GetValue<string>(); if (inputs.Members.Any(m => Key(m.Id) == id && m.Owned)) Shape(member, cancel); }
@@ -131,7 +137,7 @@ internal static class NativeSketchConstraintState385
     }
     internal static Control ControlOf(Snapshot state, string constraintId, Action cancel)
     {
-        using var manager = NativeSketchMembers385.Manager(state.Sketch.Sketch); var ids = manager.GetAllConstraints(); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The existing relation inventory is unavailable."); var matches = ids.Where(id => Same(Key(id), constraintId)).ToArray(); Need(matches.Length == 1, "CONSTRAINT_SCOPE_MISMATCH", "Read one exact current dimensional relation ID.");
+        using var manager = NativeSketchMembers385.Manager(state.Sketch.Sketch); var ids = NativeSketchInventory.CompleteIds(manager, cancel, state.Sketch.Sketch); Need(ids != null, "CONSTRAINTS_UNAVAILABLE", "The existing relation inventory is unavailable."); var matches = ids.Where(id => Same(Key(id), constraintId)).ToArray(); Need(matches.Length == 1, "CONSTRAINT_SCOPE_MISMATCH", "Read one exact current dimensional relation ID.");
         var id = matches[0]; using var info = manager.GetConstraintInfo(id); Need(info != null && info.IsDimensional, "OUT_OF_SCOPE", "The selected relation is not dimensional.");
         var binding = NativeSketchDimensionBinding411.Prove(manager, id, info, state.Inputs, cancel); string kind = binding.Kind; var references = binding.References;
         var parameterVariable = manager.GetConstraintParamId(id); double parameterValue = manager.GetConstraintParamValue(id); var variable = info.VarId; double value = info.Param;

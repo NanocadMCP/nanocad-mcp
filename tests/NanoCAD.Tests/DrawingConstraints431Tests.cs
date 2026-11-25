@@ -82,5 +82,22 @@ internal static class DrawingConstraints431Tests
             if(DrawingConstraintOperands431.Canonical(span,sources).Kind!="distance")throw new Exception("Across-corner distance was incorrectly converted to one segment length.");
             return Task.CompletedTask;
         });
+        await test("drawing mobility recognizes a shared vertex without changing its tangent segment",()=>{
+            var polyline=new SketchConstraintCurve("A","polyline",Polyline:new(false,
+                [new(new(0,0),0,0,0),new(new(10,0),0,0,0),new(new(10,5),0,0,0)]));
+            var curves=new Dictionary<string,SketchConstraintCurve>{{polyline.Id,polyline}};
+            var fixedEnd=new SketchConstraintSpec("fix_point","A",null,"end",null,null,FirstSegmentIndex:0);
+            var fixedStart=fixedEnd with{FirstSegmentIndex=1,FirstPoint="start"};
+            var end=DrawingConstraintOperands431.ForMobility(fixedEnd,curves);
+            if(end!=fixedStart)throw new Exception("Adjacent polylines did not agree on their shared native vertex.");
+            var last=fixedEnd with{FirstSegmentIndex=1};
+            if(DrawingConstraintOperands431.ForMobility(last,curves)!=last)throw new Exception("Open polyline's last vertex acquired a nonexistent following segment.");
+            var smooth=new SketchConstraintSpec("smooth","A","B","end","start",null,FirstSegmentIndex:0);
+            if(DrawingConstraintOperands431.ForMobility(smooth,curves)!=smooth)throw new Exception("A tangent was transferred across a corner.");
+            var plan=SketchMobility.Plan([polyline],[new("point-fix",end)],[fixedStart]);
+            if(plan.decisions.Single().classification!="implied"||plan.EffectiveCandidates([fixedStart]).Length!=0)
+                throw new Exception("The same fixed vertex would be submitted twice.");
+            return Task.CompletedTask;
+        });
     }
 }

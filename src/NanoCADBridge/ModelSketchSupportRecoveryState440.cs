@@ -147,7 +147,7 @@ internal static class ModelSketchSupportRecoveryState440
         // null never substitutes a target/new plane into old relation data.
         using var manager=owner.Get2dConstraintsManager(Constraint2dNetType.Auto,sketch.ID,null!);
         Need(manager!=null,"RECOVERY_CONSTRAINTS_UNAVAILABLE","The failed sketch's existing native manager is unavailable.");NativeSketchMembers385.RequireManagerScope(manager,sketch,owner);
-        var constraints=manager.GetAllConstraints();Need(constraints!=null,"RECOVERY_CONSTRAINTS_UNAVAILABLE","The existing exact sketch scope has no complete relation inventory.");ModelInventoryBudget.Ids(constraints,cancel);
+        var constraints=NativeSketchInventory.CompleteIds(manager,cancel,sketch);Need(constraints!=null,"RECOVERY_CONSTRAINTS_UNAVAILABLE","The existing exact sketch scope has no complete relation inventory.");ModelInventoryBudget.Ids(constraints,cancel);
         var helpers=new HashSet<McObjectId>(constraints);var refs=new HashSet<McObjectId>();var controls=new List<object>();
         foreach(var id in constraints.OrderBy(Key,StringComparer.OrdinalIgnoreCase))
         {

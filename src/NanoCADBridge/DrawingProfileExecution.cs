@@ -49,7 +49,10 @@ internal static partial class DrawingProfileWriter
         var selected=before.Selected.Values.Select(s=>SourceOf(s.Id,state,tx,true,s.Workplane,cancel)).ToDictionary(s=>s.Curve.Id,StringComparer.OrdinalIgnoreCase);
         var after=ReadNetwork(before.Sheet,selected,state,tx,cancel);Need(after.Available,"CONSTRAINTS_UNAVAILABLE","Resulting network inventory is unavailable.");
         var previous=before.Network.Relations.Where(r=>edit.ConstraintIds==null||!edit.ConstraintIds.Contains(Key(r.Id),StringComparer.OrdinalIgnoreCase)).ToDictionary(r=>r.Id);var current=after.Relations.ToDictionary(r=>r.Id);
-        Need(added.Distinct().Count()==added.Length&&current.Keys.ToHashSet().SetEquals(previous.Keys.Concat(added)),"CONSTRAINTS_UNAVAILABLE","Native relation inventory differs from previous plus requested additions.");
+        var expected=previous.Keys.Concat(added).ToHashSet();
+        Need(added.Distinct().Count()==added.Length&&added.All(id=>!previous.ContainsKey(id))&&
+            (before.Network.Available?expected.SetEquals(current.Keys):expected.IsSubsetOf(current.Keys)),
+            "CONSTRAINTS_UNAVAILABLE","The verified additions or previously observed constraint identities differ from the resulting native inventory.");
         foreach(var old in previous.Values)
         {
             var now=current[old.Id];bool changed=edit.Action=="set_drawing_dimension"&&old.Id.ToString().Equals(edit.ConstraintId,StringComparison.OrdinalIgnoreCase);
@@ -94,7 +97,21 @@ internal static partial class DrawingProfileWriter
         {
             var edit=(DrawingProfileEdit)args.Operations.Single();Binding binding;List<Consumer> consumers;
             using(var tx=state.Document.Database.TransactionManager.StartTransaction())
-            {binding=Resolve(edit,state,tx,job.CheckCancellation);consumers=edit.Action is "extrude_drawing_profile" or "revolve_drawing_profile"?new():Consumers(binding.Selected,state,tx,job.CheckCancellation);}
+            {binding=Resolve(edit,state,tx,job.CheckCancellation);consumers=edit.Action is "extrude_drawing_profile" or "revolve_drawing_profile"||binding.Effective is {Length:0}?new():Consumers(binding.Selected,state,tx,job.CheckCancellation);}
+            if(edit.Action=="add_drawing_constraints")
+            {
+                edit=edit with{Constraints=binding.Effective!};
+                if(edit.Constraints.Length==0)
+                {
+                    var sources=binding.Selected.Keys.Select(handle=>new EntityRef(args.BridgeId,args.DocumentId,handle)).ToArray();
+                    var observed=Assess(binding.Selected.Values.Select(s=>s.Curve),binding.Network,null,null,job.CheckCancellation);
+                    var unchanged=new DrawingProfileChange(edit.Action,sources,[],null,null,[],null,[],mobility:binding.Plan,mobility_after:observed);
+                    job.CheckCancellation();job.BeginCommit();
+                    var noChange=Result.Ok(job.OriginalRequestId,new ModifiedEntities(args.OperationId,"committed",false,[],[],[],[],
+                        "not_applicable",drawing_profile_changes:[unchanged]),context);
+                    job.RecordCommit(noChange);return noChange;
+                }
+            }
             var previousConsumers=consumers.ToArray();
             RequireRetainedSweepEdit366(edit,binding,consumers);
             Consumer? created=null;Network? after=null;var changes=new List<DrawingRelationChange>();
@@ -139,7 +156,10 @@ internal static partial class DrawingProfileWriter
             using(var tx=state.Document.Database.TransactionManager.StartTransaction())
             {selected=binding.Selected.Values.Select(s=>SourceOf(s.Id,state,tx,true,s.Workplane,job.CheckCancellation)).ToDictionary(s=>s.Curve.Id,StringComparer.OrdinalIgnoreCase);}
             if(created!=null)foreach(var old in binding.Selected.Values)Need(DrawingProfileGeometry.Same(old.Curve,selected[old.Curve.Id].Curve)&&old.Layer==selected[old.Curve.Id].Layer,"NATIVE_GEOMETRY_MISMATCH","Projection creation changed a source.");
-            Trace("models_verify");consumers=VerifyModels(consumers,selected,state,job.CheckCancellation);job.CheckCancellation();job.BeginCommit();
+            Trace("models_verify");consumers=VerifyModels(consumers,selected,state,job.CheckCancellation);
+            var observedMobility=after!=null&&(binding.Plan!=null||edit.Action=="remove_drawing_constraints")?
+                Assess(selected.Values.Select(s=>s.Curve),after,null,null,job.CheckCancellation):null;
+            job.CheckCancellation();job.BeginCommit();
             if(created!=null)created=consumers.Single(c=>c.Native==created.Native);
             EntityRef Ref(Db.ObjectId id)=>new(args.BridgeId,args.DocumentId,id.Handle.ToString());
             var sourceRefs=selected.Values.Select(s=>Ref(s.Id)).ToArray();var bodyRefs=consumers.Select(c=>Ref(c.Id)).ToArray();
@@ -149,12 +169,12 @@ internal static partial class DrawingProfileWriter
                 return new DrawingRetainedSweepPart366(Ref(c.Id),Key(c.Native),after.Owner,Key(after.Sketch),edit.ConstraintId!,after.SourceVariable,after.SourceId,before.Radius,after.Radius,after.Consumers,
                     "actual_ACAD_source_dimension_and_same_native_part_sketch_profiles_sweeps; ordered_paths_drivers_metadata_and_peers_retained; private_sketch_solver_internals_not_claimed");
             }).ToArray();
-            var change=new DrawingProfileChange(edit.Action,sourceRefs,changes.ToArray(),created==null?null:Ref(created.Id),created?.Sketch.ToString(),created?.Projections.Select(p=>p.ToString()).ToArray()??Array.Empty<string>(),created?.Feature.ToString(),created==null?bodyRefs:Array.Empty<EntityRef>(),variableChanges,removal?.Relations.Select(r=>Key(r.Id)).ToArray(),removedVariables,retained.Length==0?null:retained);
+            var change=new DrawingProfileChange(edit.Action,sourceRefs,changes.ToArray(),created==null?null:Ref(created.Id),created?.Sketch.ToString(),created?.Projections.Select(p=>p.ToString()).ToArray()??Array.Empty<string>(),created?.Feature.ToString(),created==null?bodyRefs:Array.Empty<EntityRef>(),variableChanges,removal?.Relations.Select(r=>Key(r.Id)).ToArray(),removedVariables,retained.Length==0?null:retained,binding.Plan,observedMobility);
             var replaced=previousConsumers.Where(old=>consumers.Any(now=>now.Native==old.Native&&now.Id!=old.Id)).ToArray();
             var newRepresentations=consumers.Where(now=>replaced.Any(old=>old.Native==now.Native)).Select(c=>Ref(c.Id)).ToArray();
             var data=new ModifiedEntities(args.OperationId,"committed",false,created==null?sourceRefs.Concat(bodyRefs).ToArray():Array.Empty<EntityRef>(),replaced.Select(c=>Ref(c.Id)).ToArray(),created==null?newRepresentations:new[]{Ref(created.Id)},Array.Empty<CopyMapping>(),"not_guaranteed",drawing_profile_changes:new[]{change});
             var warnings=new List<string>{WriteRecovery.Warning,"DRAWING_PROFILE_SCOPE: Native relations, their values and dependent model history were checked. Full constraint status is not inferred; an underconstrained component may move within its remaining degrees of freedom. Inspect the rebuilt shape and an MCP image after dimensional edits."};
-            if(edit.Action=="add_drawing_constraints"&&!binding.Network.Available)warnings.Add("CONSTRAINT_INVENTORY_INITIALIZED: Prior inventory unavailable; resulting network contains exactly the returned new relations. No prior-empty-network claim.");
+            if(edit.Action=="add_drawing_constraints"&&!binding.Network.Available)warnings.Add("CONSTRAINT_INVENTORY_INITIALIZED: Prior inventory was incomplete. The resulting network contains the verified new relations and all previously observed constraints.");
             warnings.AddRange(consumers.Where(c=>c.RetainedSweeps!=null).SelectMany(c=>c.RetainedSweeps!.Warnings).Distinct(StringComparer.Ordinal));
             var result=Result.Ok(job.OriginalRequestId,data,context,warnings.ToArray());job.RecordCommit(result);Trace("commit_recorded");return result;
         }

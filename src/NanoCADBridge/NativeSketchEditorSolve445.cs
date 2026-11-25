@@ -76,7 +76,7 @@ internal static class NativeSketchEditorSolve445
         NativeSketchCorrespondence410.PointRoleWitness[] PointRoles,JsonElement Receipt,NativeBodyTransparency445.Witness BodyTransparency);
     static (NativeSketchMembers385.Snapshot Inputs,JsonElement Relations) Capture(PlanarSketch sketch,DocumentState document,Constraints2D manager,Action cancel)
     {
-        cancel();var inventory=manager.GetAllConstraints();Need(inventory!=null,"CONSTRAINTS_UNAVAILABLE","The live native solver relation inventory is unavailable, not empty.");
+        cancel();var inventory=NativeSketchInventory.CompleteIds(manager,cancel,sketch);Need(inventory!=null,"CONSTRAINTS_UNAVAILABLE","The live native solver relation inventory is unavailable, not empty.");
         NativeSketchMembers385.Snapshot inputs;
         using(var tx=document.Document.Database.TransactionManager.StartTransaction())inputs=NativeSketchMembers385.Capture(sketch,document,tx,cancel,manager,inventory);
         Need(inputs.Members.Any(member=>member.Owned)&&inputs.Members.All(member=>member.Owned||member.ReferenceOnly),"OUT_OF_SCOPE","The live solver inputs are not owned members with immutable same-sketch references.");

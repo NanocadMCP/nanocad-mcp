@@ -14,6 +14,7 @@ internal static class OutputSchemas
             ("sketch_id", Text()), ("profile_id", Text()), ("feature_id", Text()), ("last_item_id", Text()),
             ("native_objects", NativeSketchSchema385.Created()), ("constraint_changes", NativeSketchSchema385.Changes()),
             ("distance_variable_id", Nullable(Text()))));
+        data["properties"]!["model_sketch_creation"]!["items"]!["properties"]!["mobility_plan"] = Mobility();
         return data;
     }
 
@@ -226,6 +227,13 @@ internal static class OutputSchemas
         data["properties"]!["model_parameter_names"] = Array(Object(("body_ref", Ref("ref")), ("variable_id", Text()), ("previous_name", Text()), ("name", Text()), ("rewritten_expression_ids", Array(Text()))));
         data["properties"]!["model_body_names"] = Array(Object(("body_ref", Ref("ref")), ("previous_name", Text()), ("name", Text())));
         AddBodyNameProvenance(data["properties"]!["model_body_names"]!["items"]!["properties"]!, committed: true);
+        data["properties"]!["sketch_mobility_plan"] = Mobility();
+        data["properties"]!["sketch_mobility_after"] = Mobility();
+        foreach (string collection in new[] { "drawing_profile_changes", "drawing_circle_changes" })
+        {
+            data["properties"]![collection]!["items"]!["properties"]!["mobility"] = Mobility();
+            data["properties"]![collection]!["items"]!["properties"]!["mobility_after"] = Mobility();
+        }
         var relation431 = data["properties"]!["drawing_profile_changes"]!["items"]!["properties"]!["constraints"]!["items"]!["properties"]!.AsObject();
         relation431["third_handle"] = Nullable(Text());
         foreach (var field in new[] { "first_segment_index", "second_segment_index", "third_segment_index" }) relation431[field] = Nullable(Integer());
@@ -348,6 +356,20 @@ internal static class OutputSchemas
         AddOptional(item, "source_refs_unavailable_reason", Nullable(Text()));
         return result;
     }
+    internal static JsonObject Mobility()
+    {
+        JsonObject Movement() => Object(("name", Text()), ("status", Text()), ("witnesses", Array(Text())), ("requested", Bool()));
+        var issue = Object(("constraint_id", Text()), ("classification", Text()), ("witnesses", Array(Text())), ("reason", Text()));
+        var component = Object(("members", Array(Text())), ("remaining_dof", Nullable(Integer())), ("planned_dof", Nullable(Integer())),
+            ("reasons", Array(Text())), ("movements_before", Array(Movement())), ("movements_after", Array(Movement())), ("existing_issues", Array(issue)));
+        var decision = Object(("candidate_index", Integer()), ("classification", Text()), ("dof_before", Nullable(Integer())),
+            ("dof_after", Nullable(Integer())), ("reason", Text()), ("witnesses", Array(Text())));
+        var report = Object(("remaining_dof", Nullable(Integer())), ("planned_dof", Nullable(Integer())), ("state", Text()),
+            ("source", Text()), ("components", Array(component)), ("decisions", Array(decision)));
+        report["description"] = "Local geometric freedom with driver values held fixed. Components with incomplete information report a null count.";
+        return report;
+    }
+
     private static JsonObject SketchConstraints()
     {
         JsonObject Reference() => Nullable(Object(("object_id", Text()), ("subentity_id", Nullable(Text())), ("polyline_segment_index", Integer()),
@@ -357,6 +379,15 @@ internal static class OutputSchemas
             ("constraints", Array(Object(("mc_id", Text()), ("type", Text()), ("is_geometrical", Bool()), ("is_dimensional", Bool()),
                 ("first", Reference()), ("second", Reference()), ("third", Reference()), ("parameter_value", Nullable(Number())), ("parameter_value_unit", Text()),
                 ("variable_id", Nullable(Text())), ("variable_name", Nullable(Text())), ("variable_expression", Nullable(Text())), ("dimension_id", Nullable(Text()))))));
+        data["properties"]!["mobility"] = Nullable(Mobility());
+        data["properties"]!["constraints_complete"] = Bool();
+        data["properties"]!["inventory_routes"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = Text() };
+        data["properties"]!["inventory_source"] = Text();
+        data["properties"]!["inventory_unavailable_reason"] = Nullable(Text());
+        data["properties"]!["mobility_unavailable_reason"] = Nullable(Text());
+        data["properties"]!["native_fully_constrained"] = Nullable(Bool());
+        data["properties"]!["native_mobility_agreement"] = Text();
+        data["properties"]!["proposal_binding"] = Nullable(Object(("editable", Bool()), ("reason", Nullable(Text()))));
         data["properties"]!["presentation"] = ModelSketchVisibilitySchema436.Presentation();
         data["properties"]!["smooth_measurements"] = Nullable(Array(new JsonObject { ["type"] = "object" }));
         data["properties"]!["sketch_membership"] = Text();
@@ -366,11 +397,15 @@ internal static class OutputSchemas
     {
         JsonObject Reference() => Nullable(Object(("object_id", Text()), ("source_ref", Nullable(Ref("ref"))), ("subentity_id", Nullable(Text())),
             ("polyline_segment_index", Integer()), ("point", Nullable(Point())), ("point_unavailable_reason", Nullable(Text()))));
-        var data = Object(("source_refs", Array(Ref("ref"))), ("network", Text()), ("plane", Text()), ("manager_document_id", Text()), ("scope_id", Nullable(Text())),
+        var data = Object(("source_refs", Array(Ref("ref"))), ("network", Text()), ("plane", Text()), ("manager_document_id", Nullable(Text())), ("scope_id", Nullable(Text())),
             ("identity_scope", Text()), ("reference_coordinate_system", Text()), ("solver_status", Text()), ("scanned_constraints", Integer()), ("complete", Bool()), ("completeness_scope", Text()),
             ("constraints", Array(Object(("mc_id", Text()), ("type", Text()), ("is_geometrical", Bool()), ("is_dimensional", Bool()), ("first", Reference()), ("second", Reference()), ("third", Reference()),
                 ("parameter_value", Nullable(Number())), ("parameter_value_unit", Text()), ("parameter_value_source", new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("constraint_manager", "document_variable", "unavailable", "not_applicable") }), ("variable_id", Nullable(Text())), ("variable_name", Nullable(Text())), ("variable_expression", Nullable(Text())),
                 ("dimension_id", Nullable(Text())), ("references_outside_selection", Array(Text()))))));
+        data["properties"]!["inventory_routes"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = Text() };
+        data["properties"]!["inventory_source"] = Text();
+        data["properties"]!["inventory_unavailable_reason"] = Nullable(Text());
+        data["properties"]!["mobility"] = Mobility();
         data["properties"]!["workplane"] = WorkplaneSchema.Input();
         data["properties"]!["variable_inventory"] = Nullable(Object(("scope", Text()), ("dependency_direction", Text()), ("value_scope", Text()),
             ("variables", Array(Object(("mc_id", Text()), ("name", Text()), ("type", Text()), ("expression", Text()), ("value", Nullable(Number())), ("value_available", Bool()),

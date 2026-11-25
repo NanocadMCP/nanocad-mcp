@@ -222,7 +222,7 @@ internal static class NativeSketchRelations410
     }
     internal static McObjectId[] RequestedPersistent(Constraints2D manager,SketchConstraintSpec[] specs,NativeSketchMembers385.Snapshot inputs,ISet<string> baselineIds,Action cancel)
     {
-        var inventory=manager.GetAllConstraints()??throw new DomainException("CONSTRAINTS_UNAVAILABLE","The persistent sketch relation inventory is unavailable.");var result=new List<McObjectId>();
+        var inventory=NativeSketchInventory.CompleteIds(manager,cancel,inputs.Sketch)??throw new DomainException("CONSTRAINTS_UNAVAILABLE","The persistent sketch relation inventory is unavailable.");var result=new List<McObjectId>();
         foreach(var spec in specs)
         {
             cancel();using var expected=NativeSketchMembers385.Info(spec,inputs);var candidates=new List<McObjectId>();

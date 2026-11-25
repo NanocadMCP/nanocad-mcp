@@ -32,7 +32,8 @@ public sealed record ModelSketchChange362(int operation_index,string operation,E
     [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] string? angle_variable_id=null,
     [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] double? angle_degrees=null,
     [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] EntityRef? axis_ref=null,
-    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] ModelProfileConsumed446[]? consumed_profiles=null);
+    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] ModelProfileConsumed446[]? consumed_profiles=null,
+    [property:JsonIgnore(Condition=JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility_plan=null);
 public sealed record ModelSketchOutput362(string operation_id,string status,bool replayed,EntityRef[] modified,EntityRef[] erased,EntityRef[] created,
     CopyMapping[] copies,string undo_history,ModelSketchChange362[] model_sketch_lifecycle);
 
@@ -67,7 +68,7 @@ public static class ModelSketchLifecycleValidation362
     {
         if(item.ValueKind!=JsonValueKind.Object||handles.Length!=1)throw Invalid(path,"Select one existing native Model Space part.");string operation=Text(item,"operation",path);
         string[] specific=operation switch{
-            "create_model_sketch"=>["source_handles","reference_ids","plane","support","native_geometry","initial_constraints"],
+            "create_model_sketch"=>["source_handles","reference_ids","plane","support","native_geometry","initial_constraints","preserve_motion","require_verified_constraints"],
             "create_model_profile_on_sketch"=>["sketch_id","expected_sketch_token","region_point"],
             "add_model_sweep_from_profile"=>["profile_id","expected_sketch_id","expected_profile_token","path_handles","orientation","taper_angle","part_operation"],
             "add_model_revolution_from_profile"=>["profile_id","expected_sketch_id","expected_profile_token","axis_handle","angle_degrees","part_operation"],
@@ -82,8 +83,8 @@ public static class ModelSketchLifecycleValidation362
             SketchPlaneSpec? frame=raw?DrawingWorkplane.Parse(plane):null;var selected=supported?ModelSketchSupportValidation396.Parse(support,path+".support"):null;
             string[]? references=item.TryGetProperty("reference_ids",out var referenceArray)?Ids(referenceArray,path+".reference_ids"):null;
             var sources=item.TryGetProperty("source_handles",out _)?Handles(item,"source_handles",path,handles[0]):[];
-            if(item.TryGetProperty("native_geometry",out var native)){var constraints=item.TryGetProperty("initial_constraints",out var c)?c:Wire.Element(Array.Empty<object>());return new ModelSketchCreate362(handles,last,sources,frame,name,NativeSketchValidation385.Parse(native,constraints,frame,path+".native_geometry",referenceIds:references),selected,references);}
-            if(item.TryGetProperty("initial_constraints",out _))throw Invalid(path,"initial_constraints applies to new native_geometry.");
+            if(item.TryGetProperty("native_geometry",out var native)){var constraints=item.TryGetProperty("initial_constraints",out var c)?c:Wire.Element(Array.Empty<object>());return new ModelSketchCreate362(handles,last,sources,frame,name,NativeSketchValidation385.Parse(native,constraints,frame,path+".native_geometry",referenceIds:references,preserveMotion:item.TryGetProperty("preserve_motion", out var motion) ? motion : null, requireVerifiedConstraints:SketchMotionInput.RequireProof(item)),selected,references);}
+            if(item.TryGetProperty("initial_constraints",out _)||item.TryGetProperty("preserve_motion",out _)||item.TryGetProperty("require_verified_constraints",out _))throw Invalid(path,"initial_constraints applies to new native_geometry.");
             if(sources.Length==0&&references==null)throw Invalid(path,"Supply retained drawing sources, current native part reference IDs or owned native_geometry.");
             return new ModelSketchCreate362(handles,last,sources,frame,name,Support:selected,ReferenceIds:references);
         }

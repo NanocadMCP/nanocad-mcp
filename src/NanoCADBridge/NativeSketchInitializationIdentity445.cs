@@ -98,7 +98,7 @@ internal static class NativeSketchInitializationIdentity445
     }
     internal static NativeSketchRelations410.Baseline CapturePriorBaseline(Constraints2D manager,NativeSketchMembers385.Snapshot inputs,IReadOnlySet<string> actualRetainedIds,Action cancel)
     {
-        cancel();var inventory=manager.GetAllConstraints();Need(inventory!=null,"The actual retained baseline relation inventory is unavailable.");ModelInventoryBudget.Ids(inventory,cancel);
+        cancel();var inventory=NativeSketchInventory.CompleteIds(manager,cancel,inputs.Sketch);Need(inventory!=null,"The actual retained baseline relation inventory is unavailable.");ModelInventoryBudget.Ids(inventory,cancel);
         var selected=inventory.Where(id=>actualRetainedIds.Contains(Key(id))).ToArray();
         Need(selected.Length==actualRetainedIds.Count&&selected.Select(Key).ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(actualRetainedIds),"A retained baseline relation disappeared before its typed native helper capture.");
         // The manager overload preserves exact relation/dimension/variable IDs
@@ -138,7 +138,7 @@ internal static class NativeSketchInitializationIdentity445
         cancel();Need(requested.Value.HasValue&&info.IsDimensional&&!info.VarId.IsNull&&manager.GetConstraintParamId(relation)==info.VarId&&ModelParameterSnapshot.Near(manager.GetConstraintParamValue(relation),requested.Value.Value),
             "The new persistent dimension has no actual requested native control value/binding.");
         NativeSketchDimensionBinding411.Prove(manager,relation,info,inputs,cancel);
-        var inventory=manager.GetAllConstraints();Need(inventory!=null,"The new dimensional relation inventory is unavailable.");int shared=0;
+        var inventory=NativeSketchInventory.CompleteIds(manager,cancel,inputs.Sketch);Need(inventory!=null,"The new dimensional relation inventory is unavailable.");int shared=0;
         foreach(var id in inventory)
         {cancel();using var row=manager.GetConstraintInfo(id);Need(row!=null,"A current native relation is unavailable while proving its new driver.");if(row.VarId==info.VarId)shared++;}
         Need(shared==1,"A newly created dimension variable does not bind one unique actual relation.");

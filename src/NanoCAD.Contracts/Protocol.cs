@@ -116,6 +116,9 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     public MarkerDimensionPage? MarkerDimensions { get; init; }
     public string[]? SketchConstraintParameterIds { get; init; }
     public bool MeasureSmooth { get; init; }
+    public SketchConstraintSpec[]? ProposedConstraints { get; init; }
+    public SketchConstraintSpec[]? ProposedDrawingConstraints { get; init; }
+    public SketchMobilityMotion[]? PreserveMotion { get; init; }
     public bool DocumentSketchScope { get; init; }
     public QueryBounds407? QueryBounds { get; init; }
     public bool SummaryOnly { get; init; }

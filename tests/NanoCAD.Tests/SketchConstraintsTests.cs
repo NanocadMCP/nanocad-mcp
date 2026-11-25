@@ -31,5 +31,28 @@ internal static class SketchConstraintsTests
             File.WriteAllText(Path.Combine(Environment.GetEnvironmentVariable("NANOCAD_MCP_HOME")!,"tools-list.json"),JsonSerializer.Serialize(ToolCatalog.Tools,Wire.Json));
             return Task.CompletedTask;
         });
+        await test("constraint preview preserves native IDs, directional motion, drawing handles and distinct angle units", () =>
+        {
+            var first = Guid.NewGuid().ToString("B");
+            var second = Guid.NewGuid().ToString("B");
+            var native = Input();
+            native["proposed_constraints"] = new[] { new { kind="angle", first, second, value=Math.PI / 2 } };
+            native["preserve_motion"] = new[] { new { name="slide", object_ids=new[]{first,second}, dx=2, dy=0 } };
+            var args = Validation.Parse("inspect_sketch_constraints", Wire.Element(native));
+            if (args.ProposedConstraints?.Single().Value != Math.PI / 2 || args.PreserveMotion?.Single().dx != 1 ||
+                args.PreserveMotion.Single().object_ids[0] != first.ToUpperInvariant()) throw new Exception("Sketch preview lost units or bindings.");
+            native.Remove("handle");
+            native.Remove("sketch_id");
+            native["handles"] = new[] { "00A", "00B" };
+            native["proposed_constraints"] = new[] { new { kind="angle", first="a", second="B", value=90 } };
+            native["preserve_motion"] = new[] { new { name="slide", object_ids=new[]{"a","b"}, dx=0, dy=-3 } };
+            args = Validation.Parse("inspect_constraints", Wire.Element(native));
+            if (args.ProposedDrawingConstraints?.Single().Value != 90 || args.PreserveMotion?.Single().dy != -1 ||
+                !args.PreserveMotion.Single().object_ids.SequenceEqual(new[] { "A", "B" })) throw new Exception("Drawing preview lost its frame or selected handles.");
+            native["preserve_motion"] = new[] { new { name="slide", object_ids=new[]{"C"}, dx=1, dy=0 } };
+            try { Validation.Parse("inspect_constraints", Wire.Element(native)); }
+            catch (DomainException error) when (error.Error.code == "INVALID_ARGUMENT") { return Task.CompletedTask; }
+            throw new Exception("Unselected protected geometry reached a preview.");
+        });
     }
 }

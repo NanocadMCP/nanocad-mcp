@@ -4,9 +4,14 @@ namespace NanoCAD.Contracts;
 
 public sealed record DrawingCircleEdit(string Action,string[] Targets,double ExpectedRadius,double? Radius=null,
     string? ConstraintId=null,string? ExpectedExpression=null,double? Distance=null,string? Direction=null,string? Name=null)
-    :EditSpec(Action,Targets);
+    :EditSpec(Action,Targets)
+{
+    public bool RequireVerifiedConstraints { get; init; }
+}
 public sealed record DrawingCircleChange(string operation,EntityRef source_ref,string? constraint_id,string? variable_id,
-    double radius,EntityRef? body_ref,string? sketch_id,string? projection_id,string? feature_id,EntityRef[] rebuilt_bodies);
+    double radius,EntityRef? body_ref,string? sketch_id,string? projection_id,string? feature_id,EntityRef[] rebuilt_bodies,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility=null,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility_after=null);
 
 public static partial class ModifyValidation
 {
@@ -17,7 +22,8 @@ public static partial class ModifyValidation
         double expected=Radius("expected_radius");
         if(action=="add_drawing_radius")
         {
-            Shape(item,path,"operation","handles","expected_radius");return new(action,handles,expected);
+            Shape(item,path,"operation","handles","expected_radius","require_verified_constraints");
+            return new(action,handles,expected) { RequireVerifiedConstraints = SketchMotionInput.RequireProof(item) };
         }
         if(action=="set_drawing_radius")
         {

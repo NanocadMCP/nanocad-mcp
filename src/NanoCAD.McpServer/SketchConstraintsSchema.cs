@@ -9,6 +9,12 @@ internal static class SketchConstraintsSchema
     {
         var schema = JsonNode.Parse(ModelVariablesSchema.Input().GetRawText())!.AsObject();
         schema["required"]!.AsArray().Add("sketch_id");
+        schema["properties"]!["preserve_motion"] = NativeSketchSchema385.PreserveMotion();
+        schema["properties"]!["proposed_constraints"] = new JsonObject
+        {
+            ["type"] = "array", ["items"] = NativeSketchSchema385.Constraint(),
+            ["description"] = "Preview these relations together against the current sketch, using actual native member IDs, sketch-plane coordinates and radians. The preview preserves the drawing."
+        };
         schema["properties"]!["measure_smooth"] = new JsonObject
         {
             ["type"] = "boolean",

@@ -51,7 +51,7 @@ internal static class NativeSketchHistory385
             // leaves those nodes unverified; it is never inferred empty.
             try
             {
-                using var manager=NativeSketchMembers385.Manager(sketch);var ids=manager.GetAllConstraints();if(ids==null)continue;ModelInventoryBudget.Ids(ids,check);
+                using var manager=NativeSketchMembers385.Manager(sketch);var ids=NativeSketchInventory.Read(manager,sketch,check).Ids;ModelInventoryBudget.Ids(ids,check);
                 foreach(var id in ids)
                 {
                     check();using var info=manager.GetConstraintInfo(id);if(info==null)continue;

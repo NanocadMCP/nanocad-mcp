@@ -13,7 +13,7 @@ namespace NanoCADBridge;
 internal static class NativeSketchInitialization385
 {
     internal sealed record Created(NativeSketchCreated385[] Objects,McObjectId[] ObjectIds,McObjectId[] ConstraintIds,McObjectId[] DimensionIds,McObjectId[] VariableIds,SketchConstraintChange[] Changes,
-        NativeSketchRelations410.Baseline Baseline,NativeSketchMembers385.Snapshot InitialInputs);
+        NativeSketchRelations410.Baseline Baseline,NativeSketchMembers385.Snapshot InitialInputs, int[] SubmittedIndices, SketchMobilityReport? Mobility);
     internal static Created Create(PlanarSketch sketch,NanoCAD.Contracts.NativeSketchInitialization385 input,DocumentState state,Action cancel,Action<McObjectId> observed)
     {
         bool editing=false;var ids=new List<McObjectId>();var transientRelations=new List<McObjectId>();var objects=new List<NativeSketchCreated385>();var nativeSplines=new Dictionary<McObjectId,NativeSketchPrimitive385>();
@@ -66,9 +66,20 @@ internal static class NativeSketchInitialization385
             RequireNativeSplines(sketch,nativeSplines,members.Plane,cancel);
             RequireRequested(input,objects.ToArray(),members,cancel);var specs=BindSpecs(input,objects.ToArray(),members,cancel);NativeSketchMembers385.ValidateInputs(specs,members);
             NativeSketchRelations410.Baseline baseline;NativeSketchInitializationIdentity445.ExitWitness? exitWitness=null;
+            int[] submittedIndices = []; SketchMobilityReport? plan = null;
+            if (specs.Length > 0 || input.PreserveMotion?.Length > 0)
+            {
+                using var inspection = NativeSketchMembers385.Manager(sketch, allowUnlinkedEditScope: true);
+                var inventory = NativeSketchInventory.Read(inspection, sketch, cancel);
+                var bindings = InputBindings(input, objects.ToArray(), members, cancel);
+                var motion = input.PreserveMotion?.Select(m => m with { object_ids = m.object_ids.Select(id => bindings[id]).ToArray() }).ToArray();
+                plan = NativeSketchMobility.Plan(members, inspection, inventory.Ids, inventory.Complete, specs, cancel, preserve: motion);
+                specs = plan.EffectiveCandidates(specs, input.RequireVerifiedConstraints);
+                submittedIndices = plan.decisions.Where(d => d.classification != "implied").Select(d => d.candidate_index).ToArray();
+            }
             if(specs.Length>0)using(var manager=NativeSketchMembers385.Manager(sketch,allowUnlinkedEditScope:true))
             {
-                var preAddInventory=manager.GetAllConstraints();
+                var preAddInventory=NativeSketchInventory.CompleteIds(manager,cancel,sketch);
                 if(preAddInventory!=null)
                 {
                     NativeSketchMembers385.Snapshot scoped;using(var tx=state.Document.Database.TransactionManager.StartTransaction())scoped=NativeSketchMembers385.Capture(sketch,state,tx,cancel,manager,preAddInventory);
@@ -89,7 +100,7 @@ internal static class NativeSketchInitialization385
                         // writes its first requested relation before inventory
                         // enumeration. A pre-add null remains unobserved; it
                         // never becomes an empty-network preservation claim.
-                        var materializedInventory=manager.GetAllConstraints();
+                        var materializedInventory=NativeSketchInventory.CompleteIds(manager,cancel,sketch);
                         NativeSketchMembers385.Need(materializedInventory!=null&&materializedInventory.Contains(id),"CONSTRAINTS_UNAVAILABLE","The native relation inventory did not materialize after the first requested Add(false); no solve was requested.");
                         NativeSketchMembers385.Snapshot materialized;using(var tx=state.Document.Database.TransactionManager.StartTransaction())materialized=NativeSketchMembers385.Capture(sketch,state,tx,cancel,manager,materializedInventory);
                         PreserveBeforeSolve(members,materialized,input,objects.ToArray(),cancel);members=materialized;
@@ -168,7 +179,7 @@ internal static class NativeSketchInitialization385
                 catch(Exception error)
                 {baseline=NativeSketchRelations410.Unavailable(current,ObservationFailure(error));}
                 foreach(var id in baseline.NativeIds)observed(id);
-                return new(objects.ToArray(),ids.ToArray(),[],[],[],[],baseline,members);
+                return new(objects.ToArray(),ids.ToArray(),[],[],[],[],baseline,members,submittedIndices,plan);
             }
             using var retainedManager=NativeSketchMembers385.Manager(sketch);var retained=NativeSketchConstraintState385.Relations(retainedManager,cancel);
             var baselineIds=NativeSketchRelations410.Retained(baseline,retained,current,cancel,allowNetworkTransfer:true).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -176,7 +187,7 @@ internal static class NativeSketchInitialization385
             foreach(var spec in specs)
             {
                 cancel();using var expected=NativeSketchMembers385.Info(spec,current);var candidates=new List<McObjectId>();
-                foreach(var id in retainedManager.GetAllConstraints()??throw new DomainException("CONSTRAINTS_UNAVAILABLE","The persistent relation inventory is unavailable."))
+                foreach(var id in NativeSketchInventory.CompleteIds(retainedManager,cancel,sketch)??throw new DomainException("CONSTRAINTS_UNAVAILABLE","The persistent relation inventory is unavailable."))
                 {
                     if(baselineIds.Contains(id.ToString()))continue;using var info=retainedManager.GetConstraintInfo(id);
                     if(info==null||!NativeSketchMembers385.RequestedReferences(info,expected,spec,current))continue;
@@ -202,7 +213,7 @@ internal static class NativeSketchInitialization385
             for(int i=baselineRows.Count-1;i>=0;i--)if(!baselineIds.Contains(baselineRows[i]!["id"]!.GetValue<string>()))baselineRows.RemoveAt(i);
             var finalBaseline=(nativeSplines.Count>0?NativeSketchInitializationIdentity445.CapturePriorBaseline(retainedManager,current,baselineIds,cancel):
                 NativeSketchRelations410.Capture(retainedManager,current,cancel) with{Relations=Wire.Element(baselineNode)}) with{ObservationStage=baseline.ObservationStage,PreAddUnavailableReason=baseline.PreAddUnavailableReason};
-            return new(objects.ToArray(),ids.ToArray(),relations.ToArray(),dimensions.ToArray(),variables.Distinct().ToArray(),changes.ToArray(),finalBaseline,members);
+            return new(objects.ToArray(),ids.ToArray(),relations.ToArray(),dimensions.ToArray(),variables.Distinct().ToArray(),changes.ToArray(),finalBaseline,members,submittedIndices,plan);
         }
         finally{if(editing)sketch.ExitEditMode();}
     }
@@ -237,7 +248,8 @@ internal static class NativeSketchInitialization385
     {
         var current=NativeSketchMembers385.Capture(sketch,state,tx,cancel);
         NativeSketchMembers385.Need(current.Members.All(m=>m.Owned||m.ReferenceOnly)&&current.Members.Where(m=>m.Owned).Select(m=>m.ObjectId).ToHashSet().SetEquals(created.ObjectIds),"SKETCH_BINDING_UNAVAILABLE","Created internal inputs changed native membership or ownership.");
-        var specs=BindSpecs(input,created.Objects,current,cancel);
+        var allRequested=BindSpecs(input,created.Objects,current,cancel);
+        var specs=created.SubmittedIndices.Select(i=>allRequested[i]).ToArray();
         if(specs.Length==0)RequireRequested(input,created.Objects,current,cancel);NativeSketchMembers385.ValidateSolved(specs,current);NativeSketchMembers385.FixedRequested(specs,created.InitialInputs,current);NativeSketchRelations410.ImmutableReferences(created.InitialInputs,current,cancel);
         VerifyRelations(sketch,specs,current,created.ConstraintIds,created.Changes,cancel,verifyNewDrivers:input.Geometry.Any(item=>item.Kind=="spline"));
         if(created.Baseline.Complete)
@@ -247,7 +259,7 @@ internal static class NativeSketchInitialization385
         }
         else NativeSketchMembers385.Need(specs.Length==0&&created.ConstraintIds.Length==0,"CONSTRAINTS_UNAVAILABLE","Requested relation writes require an observed complete baseline; geometry-only initialization does not infer constraint preservation.");
     }
-    internal static SketchConstraintSpec[] BindSpecs(NanoCAD.Contracts.NativeSketchInitialization385 input,NativeSketchCreated385[] objects,NativeSketchMembers385.Snapshot members,Action cancel)
+    static Dictionary<string,string> InputBindings(NanoCAD.Contracts.NativeSketchInitialization385 input,NativeSketchCreated385[] objects,NativeSketchMembers385.Snapshot members,Action cancel)
     {
         var bindings=objects.ToDictionary(row=>row.key,row=>row.object_id,StringComparer.Ordinal);
         foreach(string sourceId in input.ReferenceIds??[])
@@ -263,6 +275,11 @@ internal static class NativeSketchInitialization385
             NativeSketchMembers385.Need(candidates.Count==1&&!bindings.ContainsKey(sourceId),"SKETCH_BINDING_UNAVAILABLE","An initial source reference must map to one exact current immutable projection in this sketch.");
             bindings.Add(sourceId,candidates[0].Id.ToString());
         }
+        return bindings;
+    }
+    internal static SketchConstraintSpec[] BindSpecs(NanoCAD.Contracts.NativeSketchInitialization385 input,NativeSketchCreated385[] objects,NativeSketchMembers385.Snapshot members,Action cancel)
+    {
+        var bindings=InputBindings(input,objects,members,cancel);
         string Bound(string key)
         {NativeSketchMembers385.Need(bindings.TryGetValue(key,out var id),"SKETCH_BINDING_UNAVAILABLE","An initial constraint operand is neither a created geometry key nor a verified declared native projection source.");return id!;}
         return input.Constraints.Select(spec=>spec with{First=Bound(spec.First),Second=spec.Second==null?null:Bound(spec.Second),Third=spec.Third==null?null:Bound(spec.Third)}).ToArray();
@@ -286,7 +303,7 @@ internal static class NativeSketchInitialization385
     }
     internal static void VerifyRelations(PlanarSketch sketch,SketchConstraintSpec[] specs,NativeSketchMembers385.Snapshot members,McObjectId[] ids,SketchConstraintChange[] changes,Action cancel,bool verifyNewDrivers=false)
     {
-        if(specs.Length==0)return;using var manager=NativeSketchMembers385.Manager(sketch);var actual=manager.GetAllConstraints();
+        if(specs.Length==0)return;using var manager=NativeSketchMembers385.Manager(sketch);var actual=NativeSketchInventory.CompleteIds(manager,cancel,sketch);
         NativeSketchMembers385.Need(actual!=null&&ids.All(actual.Contains)&&ids.Length==specs.Length&&changes.Length==specs.Length,"CONSTRAINT_SCOPE_MISMATCH","Requested persistent relations are absent from the current sketch network.");
         for(int i=0;i<specs.Length;i++)
         {cancel();using var info=manager.GetConstraintInfo(ids[i]);using var expected=NativeSketchMembers385.Info(specs[i],members);NativeSketchMembers385.Need(info!=null&&NativeSketchMembers385.RequestedReferences(info,expected,specs[i],members),"CONSTRAINT_SCOPE_MISMATCH","A created relation changed type/member binding after solve.");NativeSketchRelations410.RequirePointReceipt(specs[i],info,members);if(specs[i].Value.HasValue){NativeSketchMembers385.Need(info.IsDimensional&&!info.VarId.IsNull&&info.VarId.ToString()==changes[i].variable_id&&manager.GetConstraintParamId(ids[i])==info.VarId&&ModelParameterSnapshot.Near(manager.GetConstraintParamValue(ids[i]),specs[i].Value!.Value),"CONSTRAINT_PARAMETER_UNAVAILABLE","A created control changed persistent dimensional/variable binding/value after solve.");if(verifyNewDrivers)NativeSketchInitializationIdentity445.VerifyNewDriver(manager,ids[i],info,members,specs[i],cancel);}}

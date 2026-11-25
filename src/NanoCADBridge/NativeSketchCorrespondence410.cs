@@ -341,7 +341,7 @@ internal static class NativeSketchCorrespondence410
         var after=relations.GetProperty("constraints").EnumerateArray().Select(row=>Signature(row,current,false).GetRawText()).OrderBy(value=>value,StringComparer.Ordinal).ToArray();
         Need(before.SequenceEqual(after),"The pending editor changed native constraint/member/control structure before its solve.",new{phase,prior_count=before.Length,current_count=after.Length});
         var reverse=manager.GetAllObjectsToConstraints();Need(reverse!=null,"The pending editor solver reverse inventory is unavailable.",new{phase});
-        foreach(var relation in manager.GetAllConstraints()??throw new DomainException("CONSTRAINTS_UNAVAILABLE","The pending editor relation inventory disappeared."))
+        foreach(var relation in NativeSketchInventory.CompleteIds(manager,cancel,current.Sketch)??throw new DomainException("CONSTRAINTS_UNAVAILABLE","The pending editor relation inventory disappeared."))
         {
             cancel();using var info=manager.GetConstraintInfo(relation);Need(info!=null,"A pending editor relation has no native receipt.",new{phase,constraint_id=Key(relation)});
             foreach(var reference in new[]{info.FirstObject,info.SecondObject,info.ThirdObject}.Where(value=>value!=null&&!value.ObjectId.IsNull))

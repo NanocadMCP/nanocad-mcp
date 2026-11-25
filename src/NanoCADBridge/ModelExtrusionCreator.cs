@@ -150,7 +150,7 @@ internal static class ModelExtrusionCreator
             after=Inventory(state.Document);Need(before.IsSubsetOf(after),"MODEL_UPDATE_FAILED","Tracking close removed pre-existing entities.");handle=Verify();
             var bodyRef=new EntityRef(args.BridgeId,args.DocumentId,handle);
             var receipt=nativeCreated==null?null:new[]{new ModelSketchCreation410(bodyRef,body.ID.ToString(),sketch!.ID.ToString(),selectedProfile!.ID.ToString(),extrusion!.ID.ToString(),body.LastPartItemID.ToString(),
-                nativeCreated.Objects,nativeCreated.Changes,(extrusion as ExtrudeFeature)?.DistanceParamVarID.ToString())};
+                nativeCreated.Objects,nativeCreated.Changes,(extrusion as ExtrudeFeature)?.DistanceParamVarID.ToString(),mobility_plan:nativeCreated.Mobility)};
             var result=Result.Ok(job.OriginalRequestId,new CreatedEntities(args.OperationId,"committed",false,new[]{bodyRef},"not_guaranteed",model_sketch_creation:receipt),context,
                 WriteRecovery.Warning,nativeCreated==null?"MODEL_HISTORY_CREATED: Read inspect_model_history for the native sketch, profile, feature and parameters. Sketch constraints were not created.":
                 "NATIVE_SKETCH_HISTORY_CREATED: Native inputs, requested relations, selected profile and initial feature retained. Read current control tokens before a driver edit; an unchanged initial value alone does not certify driving behavior.");

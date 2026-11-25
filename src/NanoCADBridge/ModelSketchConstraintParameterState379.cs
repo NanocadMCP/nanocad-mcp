@@ -101,7 +101,7 @@ internal static class ModelSketchConstraintParameterState379
         var sketch=matches[0].GetObjectOfType<PlanarSketch>();var owner=ModelProfileDiscovery348.OwnerDocument(body,state);
         Need(sketch!=null&&sketch.ID==matches[0]&&sketch.HostSolidID==body.ID&&sketch.DbEntity.Document?.ID==owner.ID&&!sketch.IsInEditMode,
             "CONSTRAINT_SCOPE_MISMATCH","The current sketch must belong to this part's actual owner outside edit mode.");
-        using var manager=Manager(sketch);var ids=manager.GetAllConstraints();Need(ids!=null,"CONSTRAINTS_UNAVAILABLE","The current relation inventory is unavailable; no empty-network claim is made.");ModelInventoryBudget.Ids(ids,cancel);
+        using var manager=Manager(sketch);var ids=NativeSketchInventory.CompleteIds(manager,cancel,sketch);Need(ids!=null,"CONSTRAINTS_UNAVAILABLE","The current relation inventory is unavailable; no empty-network claim is made.");ModelInventoryBudget.Ids(ids,cancel);
         var selected=ids.Where(id=>Same(Key(id),constraintId)).ToArray();Need(selected.Length==1,"CONSTRAINT_SCOPE_MISMATCH","The selected dimensional relation is not a unique member of this current sketch network.");
         using var info=manager.GetConstraintInfo(selected[0]);Need(info!=null&&info.IsDimensional&&info.Type is ConstraintType.DimRadial or ConstraintType.DimDiametrical,
             "OUT_OF_SCOPE","Select an existing internal DimRadial or DimDiametrical relation; no driving mode is inferred from AddConstraint's fApply boolean.");

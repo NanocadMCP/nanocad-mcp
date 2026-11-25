@@ -39,7 +39,7 @@ internal static class NativeSketchMembers385
         if (manager != null) RequireManagerScope(manager, sketch, context, allowUnlinkedEditScope: sketch.IsInEditMode);
         var helpers = new HashSet<McObjectId>(); var helperRoles = new List<(McObjectId Id, string Role, McObjectId Relation, string Type)>(); var fixedPoints = new HashSet<McObjectId>();
         IEnumerable<McObjectId>? relations = observedConstraints;
-        if (relations == null && manager != null) try { relations = manager.GetAllConstraints(); }
+        if (relations == null && manager != null) try { relations = NativeSketchInventory.Read(manager, sketch, cancel).Ids; }
             catch (OperationCanceledException) { throw; }
             catch (Exception) when (observedManager == null) {/* Optional acquisition/inventory absence is not an empty network. */}
         if (relations != null)
@@ -144,14 +144,7 @@ internal static class NativeSketchMembers385
         }
         void Add(McObjectId member, McObjectId objectId, int? segment, string type, JsonElement geometry, bool owned, string? reason, bool referenceOnly = false)
         {
-            SketchConstraintCurve Curve()
-            {
-                var g = geometry; Point3 Q(JsonElement p) => new(p[0].GetDouble(), p[1].GetDouble(), p[2].GetDouble()); string id = Key(member);
-                if (g.GetProperty("kind").GetString() == "line") return new(id, "line", DrawingWorkplane.Local(plane, Q(g.GetProperty("start"))), DrawingWorkplane.Local(plane, Q(g.GetProperty("end"))));
-                if (g.GetProperty("kind").GetString() is "spline" or "elliptical_arc") return NativeSketchCurveGeometry445.Curve(id, g, plane, cancel);
-                return ModelPolycurve.FromSketchArc(id, Q(g.GetProperty("center")), g.GetProperty("radius").GetDouble(), Q(g.GetProperty("normal")), Q(g.GetProperty("reference_direction")), g.GetProperty("start_angle").GetDouble(), g.GetProperty("end_angle").GetDouble(), plane);
-            }
-            var curve = Curve(); bool Finite(Point2? p) => p == null || double.IsFinite(p.X) && double.IsFinite(p.Y);
+            var curve = LocalCurve(Key(member), geometry, plane, cancel); bool Finite(Point2? p) => p == null || double.IsFinite(p.X) && double.IsFinite(p.Y);
             Need(Finite(curve.Start) && Finite(curve.End) && Finite(curve.Center) && double.IsFinite(curve.Radius) && double.IsFinite(curve.Sweep), "SKETCH_GEOMETRY_UNAVAILABLE", "Native sketch curve has nonfinite geometry.");
             var row = new Member(member, objectId, segment, type, geometry, curve, owned, reason, referenceOnly); budget.Add(new { member_id = Key(member), object_id = Key(objectId), segment, geometry, owned, reason, reference_only = referenceOnly }); members.Add(row);
         }
@@ -300,12 +293,33 @@ internal static class NativeSketchMembers385
         var stored = Wire.Element(new { sketch_id = Key(sketch.ID), owner_document_id = Key(sketch.DbEntity.Document.ID), member_context_document_id = Key(context.ID), plane, members = members.Select(Describe).ToArray(), objects = objectStates.Select(value => Wire.Element(value)).OrderBy(row => row.GetProperty("id").GetString(), StringComparer.OrdinalIgnoreCase).ToArray(), construction = construction.Select(c => new { id = Key(c.Id), geometry = c.Geometry }).ToArray(), constraint_helpers = helperStates, projection_ids = projections.Select(Key).OrderBy(id => id, StringComparer.OrdinalIgnoreCase).ToArray() }); budget.Add(stored);
         return new(sketch, plane, members.ToArray(), stored, Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(stored, Wire.Json))), construction.ToArray(), helpers.OrderBy(Key, StringComparer.OrdinalIgnoreCase).ToArray());
     }
+    internal static SketchConstraintCurve LocalCurve(string id, JsonElement g, SketchPlaneSpec plane, Action cancel)
+    {
+        Point3 Point(JsonElement p) => new(p[0].GetDouble(), p[1].GetDouble(), p[2].GetDouble());
+        return g.GetProperty("kind").GetString() switch
+        {
+            "line" => new(id, "line", DrawingWorkplane.Local(plane, Point(g.GetProperty("start"))), DrawingWorkplane.Local(plane, Point(g.GetProperty("end")))),
+            "spline" or "elliptical_arc" => NativeSketchCurveGeometry445.Curve(id, g, plane, cancel),
+            "circular_arc" => ModelPolycurve.FromSketchArc(id, Point(g.GetProperty("center")), g.GetProperty("radius").GetDouble(), Point(g.GetProperty("normal")), Point(g.GetProperty("reference_direction")), g.GetProperty("start_angle").GetDouble(), g.GetProperty("end_angle").GetDouble(), plane),
+            _ => new(id, "unsupported")
+        };
+    }
     internal static NativeSketchMember385 Describe(Member value) => new(Key(value.Id), Key(value.ObjectId), value.NativeType, value.Segment, value.Geometry, value.Owned, value.Reason, reference_only: value.ReferenceOnly);
     internal static NativeSketchBindings385 Observe(PlanarSketch sketch, DocumentState state, Db.Transaction tx, Action cancel)
     {
-        try { var value = Capture(sketch, state, tx, cancel); return new(true, null, value.Token, value.Members.Select(Describe).ToArray(), "bridge_document_revision", "exact native sketch item IDs and WCS geometry, resident or abstract; segments use SDK MakePolylineSegmentId; no inspection-ID alias"); }
+        SketchMobilityReport? mobility = null;
+        try
+        {
+            using var manager = Manager(sketch);
+            var inventory = NativeSketchInventory.Read(manager, sketch, cancel);
+            mobility = NativeSketchMobilityReader.Read(sketch, manager, inventory, null, null, cancel);
+        }
         catch (OperationCanceledException) { throw; }
-        catch (Exception error) { return new(false, error is DomainException d ? d.Error.code + ": " + d.Message : error.GetType().Name, "", [], "bridge_document_revision", "native inputs unavailable; no edit readiness inferred"); }
+        catch (DomainException e) when (e.Error.code == "RESPONSE_LIMIT_EXCEEDED") { throw; }
+        catch (Exception) { /* A separate optional observation cannot invalidate an actual edit binding. */ }
+        try { var value = Capture(sketch, state, tx, cancel); return new(true, null, value.Token, value.Members.Select(Describe).ToArray(), "bridge_document_revision", "exact native sketch item IDs and WCS geometry, resident or abstract; segments use SDK MakePolylineSegmentId; no inspection-ID alias", mobility); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception error) { return new(false, error is DomainException d ? d.Error.code + ": " + d.Message : error.GetType().Name, "", [], "bridge_document_revision", "native inputs unavailable; no edit readiness inferred", mobility); }
     }
     internal static Constraints2D Manager(PlanarSketch sketch, bool allowUnlinkedEditScope = false)
     {

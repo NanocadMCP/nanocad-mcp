@@ -1,13 +1,63 @@
 using NanoCAD.Contracts;
+using System.Text.Json.Nodes;
 
 internal static class ModelProfileElementGeometry358Tests
 {
     public static async Task Run(Func<string,Func<Task>,Task> test)
     {
         static void Need(bool value,string message){if(!value)throw new Exception(message);}
+        await test("closed profile traversal retains winding and adjacency across a cyclic start change", () =>
+        {
+            var loop = new SketchConstraintCurve[] {
+                new("bottom", "line", new(0,0), new(4,0)),
+                new("corner", "arc", new(4,0), new(5,1), new(4,1), 1, Math.PI/2),
+                new("right", "line", new(5,1), new(5,4)),
+                new("top", "line", new(5,4), new(0,4)),
+                new("left", "line", new(0,4), new(0,0)) };
+            var rotated = loop.Skip(2).Concat(loop.Take(2)).ToArray();
+            var reversed = loop.Reverse().ToArray();
+            Need(ClosedProfileTraversal.Winding(loop,()=>{}) == 1 && ClosedProfileTraversal.Winding(rotated,()=>{}) == 1, "A rotated native contour must retain its direction.");
+            Need(ClosedProfileTraversal.Winding(reversed,()=>{}) == -1, "Reversed traversal must remain distinguishable.");
+            Need(ClosedProfileTraversal.Winding(new[]{loop[0], loop[2], loop[1], loop[3], loop[4]},()=>{}) == 0, "A broken adjacency must not be normalized.");
+            string Canon(string s) { int k=ClosedProfileTraversal.Start(s.Select(c=>c.ToString()).ToArray(),()=>{}); return s[k..] + s[..k]; }
+            Need(Canon("ABACB") == Canon("ACBAB") && Canon("ABACB") != Canon("ABBAC"), "Only cyclic equivalence preserves the perimeter order.");
+            Need(Canon("ABAB") == Canon("BABA"), "Periodic patterns need a deterministic start.");
+            return Task.CompletedTask;
+        });
+        await test("closed profile compares original positions unless both snapshots prove their traversal", () =>
+        {
+            static JsonObject Loop(string order) => new()
+            {
+                ["elements"] = new JsonArray(order.Select((kind, i) => (JsonNode)new JsonObject
+                {
+                    ["element_id"] = i.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["geometry"] = new JsonObject { ["kind"] = kind.ToString() }
+                }).ToArray())
+            };
+            static string CompareSide(string order, int own, int peer)
+            {
+                var loop = Loop(order);
+                ClosedProfileTraversal.AlignForComparison(loop, own, peer, () => {});
+                return loop.ToJsonString();
+            }
+            string original = Loop("BABC").ToJsonString();
+            Need(CompareSide("BABC", 1, 0) == original && CompareSide("BABC", 0, 1) == original, "One-sided proof must leave both original sequences identical.");
+            Need(CompareSide("BABC", 1, 0) != CompareSide("ABCB", 0, 1), "A changed order without both witnesses must still fail.");
+            Need(CompareSide("BABC", 1, 1) == CompareSide("ABCB", 1, 1), "Both witnessed rotations must agree.");
+            Need(CompareSide("BABC", 1, -1) != CompareSide("BABC", -1, 1), "Opposite winding must stay distinguishable.");
+            return Task.CompletedTask;
+        });
         static SketchConstraintCurve Line(string id,double ax,double ay,double bx,double by)=>new(id,"line",new(ax,ay),new(bx,by));
         static SketchConstraintCurve Arc(string id,double start,double sweep)=>new(id,"arc",new(5*Math.Cos(start),5*Math.Sin(start)),
             new(5*Math.Cos(start+sweep),5*Math.Sin(start+sweep)),new(0,0),5,sweep);
+        await test("native arc coverage respects the angular cut at the top right rounded holder corner", () =>
+        {
+            var member = Arc("native member", 0, Math.PI / 2);
+            var profile = Arc("selected perimeter", -1.8e-15, Math.PI / 2 + 2.7e-15);
+            Need(ModelProfileElementGeometry358.SameBoundary([member], [profile], () => {}), "Equivalent native quadrants lost coverage at the angular cut.");
+            Need(!ModelProfileElementGeometry358.SameBoundary([member], [Arc("physical gap", 1e-4, Math.PI / 2 - 1e-4)], () => {}), "A resolved angular gap must remain detectable.");
+            return Task.CompletedTask;
+        });
         await test("block358 mixed native boundaries preserve physical coverage across split and merge",()=>
         {
             var original=new[]{Line("chord",0,-5,0,5),Arc("semicircle",-Math.PI/2,Math.PI)};

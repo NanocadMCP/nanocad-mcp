@@ -33,6 +33,26 @@ public static class DrawingConstraintOperands431
         }
         return matched.HasValue?spec with{Kind="length",Second=null,FirstPoint=null,SecondPoint=null,FirstSegmentIndex=matched,SecondSegmentIndex=null}:spec;
     }
+    public static SketchConstraintSpec ForMobility(SketchConstraintSpec spec, IReadOnlyDictionary<string,SketchConstraintCurve> curves)
+    {
+        // Concrete native vertices are shared by the two adjacent edges of a Polyline.
+        // An open Polyline's final vertex has no following segment.
+        (int? segment, string? role) Endpoint(string? id, int? segment, string? role)
+        {
+            if (id == null || !curves.TryGetValue(id, out var curve) ||
+                DrawingConstraintOperands431.VertexIndex(curve,segment,role) is not int vertex)
+                return (segment,role);
+            int last = curve.Polyline!.Vertices.Length - 1;
+            return !curve.Polyline.Closed && vertex == last ? (last-1,"end") : (vertex,"start");
+        }
+        var canonical = DrawingConstraintOperands431.Canonical(spec,curves);
+        if (canonical.Kind is not ("coincident" or "fix_point" or "distance" or "distance_x" or "distance_y"))
+            return canonical;
+        var first = Endpoint(canonical.First,canonical.FirstSegmentIndex,canonical.FirstPoint);
+        var second = Endpoint(canonical.Second,canonical.SecondSegmentIndex,canonical.SecondPoint);
+        return canonical with { FirstSegmentIndex=first.segment, FirstPoint=first.role,
+            SecondSegmentIndex=second.segment, SecondPoint=second.role };
+    }
     public static bool SameReference(string? first,int? firstSegment,string? firstPoint,string? second,int? secondSegment,string? secondPoint,
         IReadOnlyDictionary<string,SketchConstraintCurve> sources)
     {

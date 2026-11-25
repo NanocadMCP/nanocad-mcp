@@ -3,7 +3,8 @@ using System.Text.Json;
 namespace NanoCAD.Contracts;
 
 public sealed record ModelSketchConstraintRemoval430(string[] Targets,string SketchId,string ExpectedBindingToken,string[] ConstraintIds):EditSpec("delete_sketch_constraints",Targets);
-public sealed record ModelSketchConstraintDeletion430(string sketch_id,string[] deleted_constraint_ids,string[] retired_control_variable_ids,string[] retained_control_variable_ids,bool native_rebuild_accepted,bool model_healthy,string[] unresolved_history_ids);
+public sealed record ModelSketchConstraintDeletion430(string sketch_id,string[] deleted_constraint_ids,string[] retired_control_variable_ids,string[] retained_control_variable_ids,bool native_rebuild_accepted,bool model_healthy,string[] unresolved_history_ids,
+    [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] SketchMobilityReport? mobility_after=null);
 public sealed record ModelSketchConstraintRemovalOutput430(string operation_id,string status,bool replayed,EntityRef[] modified,EntityRef[] erased,EntityRef[] created,CopyMapping[] copies,string undo_history,ModelSketchConstraintDeletion430[] sketch_constraint_deletions);
 
 public static class ModelSketchConstraintRemovalValidation430

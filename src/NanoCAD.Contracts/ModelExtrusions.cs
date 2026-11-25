@@ -17,7 +17,7 @@ public static partial class CreateValidation
     internal static EntitySpec ParseModelExtrusion(JsonElement item, string path, string layer,Action? cancel=null,bool allowNativeGeometry=false)
     {
         Shape(item,path,allowNativeGeometry
-            ?["type","kind","layer","plane","profile","distance","direction","name","editable_profile","native_geometry","initial_constraints","region_point"]
+            ?["type","kind","layer","plane","profile","distance","direction","name","editable_profile","native_geometry","initial_constraints","region_point","preserve_motion","require_verified_constraints"]
             :["type","kind","layer","plane","profile","distance","direction","name","editable_profile"]);
         var plane=Required(item,"plane",path); string pp=path+".plane";
         Shape(plane,pp,"origin","x_axis","y_axis");
@@ -36,14 +36,14 @@ public static partial class CreateValidation
             if(item.TryGetProperty("profile",out _)||item.TryGetProperty("editable_profile",out _))
                 throw Invalid(path,"Use native_geometry or the legacy profile/editable_profile branch, not both.");
             var constraints=item.TryGetProperty("initial_constraints",out var initial)?initial:Wire.Element(Array.Empty<object>());
-            var geometry=NativeSketchValidation385.Parse(native,constraints,frame,path+".native_geometry");
+            var geometry=NativeSketchValidation385.Parse(native,constraints,frame,path+".native_geometry",preserveMotion:item.TryGetProperty("preserve_motion", out var motion) ? motion : null, requireVerifiedConstraints:SketchMotionInput.RequireProof(item));
             var region=Triple(item,"region_point",path);DrawingWorkplane.Local(frame,region);
             string nativeDirection=Text(item,"direction",path,16);
             if(nativeDirection is not "positive" and not "negative")throw Invalid(path+".direction","Use positive or negative relative to plane x_axis cross y_axis.");
             return new ModelExtrusionSpec(frame,new("native_sketch",null,0,null),Number(Required(item,"distance",path),path+".distance",.001,1e6),nativeDirection,Text(item,"name",path,64,"Model"),layer,
                 NativeGeometry:geometry,RegionPoint:region);
         }
-        if(item.TryGetProperty("initial_constraints",out _)||item.TryGetProperty("region_point",out _))
+        if(item.TryGetProperty("initial_constraints",out _)||item.TryGetProperty("region_point",out _)||item.TryGetProperty("preserve_motion",out _)||item.TryGetProperty("require_verified_constraints",out _))
             throw Invalid(path,"initial_constraints and region_point belong to the native_geometry branch.");
         var profile=Required(item,"profile",path); string sp=path+".profile";
         Shape(profile,sp,"kind","center","radius","vertices","bulges");string kind=Text(profile,"kind",sp,16);

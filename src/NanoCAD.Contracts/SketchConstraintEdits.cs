@@ -7,7 +7,11 @@ public sealed record SketchConstraintSpec(string Kind,string First,string? Secon
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? FirstSegmentIndex=null,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? SecondSegmentIndex=null,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] int? ThirdSegmentIndex=null);
-public sealed record SketchConstraintsEdit(string[] Targets,string SketchId,SketchConstraintSpec[] Constraints,string? ExpectedBindingToken=null):EditSpec("add_sketch_constraints",Targets);
+public sealed record SketchConstraintsEdit(string[] Targets,string SketchId,SketchConstraintSpec[] Constraints,string? ExpectedBindingToken=null):EditSpec("add_sketch_constraints",Targets)
+{
+    public SketchMobilityMotion[]? PreserveMotion { get; init; }
+    public bool RequireVerifiedConstraints { get; init; }
+}
 public sealed record SketchConstraintChange(string sketch_id,string constraint_id,string kind,string first_element_id,string? second_element_id,string? variable_id,double? value,
     [property:System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? third_element_id=null);
 public sealed record SketchConstraintCurve(string Id,string Kind,Point2? Start=null,Point2? End=null,Point2? Center=null,double Radius=0,double Sweep=0,
@@ -23,7 +27,7 @@ public static partial class ModifyValidation
 {
     private static SketchConstraintsEdit ParseSketchConstraints(JsonElement item,string path,string[] handles)
     {
-        Shape(item,path,"operation","handles","sketch_id","constraints","expected_binding_token");
+        Shape(item,path,"operation","handles","sketch_id","constraints","expected_binding_token","preserve_motion","require_verified_constraints");
         if(handles.Length!=1)throw Invalid(path,"Choose one native model body.");
         string Identity(JsonElement value,string field,string location)
         {
@@ -34,7 +38,7 @@ public static partial class ModifyValidation
         if(array.ValueKind!=JsonValueKind.Array||array.GetArrayLength()<1)throw Invalid(path,"Use a nonempty array of sketch constraints.");
         if(!item.TryGetProperty("expected_binding_token",out var token)||token.ValueKind!=JsonValueKind.String||token.GetString() is not {Length:64} text||text.Any(c=>!Uri.IsHexDigit(c)))throw Invalid(path,"Read native_inputs.binding_token from inspect_model_history(sketch_ids).");
         var specs=SketchConstraintValidation385.Parse(array,path+".constraints");
-        return new(handles,sketch,specs,text.ToUpperInvariant());
+        return new(handles,sketch,specs,text.ToUpperInvariant()) { RequireVerifiedConstraints = SketchMotionInput.RequireProof(item), PreserveMotion = SketchMotionInput.Read(item.TryGetProperty("preserve_motion", out var motion) ? motion : null, SketchMotionInput.NativeId) };
     }
 }
 

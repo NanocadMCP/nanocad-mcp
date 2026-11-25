@@ -19,9 +19,8 @@ internal static class ModelSketchConstraintObservation353
         using var manager=owner.Get2dConstraintsManager(Constraint2dNetType.Auto,sketch.ID,plane);
         Need(manager!=null&&manager.DocumentId==owner.ID&&manager.PlanarSketchId==sketch.ID&&!manager.ScopeId.IsNull,
             "CONSTRAINT_SCOPE_MISMATCH","The readonly sketch constraint manager lacks exact actual owner/document/sketch scope; no solver/bootstrap is used.");
-        var ids=manager.GetAllConstraints();cancel();
-        if(ids==null)return Wire.Element(new NanoCAD.Contracts.ModelSketchConstraintObservation353(owner.ID.ToString(),sketch.ID.ToString(),manager.ScopeId.ToString(),
-            manager.ConstraintsNetworkType.ToString(),"not_evaluated",false,null,"native_GetAllConstraints_returned_null",Warning));
+        var inventory=NativeSketchInventory.Read(manager,sketch,cancel);
+        var ids=inventory.Ids;
         ModelInventoryBudget.Ids(ids,cancel);var values=new List<JsonElement>();var bytes=new ModelInventoryBudget(cancel);
         object? Reference(IConstraintObjectInfo? info)
         {
@@ -31,7 +30,7 @@ internal static class ModelSketchConstraintObservation353
         }
         foreach(var id in ids.OrderBy(id=>id.ToString(),StringComparer.OrdinalIgnoreCase))
         {
-            cancel();using var info=manager.GetConstraintInfo(id);Need(info!=null,"CONSTRAINTS_UNAVAILABLE","A listed retained constraint has unavailable native metadata.");
+            cancel();using var info=manager.GetConstraintInfo(id);if(info==null&&!inventory.Complete)continue;Need(info!=null,"CONSTRAINTS_UNAVAILABLE","A listed retained constraint has unavailable native metadata.");
             double parameter=info.Param;var item=Wire.Element(new{id=id.ToString(),type=info.Type.ToString(),info.IsGeometrical,info.IsDimensional,
                 first=Reference(info.FirstObject),second=Reference(info.SecondObject),third=Reference(info.ThirdObject),
                 parameter=double.IsFinite(parameter)?(double?)parameter:null,variable_id=ModelProfileDiscovery348.Id(info.VarId),variable_name=info.VarName,
@@ -39,7 +38,7 @@ internal static class ModelSketchConstraintObservation353
             bytes.Add(item);values.Add(item);
         }
         return Wire.Element(new NanoCAD.Contracts.ModelSketchConstraintObservation353(owner.ID.ToString(),sketch.ID.ToString(),manager.ScopeId.ToString(),
-            manager.ConstraintsNetworkType.ToString(),"not_evaluated",true,values.ToArray(),null,null));
+            manager.ConstraintsNetworkType.ToString(),"not_evaluated",inventory.Complete,values.Count>0||inventory.Complete?values.ToArray():null,inventory.Reason,inventory.Complete?null:Warning));
     }
     internal static bool Complete(JsonElement observation)=>observation.GetProperty("constraints_complete").GetBoolean();
     internal static string[] Warnings(IEnumerable<JsonElement> observations)=>observations.Any(value=>!Complete(value))?[Warning]:[];
