@@ -22,10 +22,16 @@ internal static class DrawingViewsSchema
             ["type"] = "object",
             ["additionalProperties"] = false,
             ["required"] = new JsonArray("view_handle"),
-            ["description"] = "Check an ordinary paper projection at its current or proposed origin. Supply a free rectangle [minX,minY,maxX,maxY] in sheet WCS, optional clearance in drawing units, and inspect obstacle bounds and suggested alignment-preserving translation. Separate read from geometry/source detail. No movement or regeneration.",
+            ["description"] = "Check an ordinary paper projection at its current or proposed origin. Supply a free rectangle [minX,minY,maxX,maxY] in sheet WCS, optional clearance in drawing units, and inspect obstacle bounds and suggested alignment-preserving translation. Use include_aligned_group on a root view to fit aligned descendants and their attached dimension envelopes together. The result supplies native property operations for the same revision. Inspect the sheet again after applying them.",
             ["properties"] = new JsonObject
             {
                 ["view_handle"] = handle.DeepClone(),
+                ["include_aligned_group"] = new JsonObject { ["type"] = "boolean", ["default"] = false },
+                ["compact_spacing"] = new JsonObject { ["type"] = "boolean", ["description"] = "Prefer compact spacing even when the existing spacing fits at the requested origin." },
+                ["frame_handle"] = handle.DeepClone(),
+                ["annotation_margin"] = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["description"] = "Reserve this much paper space around each view for future annotation in aligned group mode." },
+                ["reserved_areas"] = new JsonObject { ["type"] = "array", ["items"] = NumericArray(4), ["description"] = "Keep these paper rectangles free, including blank title-block cells and space reserved for notes." },
+                ["member_sides"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = new JsonObject { ["enum"] = new JsonArray("left", "right", "above", "below") }, ["description"] = "Optional child-handle to paper-side mapping for coincident aligned origins. Must agree with any measured alignment." },
                 ["proposed_origin"] = NumericArray(2),
                 ["available_area"] = NumericArray(4),
                 ["clearance"] = new JsonObject { ["type"] = "number", ["minimum"] = 0 },

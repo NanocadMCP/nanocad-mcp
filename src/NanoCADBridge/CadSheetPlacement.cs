@@ -7,14 +7,14 @@ using G = Multicad.Geometry;
 
 namespace NanoCADBridge;
 
-internal static class CadSheetPlacement
+internal static partial class CadSheetPlacement
 {
     private sealed record Mark(string Kind, SheetBox Bounds);
     private sealed record Parts(string Status, List<Mark> Marks);
     private sealed record Footprint(string Handle, string Kind, string Source, SheetBox? Box, Parts? Parts = null);
 
     internal static object Read(SheetPlacementRequest request, Layout layout, BlockTableRecord block, Transaction tx,
-        List<(Entity Entity, McObjectId Id, DrawingView View)> views, Action check, int responseRoom)
+        List<(Entity Entity, McObjectId Id, DrawingView View)> views, Action check, int responseRoom, string instance, string documentId)
     {
         if (layout.ModelType) throw new DomainException("OUT_OF_SCOPE", "Sheet placement requires an explicit Paper layout.");
         var target = views.SingleOrDefault(v => v.Entity.Handle.ToString() == request.View);
@@ -57,6 +57,8 @@ internal static class CadSheetPlacement
             if (id == target.Entity.ObjectId) selected = row;
             else objects.Add(row);
         }
+        if (request.IncludeAlignedGroup)
+            return ReadGroup(request, layout, block, tx, views, selected, objects, area, extent, proposed, check, responseRoom, instance, documentId);
         var at = selected?.Box?.Shift(delta.X, delta.Y);
         int unknown = objects.Count(o => o.Box == null);
         var fixedBoxes = objects.Where(o => o.Box.HasValue).Select(o => o.Box!.Value).ToArray();

@@ -14,6 +14,12 @@ internal sealed class ModelHistoryFocus
     private readonly HashSet<string> external = new(Identity);
     private readonly HashSet<string> unknownStatus = new(Identity);
     private readonly HashSet<string> upstreamIssueCandidates = new(Identity);
+    private readonly Dictionary<string, HistoryIssueDiagnosis.Node>? issueNodes;
+    private readonly Dictionary<string, string[]>? observedDependencies;
+    internal Dictionary<string, HistoryIssueDiagnosis.Support>? SketchSupports { get; }
+    internal Dictionary<string, HistoryIssueDiagnosis.Evidence>? IssueEvidence { get; }
+    internal string[]? ObservedDependencies(string id) => observedDependencies?.GetValueOrDefault(id);
+    internal string? DependencyProblem(string id) => issueNodes?.GetValueOrDefault(id)?.InventoryProblem;
     private readonly HashSet<string>? downstream;
     private readonly HashSet<string>? externalDownstream;
     private readonly List<ModelConcentricHole.CreatorLink> placementLinks = new();
@@ -21,6 +27,13 @@ internal sealed class ModelHistoryFocus
 
     internal ModelHistoryFocus(List<McObjectId> contents, string bodyId, string request, bool includeDownstream, Action cancel)
     {
+        if (request == "issues")
+        {
+            issueNodes = new(Identity);
+            observedDependencies = new(Identity);
+            SketchSupports = new(Identity);
+            IssueEvidence = new(Identity);
+        }
         var graph = new Dictionary<string, string[]>(Identity);
         var activeIssues = new HashSet<string>(Identity);
         List<McObjectId>? nativeDependents = null;
@@ -32,11 +45,32 @@ internal sealed class ModelHistoryFocus
             string[] dependencies = [];
             if (node != null)
             {
-                var native = node.GetDependsOn(false, false) ?? throw new DomainException("HISTORY_UNAVAILABLE", "A native history item returned no dependency inventory.");
-                dependencies = native.Where(d => !d.IsNull).Select(d => d.ToString())
-                    .Where(d => !Identity.Equals(d, bodyId)).Distinct(Identity).ToArray();
+                IEnumerable<McObjectId>? native;
+                string? problem = null;
+                try { native = node.GetDependsOn(false, false); }
+                catch (Exception e) when (issueNodes != null && e is not (OperationCanceledException or DomainException or OutOfMemoryException))
+                {
+                    native = null;
+                    problem = "native_dependency_read_failed:" + e.GetType().Name;
+                }
+                if (native == null)
+                {
+                    if (issueNodes == null) throw new DomainException("HISTORY_UNAVAILABLE", "A native history item returned no dependency inventory.");
+                    problem ??= "native_dependency_list_unavailable";
+                }
+                var nativeIds = native?.ToArray() ?? [];
+                if (issueNodes != null && nativeIds.Any(d => d.IsNull)) problem ??= "null_native_dependency_id";
+                var direct = nativeIds.Where(d => !d.IsNull).Select(d => d.ToString()).ToArray();
+                dependencies = direct.Where(d => !Identity.Equals(d, bodyId)).Distinct(Identity).ToArray();
+                if (issueNodes != null)
+                {
+                    observedDependencies![key] = direct;
+                    issueNodes[key] = node.ID == id && Identity.Equals(node.HostSolidID.ToString(), bodyId)
+                        ? new(key, node.Name, node.Status.ToString(), !node.IsSuppressed && !node.IsBeyondEndOfPart, dependencies, problem)
+                        : new(key, null, null, true, [], "part_ownership_unverified");
+                }
                 if (includeDownstream && id.GetObjectOfType<HoleFeature>() is { } hole && hole.ID == id &&
-                    Identity.Equals(hole.HostSolidID.ToString(), bodyId) && ModelConcentricHole.ReadCreatorLink(hole, native) is { } link)
+                    Identity.Equals(hole.HostSolidID.ToString(), bodyId) && ModelConcentricHole.ReadCreatorLink(hole, native!) is { } link)
                     placementLinks.Add(link);
                 if (includeDownstream && Identity.Equals(key, request))
                 {
@@ -50,6 +84,8 @@ internal sealed class ModelHistoryFocus
                 if (status == "Unknown") unknownStatus.Add(key);
                 if (!node.IsSuppressed && status is ("Error" or "Warn" or "NeedUpdate")) activeIssues.Add(key);
             }
+            else if (issueNodes != null)
+                issueNodes[key] = new(key, null, null, true, [], "not_a_history_item");
             graph[key] = dependencies;
         }
         if (request == "issues") selected.UnionWith(activeIssues);
@@ -118,7 +154,7 @@ internal sealed class ModelHistoryFocus
         return result;
     }
 
-    internal object Describe(string request, string handle, IEnumerable<object> nodes)
+    internal object Describe(string request, string handle, string partId, IEnumerable<object> nodes, Action cancel, Action<object> charge)
     {
         var drivers = new List<object>();
         foreach (var value in nodes)
@@ -141,6 +177,7 @@ internal sealed class ModelHistoryFocus
         return new
         {
             request,
+            issue_diagnosis = issueNodes == null ? null : HistoryIssueDiagnosis.Explain(partId, issueNodes, IssueEvidence!, cancel, charge),
             selected_ids = selected.OrderBy(id => id, Identity),
             upstream_ids = upstream.OrderBy(id => id, Identity),
             direct_consumer_ids = consumers.OrderBy(id => id, Identity),

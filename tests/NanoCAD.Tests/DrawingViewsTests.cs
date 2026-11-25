@@ -7,6 +7,37 @@ internal static class DrawingViewsTests
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
         Dictionary<string, object> Input() => new() { ["bridge_instance_id"] = Guid.NewGuid().ToString("D"), ["document_id"] = Guid.NewGuid().ToString("D"), ["expected_revision"] = "12", ["layout_handle"] = "000aB" };
+        await test("group placement compacts scattered views, clears title graphics and accounts for attached dimensions", () =>
+        {
+            var border = new SheetBox(0, 0, 40, 25);
+            List<SheetBox> strokes = [new(0,0,0,25), new(40,0,40,25), new(0,0,40,0), new(0,25,40,25),
+                new(22, 15, 22, 25), new(22, 15, 40, 15), new(30, 15, 30, 25)];
+            var frameParts = SheetGroupPlacement.FrameObstacles(border, strokes, () => { });
+            if (!frameParts.Contains(new(22, 15, 40, 25)) || frameParts.Contains(border)) throw new Exception("Blank ruled cells must be reserved and the blank frame interior released.");
+            if (SheetGroupPlacement.FrameObstacles(border, strokes.Skip(1).ToList(), () => { }).Single() != border)
+                throw new Exception("An incomplete perimeter cannot prove a frame.");
+            var root = new SheetGroupMember("A", -1, "root", new(0, 0), new(-5, -5, 9, 5)); // dimension protrudes right
+            var right = new SheetGroupMember("B", 0, "right", new(150, 0), new(147, -3, 153, 3));
+            var top = new SheetGroupMember("C", 0, "above", new(0, 1), new(-4, -2, 4, 4)); // overlaps root
+            SheetGroupMember[] members = [root, right, top];
+            var frame = new SheetBox(0, 0, 40, 25);
+            SheetBox[] obstacles = [new(22, 15, 40, 25)];
+            var fit = SheetGroupPlacement.Fit(members, obstacles, frame, new(10, 8), 2, () => { });
+            if (fit == null || fit[0] != new Point2(10, 8) || fit[1] != new Point2(24, 8) || fit[2] != new Point2(10, 18))
+                throw new Exception("A side view can sit beside the title block while the top view sits above the root.");
+            if (SheetGroupPlacement.Fit(members, obstacles, new(0, 0, 15, 15), new(10, 8), 2, () => { }) != null)
+                throw new Exception("Insufficient space accepted.");
+            SheetGroupMember[] spread = [root, right with { Origin = new(30, 0), Envelope = new(27, -3, 33, 3) }];
+            var same = SheetGroupPlacement.Fit(spread, [], new(-20, -20, 45, 40), new(0, 0), 2, () => { });
+            var compact = SheetGroupPlacement.Fit(spread, [], new(-20, -20, 45, 40), new(0, 0), 2, () => { }, compactSpacing: true);
+            if (same?[1].X != 30 || compact?[1].X != 14) throw new Exception("Existing readable spacing requires an explicit compaction request.");
+            var input = Input();
+            input["sheet_placement"] = new { view_handle = "A", include_aligned_group = true, annotation_margin = 3, reserved_areas = new[] { new[] { 3, 4, 9, 10 } }, member_sides = new { B = "right" } };
+            var request = Validation.Parse("get_drawing_views", Wire.Element(input)).SheetPlacement;
+            if (request is not { IncludeAlignedGroup: true, AnnotationMargin: 3 } || request.MemberSides["B"] != "right" || request.ReservedAreas.Single() != new SheetBox(3, 4, 9, 10))
+                throw new Exception("Group parameters lost in the public parser.");
+            return Task.CompletedTask;
+        });
         await test("dimension lookup requires both a native view and its current marker", () =>
         {
             var input = Input();
@@ -37,7 +68,7 @@ internal static class DrawingViewsTests
             var actual = target.Shift(x - 145.81, 0);
             if (actual.Conflicts(obstacle, .5) || !actual.Shift(-.000001, 0).Conflicts(obstacle, .5))
                 throw new Exception("An absolute suggested origin must still clear the requested gap after coordinate roundoff.");
-            foreach (object bad in new object[] { new { view_handle = "3", available_area = new[] { 3, 1, 2, 4 } }, new { view_handle = "3", clearance = -1 }, new { view_handle = "3", apply = true } })
+            foreach (object bad in new object[] { new { view_handle = "3", available_area = new[] { 3, 1, 2, 4 } }, new { view_handle = "3", clearance = -1 }, new { view_handle = "3", apply = true }, new { view_handle = "3", annotation_margin = 2 }, new { view_handle = "3", include_aligned_group = 1 }, new { view_handle = "3", include_aligned_group = true, member_sides = new { A = "front" } } })
             {
                 input["sheet_placement"] = bad;
                 try { Validation.Parse("get_drawing_views", Wire.Element(input)); } catch (DomainException) { continue; }

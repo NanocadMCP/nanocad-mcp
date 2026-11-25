@@ -27,7 +27,7 @@ internal static class ModelHistorySchema
         {
             ["type"] = "string",
             ["pattern"] = @"^(issues|\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\})$",
-            ["description"] = "For one part, select a current native feature ID or issues. Return the selected nodes, upstream part dependencies, direct consumers and observed parameter identities. Issues includes active Error, Warn and NeedUpdate records. Unresolved references and unknown statuses are reported separately."
+            ["description"] = "For one part, select a current native feature ID or issues. Return the selected nodes, upstream part dependencies, direct consumers and observed parameter identities. For issues, dependency_trace.issue_diagnosis reports first observed errors, links to downstream errors, native messages, sketch support IDs and unresolved dependency edges. Warnings and pending updates have separate roles."
         };
         schema["properties"]!["include_downstream_history"] = new JsonObject
         {

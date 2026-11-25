@@ -256,10 +256,20 @@ internal static class SchemaCompactor
                 if (drawing)
                     foreach (string role in new[] { "first", "second", "third" })
                         relation[role + "_segment_index"] = new JsonObject { ["type"] = "integer", ["minimum"] = 0 };
-                proposed["items"] = new JsonObject { ["type"] = "object", ["properties"] = relation,
-                    ["required"] = new JsonArray("kind", "first"), ["additionalProperties"] = false };
+                proposed["items"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = relation,
+                    ["required"] = new JsonArray("kind", "first"),
+                    ["additionalProperties"] = false
+                };
                 Hint("proposed_constraints", drawing ? "Drawing handles, angles in degrees." : "Native sketch member IDs, angles in radians.");
                 Hint("preserve_motion", "Members moving together along the given sketch-plane direction.");
+                break;
+            case "get_drawing_views":
+                Hint("sheet_placement", "Paper XY. Select the root and include_aligned_group to preview related views. Read label conflicts before applying suggested_operations.");
+                Hint("geometry_source_marker", "Use a current view geometry marker and the same drawing revision.");
+                Hint("marker_dimensions", "Find dimensions anchored to the selected view marker. Follow the returned page index.");
                 break;
             case "inspect_model_history":
                 Hint("include_downstream_history", "Include direct and indirect consumers inside the part for the selected native history ID.");

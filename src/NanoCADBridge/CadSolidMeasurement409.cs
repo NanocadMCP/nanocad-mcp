@@ -11,7 +11,7 @@ namespace NanoCADBridge;
 
 // Finite native topology is measured without tessellation, bounding-box gaps,
 // database face copies or the host's unavailable whole-body point classifier.
-internal static class CadSolidMeasurement409
+internal static partial class CadSolidMeasurement409
 {
     private sealed record Segment(string Id, Line Curve)
     {
@@ -58,6 +58,8 @@ internal static class CadSolidMeasurement409
         try
         {
             var units = new { name = state.Document.Database.Insunits.ToString(), value = (int)state.Document.Database.Insunits };
+            if (request.Mode == "cylindrical_fit")
+                return ReadCylindricalFit(request.Faces!, bodies, Ref, units, Check);
             if (SolidMeasurementValidation409.IsAxisMeasurement(request.Mode))
                 return ReadAxisMeasurement(request, bodies, Ref, units, Check);
             foreach (var item in bodies)

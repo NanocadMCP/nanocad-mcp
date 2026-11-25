@@ -14,6 +14,54 @@ internal static class ModelHistoryTests
             catch (DomainException) { return; }
             throw new Exception("Invalid history request accepted.");
         }
+        await test("rebuild diagnosis reports nearest observed errors through actual dependency paths", () =>
+        {
+            HistoryIssueDiagnosis.Node Item(string id, string status, params string[] inputs) => new(id, id, status, true, inputs, null);
+            var sketch = Item("sketch", "Error", "face");
+            var nodes = new[] { sketch, Item("profile", "Error", "sketch"), Item("helper", "Ok", "profile"),
+                Item("cut", "Error", "helper", "cut2"), Item("cut2", "Error"), Item("warning", "Warn", "sketch"),
+                Item("update", "NeedUpdate"), Item("disabled", "Error") with { Active = false } }.ToDictionary(n => n.Id);
+            var brokenSupport = new HistoryIssueDiagnosis.Support("face", "face", "unavailable", new { reason = "bound_geometry_unavailable" });
+            var evidence = new Dictionary<string, HistoryIssueDiagnosis.Evidence>
+            {
+                ["sketch"] = new([new("Error", "Plane unavailable")], "read", brokenSupport)
+            };
+            var report = HistoryIssueDiagnosis.Explain("body", nodes, evidence, () => { }, _ => { });
+            string[] ExpectedPath(string parent, string child) => report.error_links.Single(link =>
+                link.upstream_error_id == parent && link.downstream_error_id == child).dependency_path;
+            if (report.state != "observed_errors" || report.error_links.Count != 3 ||
+                !ExpectedPath("sketch", "profile").SequenceEqual(["sketch", "profile"]) ||
+                !ExpectedPath("profile", "cut").SequenceEqual(["profile", "helper", "cut"]) ||
+                !ExpectedPath("cut2", "cut").SequenceEqual(["cut2", "cut"]) ||
+                report.issues.Single(x => x.id == "sketch") is not { role: "first_observed_error", native_evidence.sketch_support.id: "face" } ||
+                report.issues.Single(x => x.id == "cut").role != "downstream_error" ||
+                report.issues.Single(x => x.id == "warning").role != "warning" ||
+                report.issues.Single(x => x.id == "update").role != "update_requested" ||
+                report.issues.Any(x => x.id == "disabled") ||
+                report.unresolved_edges.Single() != new HistoryIssueDiagnosis.Boundary("sketch", "face", "outside_part_history"))
+                throw new Exception("The diagnostic did not preserve the upstream/downstream identities and scope of the fault.");
+            return Task.CompletedTask;
+        });
+        await test("rebuild diagnosis retains unknown and cyclic dependencies without inventing a root", () =>
+        {
+            HistoryIssueDiagnosis.Node Item(string id, string status, params string[] inputs) => new(id, id, status, true, inputs, null);
+            var nodes = new[] { Item("a", "Error", "b"), Item("b", "Error", "a"), Item("consumer", "Error", "b"),
+                Item("other", "Error", "unknown") with { InventoryProblem = "native_dependency_list_unavailable" },
+                Item("unknown", "Unknown") }.ToDictionary(n => n.Id);
+            var report = HistoryIssueDiagnosis.Explain("body", nodes, new Dictionary<string, HistoryIssueDiagnosis.Evidence>(), () => { }, _ => { });
+            if (!report.issues.Where(n => n.role == "cyclic_error").Select(n => n.id).ToHashSet().SetEquals(["a", "b"]) ||
+                report.issues.Single(n => n.id == "consumer").role != "downstream_error" ||
+                report.issues.Single(n => n.id == "other").role != "unresolved_error" ||
+                report.unresolved_edges.Count != 2 || !report.unknown_status_ids.SequenceEqual(["unknown"]))
+                throw new Exception("An unresolved or cyclic failure was attributed to an unrelated feature.");
+            var unowned = new HistoryIssueDiagnosis.Node("foreign", null, null, true, [], "part_ownership_unverified");
+            var helper = new HistoryIssueDiagnosis.Node("helper", null, null, true, [], "not_a_history_item");
+            var partial = HistoryIssueDiagnosis.Explain("body", new[] { unowned, helper }.ToDictionary(n => n.Id),
+                new Dictionary<string, HistoryIssueDiagnosis.Evidence>(), () => { }, _ => { });
+            if (partial.state != "status_incomplete" || !partial.unknown_status_ids.SequenceEqual(["foreign"]))
+                throw new Exception("A helper with no status must remain distinct from a feature of unverified ownership.");
+            return Task.CompletedTask;
+        });
         await test("part chain two stored hole slots can use the same parent with distinct markers", () =>
         {
             var first = NanoCADBridge.ModelHolePlacementSlots.Observe(0, false, "A", 12, 0.25, 3);

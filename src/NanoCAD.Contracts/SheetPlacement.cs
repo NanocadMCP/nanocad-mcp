@@ -8,6 +8,8 @@ public readonly record struct SheetBox(double Left, double Bottom, double Right,
         && Left <= Right && Bottom <= Top;
     public bool HasArea => Valid && Left < Right && Bottom < Top;
     public double[] Coordinates() => [Left, Bottom, Right, Top];
+    public SheetBox Union(SheetBox b) => new(Math.Min(Left, b.Left), Math.Min(Bottom, b.Bottom), Math.Max(Right, b.Right), Math.Max(Top, b.Top));
+    public SheetBox Expand(double margin) => new(Left - margin, Bottom - margin, Right + margin, Top + margin);
     public SheetBox Shift(double dx, double dy) => new(Left + dx, Bottom + dy, Right + dx, Top + dy);
     // Returning an absolute origin and reading it back adds two roundings to a solved translation.
     // Treat adjoining representable doubles at an envelope boundary as contact.
@@ -20,13 +22,20 @@ public readonly record struct SheetBox(double Left, double Bottom, double Right,
 
 public sealed record SheetPlacementRequest(string View, Point2? Proposed, SheetBox? Area, double Clearance, int Start, int Size)
 {
+    public bool CompactSpacing { get; init; }
+    public string? FrameHandle { get; init; }
+    public bool IncludeAlignedGroup { get; init; }
+    public SheetBox[] ReservedAreas { get; init; } = [];
+    public double AnnotationMargin { get; init; }
+    public Dictionary<string, string> MemberSides { get; init; } = new(StringComparer.Ordinal);
+
     public static SheetPlacementRequest Parse(JsonElement input)
     {
         DomainException Invalid(string reason) => new("INVALID_ARGUMENT", "sheet_placement: " + reason);
         if (input.ValueKind != JsonValueKind.Object) throw Invalid("expected an object.");
         var fields = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var item in input.EnumerateObject())
-            if (item.Name is not ("view_handle" or "proposed_origin" or "available_area" or "clearance" or "start_index" or "page_size")
+            if (item.Name is not ("view_handle" or "proposed_origin" or "available_area" or "clearance" or "start_index" or "page_size" or "include_aligned_group" or "annotation_margin" or "member_sides" or "reserved_areas" or "compact_spacing" or "frame_handle")
                 || !fields.TryAdd(item.Name, item.Value)) throw Invalid("unknown or duplicate field " + item.Name);
         if (!fields.TryGetValue("view_handle", out var handle) || handle.ValueKind != JsonValueKind.String)
             throw Invalid("view_handle must identify a view on the selected paper layout.");
@@ -46,8 +55,53 @@ public sealed record SheetPlacementRequest(string View, Point2? Proposed, SheetB
         if (area is { HasArea: false }) throw Invalid("available_area must have positive width and height.");
         double gap = fields.TryGetValue("clearance", out var requested) ? Number(requested) : 0;
         if (gap < 0) throw Invalid("clearance must be nonnegative.");
+        bool group = fields.TryGetValue("include_aligned_group", out var mode) && mode.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => throw Invalid("include_aligned_group must be a boolean.")
+        };
+        double margin = fields.TryGetValue("annotation_margin", out var reserve) ? Number(reserve) : 0;
+        if (margin < 0 || !group && (fields.ContainsKey("annotation_margin") || fields.ContainsKey("member_sides")))
+            throw Invalid("annotation_margin and member_sides require group mode and a nonnegative margin.");
+        bool compact = false;
+        string? frame = null;
+        if (fields.TryGetValue("compact_spacing", out var spacing))
+        {
+            if (!group || spacing.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw Invalid("compact_spacing requires group mode and a boolean.");
+            compact = spacing.GetBoolean();
+        }
+        if (fields.TryGetValue("frame_handle", out var frameId))
+        {
+            if (!group || frameId.ValueKind != JsonValueKind.String) throw Invalid("frame_handle requires group mode and the sheet border block handle.");
+            frame = Validation.NormalizeHandle(frameId.GetString()!);
+        }
+        var reserved = new List<SheetBox>();
+        if (fields.TryGetValue("reserved_areas", out var exclusions))
+        {
+            if (!group || exclusions.ValueKind != JsonValueKind.Array) throw Invalid("reserved_areas is an array of fixed paper rectangles in group mode.");
+            foreach (var corners in exclusions.EnumerateArray())
+            {
+                if (corners.ValueKind != JsonValueKind.Array || corners.GetArrayLength() != 4) throw Invalid("A reserved area needs four coordinates.");
+                var box = new SheetBox(Number(corners[0]), Number(corners[1]), Number(corners[2]), Number(corners[3]));
+                if (!box.HasArea) throw Invalid("A reserved area must have positive width and height.");
+                reserved.Add(box);
+            }
+        }
+        var sides = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (fields.TryGetValue("member_sides", out var directions))
+        {
+            if (directions.ValueKind != JsonValueKind.Object) throw Invalid("member_sides must map child handles to paper sides.");
+            foreach (var item in directions.EnumerateObject())
+            {
+                if (item.Value.ValueKind != JsonValueKind.String || item.Value.GetString() is not ("left" or "right" or "above" or "below") ||
+                    !sides.TryAdd(Validation.NormalizeHandle(item.Name), item.Value.GetString()!))
+                    throw Invalid("Each child handle must specify one of left, right, above or below.");
+            }
+        }
         return new(Validation.NormalizeHandle(handle.GetString()!), xy == null ? null : new(xy[0], xy[1]),
-            area, gap, Index("start_index", 0, 0), Index("page_size", 100, 1));
+            area, gap, Index("start_index", 0, 0), Index("page_size", 100, 1))
+        { IncludeAlignedGroup = group, AnnotationMargin = margin, CompactSpacing = compact, FrameHandle = frame, MemberSides = sides, ReservedAreas = reserved.ToArray() };
     }
 }
 

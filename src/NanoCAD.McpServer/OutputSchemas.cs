@@ -444,7 +444,15 @@ internal static class OutputSchemas
         body["properties"]!["body_name"] = Nullable(Text());
         AddBodyNameProvenance(body["properties"]!);
         body["properties"]!["edit_routes"] = AnyObject();
-        body["properties"]!["dependency_trace"] = AnyObject();
+        var support = Object(("id", Nullable(Text())), ("kind", Nullable(Text())), ("state", Text()), ("detail", Nullable(AnyObject())));
+        var evidence = Object(("notices", Array(Object(("severity", Text()), ("description", Nullable(Text()))))),
+            ("notice_state", Text()), ("sketch_support", Nullable(support)));
+        var issue = Object(("id", Text()), ("name", Nullable(Text())), ("status", Text()), ("role", Text()), ("native_evidence", Nullable(evidence)));
+        var issueLink = Object(("upstream_error_id", Text()), ("downstream_error_id", Text()), ("dependency_path", Array(Text())));
+        var boundary = Object(("consumer_id", Text()), ("dependency_id", Nullable(Text())), ("reason", Text()));
+        var diagnosis = Object(("part_id", Text()), ("state", Text()), ("issues", Array(issue)), ("error_links", Array(issueLink)),
+            ("unresolved_edges", Array(boundary)), ("unknown_status_ids", Array(Text())));
+        body["properties"]!["dependency_trace"] = new JsonObject { ["type"] = "object", ["properties"] = new JsonObject { ["issue_diagnosis"] = Nullable(diagnosis) } };
         body["properties"]!["reference_planes"] = Array(Object(("name", Text()), ("plane_id", Text()), ("scope", Text())));
         var result = Object(("identity_scope", Text()), ("graph_scope", Text()), ("items", Array(body)));
         result["properties"]!["document_sketch_inventory"] = Nullable(ModelSketchLifecycleSchema362.InventoryOutput());

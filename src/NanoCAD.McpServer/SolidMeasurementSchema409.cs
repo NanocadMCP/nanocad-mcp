@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 
 namespace NanoCAD.McpServer;
 
-internal static class SolidMeasurementSchema409
+internal static partial class SolidMeasurementSchema409
 {
     internal const string Description = "Use analyze_geometry solid_distance for minimum distance between complete boundaries of two native Solid3d bodies whose faces are planar and whose finite edges are straight. The result also reports native material interference and material clearance; nested interfering bodies can have positive boundary distance and zero material clearance. face_distance measures two bounded trimmed planar straight-edged faces selected by their current topology native_id and body handle. Other faces of those bodies may be curved. wall_thickness measures one local normal material chord at a WCS point strictly inside the first selected face, between opposed parallel faces of one complete planar straight-edged body, and rejects intervening body/cavity boundaries. It is not global minimum wall thickness. All witnesses use WCS drawing units. Reacquire topology after edits. No workplane, UCS projection, tessellation or bounding-box distance is used.";
     internal const string AxisDescription = "cylinder_diameter reads the native diameter and WCS axis of one circular cylindrical face. axis_axis_distance measures the infinite axes of two such faces. axis_plane_distance measures the first cylindrical face axis against the second face's infinite supporting plane. Select current body handles and native face IDs from inspect_solid_topology. Near-parallel geometry uses the reported native vector tolerance. These reads use native analytic surfaces without fitting or classifying holes. Axis measurements do not establish finite face or material clearance.";
@@ -22,7 +22,7 @@ internal static class SolidMeasurementSchema409
                 {
                     ["type"] = "array",
                     ["uniqueItems"] = true,
-                    ["minItems"] = mode == "solid_distance" ? 2 : 1,
+                    ["minItems"] = mode is "solid_distance" or "cylindrical_fit" ? 2 : 1,
                     ["maxItems"] = mode == "wall_thickness" ? 1 : faceCount,
                     ["items"] = Handle(),
                     ["description"] = "Exactly the body handles used by this measurement and its face selections."
@@ -37,7 +37,7 @@ internal static class SolidMeasurementSchema409
                     ["minItems"] = faceCount,
                     ["maxItems"] = faceCount,
                     ["uniqueItems"] = true,
-                    ["description"] = "Ordered native face selections from inspect_solid_topology. Use the count and face types of the selected mode. For axis_plane_distance, put the cylindrical face first and the planar face second.",
+                    ["description"] = "Ordered native face selections from inspect_solid_topology. Use the count and face types of the selected mode. For axis_plane_distance, put the cylinder first. For cylindrical_fit, select the exterior shaft then the interior bore, on distinct bodies.",
                     ["items"] = Obj(new() { ["handle"] = Handle(), ["native_id"] = NativeId() })
                 }; required.Add("faces");
             }
@@ -52,7 +52,7 @@ internal static class SolidMeasurementSchema409
         return new()
         {
             ["type"] = "object",
-            ["description"] = Description + " " + AxisDescription,
+            ["description"] = Description + " " + AxisDescription + " " + FitDescription,
             ["oneOf"] = new JsonArray(NanoCAD.Contracts.SolidMeasurementValidation409.Modes.Select(mode => (JsonNode?)Branch(mode)).ToArray())
         };
     }
@@ -110,7 +110,7 @@ internal static class SolidMeasurementSchema409
         var axisPlane = AxisDistance("axis_plane_distance");
         axisPlane["cylinder"] = Cylinder();
         axisPlane["plane"] = Obj(new() { ["face"] = FaceRef(), ["origin"] = Triple(), ["normal"] = Triple() });
-        return new() { ["oneOf"] = new JsonArray(Distance("solid_distance"), Distance("face_distance"), Obj(wall), Obj(diameter), Obj(axes), Obj(axisPlane)) };
+        return new() { ["oneOf"] = new JsonArray(Distance("solid_distance"), Distance("face_distance"), Obj(wall), Obj(diameter), Obj(axes), Obj(axisPlane), FitOutput()) };
     }
 
     private static JsonObject Obj(JsonObject properties) => new() { ["type"] = "object", ["additionalProperties"] = false, ["properties"] = properties, ["required"] = new JsonArray(properties.Select(p => (JsonNode?)JsonValue.Create(p.Key)).ToArray()) };

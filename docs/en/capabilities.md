@@ -12,6 +12,14 @@ Part sketches and ordinary drawing geometry can report their remaining local deg
 
 The calculation uses the actual selected geometry, its relations and the sketch plane. Where the native inventory, references or equations are incomplete, the affected count is unavailable. A fully constrained flag alone cannot supply a count. Sketch angles use radians and ordinary drawing angles use degrees.
 
+## Drawing layout and part inspection
+
+For a sheet with related orthographic projections, select the parent view and request group placement. The preview considers paper boundaries, title-block graphics, the alignment side of each child, room for dimensions and the measured extents of attached annotations. Review the proposed origins and label conflicts before applying the group of view edits. An independent paper dimension stays at its paper coordinates.
+
+A part history inspection focused on issues can trace a failing feature through its observed inputs to an earlier failing sketch, profile or operation. It reports native messages and the sketch support when available. Missing links limit how far the failure can be traced.
+
+For a shaft in a bore, select the outside cylindrical face of the shaft and the inside cylindrical face of the bore. The finite engagement length and signed radial clearance account for the actual limits of the two selected surfaces and their axis offset. With no axial overlap, the result reports the axial separation. This measurement covers complete round cylindrical bands with parallel axes.
+
 ## Part names and model history
 
 Naming a parametric body sets its top-level caption in the 3D History panel and retains it in the DWG. In nanoCAD 26, a nonparametric solid can show a new caption during the session but reverts to its generated caption on reopen, including when it was renamed in nanoCAD itself. The bridge reports BODY_NAME_PERSISTENCE_UNAVAILABLE before changing any body in a naming request that includes such a solid. The construction history item and its sketches and features keep their individual names. Drawings created with older versions can still be searched by their existing history item names and DWG group labels. Parts that share a name appear as separate search results.

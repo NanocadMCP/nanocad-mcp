@@ -885,7 +885,7 @@ internal static class DrawingViewsReader
             var output = JsonSerializer.SerializeToNode(result, Wire.Json)!.AsObject();
             int room = Wire.PayloadBudget - 8192 - JsonSerializer.SerializeToUtf8Bytes(output, Wire.Json).Length;
             output["sheet_placement"] = JsonSerializer.SerializeToNode(
-                CadSheetPlacement.Read(placement, layout, block, tx, found, Budget, room), Wire.Json);
+                CadSheetPlacement.Read(placement, layout, block, tx, found, Budget, room, instance, state.Id), Wire.Json);
             CadDrawingViewLifecycleState345.Bytes(output, Budget, Wire.PayloadBudget - 8192);
             return Wire.Element(output);
         }

@@ -8,7 +8,7 @@ public sealed record SolidMeasurement409(string Mode, SolidFaceSelection409[]? F
 
 public static class SolidMeasurementValidation409
 {
-    public static IReadOnlyList<string> Modes { get; } = Array.AsReadOnly<string>(["solid_distance", "face_distance", "wall_thickness", "cylinder_diameter", "axis_axis_distance", "axis_plane_distance"]);
+    public static IReadOnlyList<string> Modes { get; } = Array.AsReadOnly<string>(["solid_distance", "face_distance", "wall_thickness", "cylinder_diameter", "axis_axis_distance", "axis_plane_distance", "cylindrical_fit"]);
     public static bool Handles(string? mode) => Modes.Contains(mode);
 
     public static bool IsAxisMeasurement(string? mode) => mode is "cylinder_diameter" or "axis_axis_distance" or "axis_plane_distance";
@@ -40,6 +40,8 @@ public static class SolidMeasurementValidation409
             int faceCount = mode == "cylinder_diameter" ? 1 : 2;
             if (args.Handles.Length < 1 || args.Handles.Length > faceCount || !input.TryGetProperty("faces", out var selections) || selections.ValueKind != JsonValueKind.Array || selections.GetArrayLength() != faceCount)
                 throw new DomainException("INVALID_ARGUMENT", $"{mode} requires exactly {faceCount} face selection(s) and their source body handles.");
+            if (mode == "cylindrical_fit" && args.Handles.Length != 2)
+                throw new DomainException("INVALID_ARGUMENT", "cylindrical_fit requires a shaft and a bore on two distinct bodies.");
             faces = selections.EnumerateArray().Select(ParseFace).ToArray();
             if (faces.Distinct().Count() != faceCount || !args.Handles.ToHashSet(StringComparer.Ordinal).SetEquals(faces.Select(f => f.Handle)))
                 throw new DomainException("INVALID_ARGUMENT", "Select distinct faces; handles must match exactly the selected source bodies.");

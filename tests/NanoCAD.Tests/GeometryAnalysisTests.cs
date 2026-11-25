@@ -126,6 +126,34 @@ internal static class GeometryAnalysisTests
             if (!schema.GetProperty("properties").TryGetProperty("workplane", out _)) throw new Exception("Analysis frame missing from MCP schema.");
             return Task.CompletedTask;
         });
+        await test("cylindrical fit distinguishes axial engagement, end contact and signed radial margin", () =>
+        {
+            const double tolerance = 1e-8;
+            CylindricalFit Fit(double start, double end, double offset) =>
+                CylindricalFit.Measure(0, 20, start, end, 4, 5, offset, tolerance);
+            if (Fit(5, 15, 0) != new CylindricalFit(10, 0, 1, "clearance") ||
+                Fit(16, 28, 0.75) != new CylindricalFit(4, 0, 0.25, "clearance") ||
+                Fit(21, 28, 0) != new CylindricalFit(0, 1, null, "axially_separated") ||
+                Fit(20, 28, 0) != new CylindricalFit(0, 0, null, "end_contact_within_tolerance") ||
+                Fit(-10, 3, 1) != new CylindricalFit(3, 0, 0, "contact_within_tolerance") ||
+                Fit(1, 3, 1.25) != new CylindricalFit(2, 0, -0.25, "interference") ||
+                Fit(1, 3, 8) != new CylindricalFit(2, 0, null, "shaft_axis_outside_bore"))
+                throw new Exception("Finite cylindrical bands yielded an incorrect fit.");
+            if (!CylindricalFit.CoversRim([(0, Math.Tau)], tolerance) ||
+                !CylindricalFit.CoversRim([(Math.PI / 2, Math.PI), (Math.PI / 2, -Math.PI)], tolerance) ||
+                CylindricalFit.CoversRim([(0, Math.PI)], tolerance) ||
+                CylindricalFit.CoversRim([(0, Math.PI), (0, Math.PI)], tolerance))
+                throw new Exception("A circular trim gap or duplicate angular sector was misclassified.");
+            var pair = Input("cylindrical_fit", "A", "B");
+            pair["faces"] = new[] { new { handle = "A", native_id = "7" }, new { handle = "B", native_id = "5" } };
+            var selected = GeometryAnalysisValidation.Parse(Wire.Element(pair)).SolidMeasurement?.Faces;
+            if (selected is not [{ Handle: "A", NativeId: "7" }, { Handle: "B", NativeId: "5" }])
+                throw new Exception("The ordered shaft and bore selections were lost.");
+            pair["handles"] = new[] { "A" };
+            pair["faces"] = new[] { new { handle = "A", native_id = "7" }, new { handle = "A", native_id = "5" } };
+            Reject(pair);
+            return Task.CompletedTask;
+        });
         await test("cylinder analysis admits only the current selected face operands", () =>
         {
             var first = new { handle = "0a", native_id = "7" };

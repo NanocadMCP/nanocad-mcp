@@ -48,25 +48,36 @@ internal static class ModelHistoryReader
         var historyNotices = new List<string>(); var distinctNotices = new HashSet<string>(StringComparer.Ordinal);
         void Notice(string value)
         { Budget(); if (distinctNotices.Add(value)) { byteBudget.Add(value); historyNotices.Add(value); } }
-        void ReadNotices(Multicad.Mc3D.HistoryItem node, string handle, Multicad.McObjectId partId, Multicad.McObjectId nodeId)
+        void ReadNotices(Multicad.Mc3D.HistoryItem node, string handle, Multicad.McObjectId partId, Multicad.McObjectId nodeId, ModelHistoryFocus? focus)
         {
             string scope = $"part_handle={handle}; part_id={Id(partId)}; node_id={Id(nodeId)}";
+            var evidence = focus?.IssueEvidence;
+            var observations = evidence == null ? null : new List<HistoryIssueDiagnosis.Notice>();
+            string noticeState = "unavailable";
             try
             {
                 Budget(); var status = node.StatusInfo;
                 if (status == null) { Notice($"NATIVE_HISTORY_NOTICES_UNAVAILABLE: {scope}; native_status_info=null"); return; }
                 // SDK null/empty Records means no retained record information;
                 // it is not proof that no transient UI notification occurred.
-                var records = status.Records; if (records == null) return;
+                var records = status.Records;
+                if (records == null) { noticeState = "no_retained_record_list"; return; }
+                noticeState = "read";
                 for (int index = 0; index < records.Count; index++)
                 {
                     Budget(); var record = records[index];
-                    if (record == null) { Notice($"NATIVE_HISTORY_NOTICES_UNAVAILABLE: {scope}; record_index={index}; native_record=null"); continue; }
+                    if (record == null) { noticeState = "partial"; Notice($"NATIVE_HISTORY_NOTICES_UNAVAILABLE: {scope}; record_index={index}; native_record=null"); continue; }
+                    observations?.Add(new(record.Severity.ToString(), record.Description));
                     Notice($"NATIVE_HISTORY_NOTICE: {scope}; severity={record.Severity}({(int)record.Severity}); description={record.Description}");
                 }
             }
             catch (Exception error) when (error is not (OperationCanceledException or DomainException or OutOfMemoryException))
-            { Notice($"NATIVE_HISTORY_NOTICES_UNAVAILABLE: {scope}; error_type={error.GetType().Name}"); }
+            { noticeState = "partial"; Notice($"NATIVE_HISTORY_NOTICES_UNAVAILABLE: {scope}; error_type={error.GetType().Name}"); }
+            finally
+            {
+                if (evidence != null)
+                    evidence[nodeId.ToString()] = new(observations!, noticeState, focus!.SketchSupports!.GetValueOrDefault(nodeId.ToString()));
+            }
         }
         var requestedSketches = new HashSet<string>(args.SketchGeometryIds ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
         var foundSketches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -91,7 +102,7 @@ internal static class ModelHistoryReader
             var focus = args.HistoryFocus == null ? null : new ModelHistoryFocus(contents, id.ToString(), args.HistoryFocus, args.IncludeDownstreamHistory, Budget);
             var visibilitySketches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool complete = true;
-            var nativeSources = NativePathSources.Inspect(contents, Budget);
+            var nativeSources = NativePathSources.Inspect(contents, Budget, focus?.SketchSupports);
             ProjectedHistorySources.Source[] projected = [];
             string? projectedFailure = null;
             try { projected = ProjectedHistorySources.Read(solid, contents.ToArray(), state, transaction, Budget); }
@@ -127,14 +138,14 @@ internal static class ModelHistoryReader
                     byteBudget.Add(nodes[^1]);
                     continue;
                 }
-                if (includeProfileEditing) ReadNotices(node, handle, id, nodeId);
+                if (includeProfileEditing) ReadNotices(node, handle, id, nodeId, focus);
                 if (nodeId.GetObjectOfType<Multicad.Mc3D.PlanarSketch>() is { } visibilitySketch &&
                     visibilitySketch.DbEntity.Document?.ID == solid.DbEntity.Document?.ID)
                 {
                     try { DrawingViewSketchWriteScope282.RequireSupported(visibilitySketch); visibilitySketches.Add(nodeId.ToString()); }
                     catch (DomainException error) when (error.Error.code == "UNSUPPORTED_DRAWING_VIEW_CUT_WRITE") { }
                 }
-                var dependencies = node.GetDependsOn(false, false);
+                var dependencies = focus?.ObservedDependencies(nodeId.ToString()) ?? node.GetDependsOn(false, false)?.Select(d => d.ToString()).ToArray();
                 if (dependencies == null) throw new DomainException("HISTORY_UNAVAILABLE", "MultiCAD did not return dependencies for a history item.");
                 object? parameters = null;
                 if (requestedSketches.Contains(nodeId.ToString()))
@@ -242,6 +253,7 @@ internal static class ModelHistoryReader
                         : ModelManufacturingHistory.Parameters(nodeId, Budget, readTwoEdgePlacement: args.IncludeDownstreamHistory) ?? ModelEdgeFeatureHistory.Parameters(nodeId) ?? ModelPlacementHistory.Parameters(nodeId) ?? SheetMetalHistory.Read(nodeId, id);
                 }
                 string? nativeReferenceFailure = nativeSources.Failures.TryGetValue(nodeId.ToString(), out var referenceFailure) ? referenceFailure : null;
+                nativeReferenceFailure ??= focus?.DependencyProblem(nodeId.ToString());
                 if (nativeReferenceFailure != null) complete = false;
                 nodes.Add(new
                 {
@@ -252,7 +264,7 @@ internal static class ModelHistoryReader
                     suppressed = node.IsSuppressed,
                     host_solid_id = Id(node.HostSolidID),
                     native_order_before_id = Id(node.OrderObjBefore),
-                    dependencies = dependencies.Select(x => x.ToString()).ToArray(),
+                    dependencies,
                     parameters,
                     detail_unavailable_reason = nativeReferenceFailure
                 });
@@ -282,7 +294,7 @@ internal static class ModelHistoryReader
             else
             {
                 var detail = System.Text.Json.JsonSerializer.SerializeToNode(body, Wire.Json)!.AsObject();
-                detail["dependency_trace"] = System.Text.Json.JsonSerializer.SerializeToNode(focus.Describe(args.HistoryFocus!, handle, nodes), Wire.Json);
+                detail["dependency_trace"] = System.Text.Json.JsonSerializer.SerializeToNode(focus.Describe(args.HistoryFocus!, handle, id.ToString(), nodes, Budget, value => byteBudget.Add(value)), Wire.Json);
                 items.Add(detail);
             }
         }
