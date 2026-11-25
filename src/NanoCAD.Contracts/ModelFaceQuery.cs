@@ -5,6 +5,9 @@ namespace NanoCAD.Contracts;
 public sealed record ModelFaceQuery(string Surface, double[]? Direction, double AngleToleranceDegrees,
     double[]? DatumPoint, double? MaxDistance, double? MinRadius, double? MaxRadius, int StartIndex, int PageSize, string? AdjacentTo)
 {
+    public bool DirectBrep { get; init; }
+    public string? CylinderRole { get; init; }
+
     public static ModelFaceQuery Parse(JsonElement input)
     {
         DomainException Invalid(string message) => new("INVALID_ARGUMENT", "face_query: " + message);
@@ -13,7 +16,7 @@ public sealed record ModelFaceQuery(string Surface, double[]? Direction, double 
         foreach (var property in input.EnumerateObject())
         {
             if (property.Name is not ("surface" or "direction" or "angle_tolerance_degrees" or "datum_point" or "max_distance" or "adjacent_to_face_id" or
-                "min_radius" or "max_radius" or "start_index" or "page_size") || !fields.TryAdd(property.Name, property.Value))
+                "min_radius" or "max_radius" or "start_index" or "page_size" or "identity_space" or "cylinder_role") || !fields.TryAdd(property.Name, property.Value))
                 throw Invalid("Unknown or duplicate property " + property.Name + ".");
         }
         double Value(JsonElement v, string field)
@@ -65,7 +68,26 @@ public sealed record ModelFaceQuery(string Surface, double[]? Direction, double 
             if (anchor.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(anchor.GetString())) throw Invalid("Choose a current model_face_id for adjacency.");
             adjacent = anchor.GetString();
         }
-        return new(surface, direction, angle ?? 0, datum, distance, min, max, Index("start_index", 0, 0), Index("page_size", 1, 30), adjacent);
+        bool direct = false;
+        if (fields.TryGetValue("identity_space", out var space))
+        {
+            if (space.ValueKind != JsonValueKind.String || space.GetString() is not ("model" or "brep"))
+                throw Invalid("identity_space must be model or brep.");
+            direct = space.GetString() == "brep";
+        }
+        string? role = null;
+        if (fields.TryGetValue("cylinder_role", out var roleValue))
+        {
+            if (!direct || surface != "cylinder" || roleValue.ValueKind != JsonValueKind.String || roleValue.GetString() is not ("bore" or "external"))
+                throw Invalid("cylinder_role requires a brep cylinder query and must be bore or external.");
+            role = roleValue.GetString();
+        }
+        if (direct && adjacent != null && (!long.TryParse(adjacent, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out var nativeId) || nativeId <= 0 ||
+            nativeId.ToString(System.Globalization.CultureInfo.InvariantCulture) != adjacent))
+            throw Invalid("A brep neighbor requires the current positive native face ID from the same body.");
+        return new(surface, direction, angle ?? 0, datum, distance, min, max, Index("start_index", 0, 0), Index("page_size", 1, 30), adjacent)
+        { DirectBrep = direct, CylinderRole = role };
     }
 
     // A plane's normal and a cylinder's axis describe undirected supporting geometry.

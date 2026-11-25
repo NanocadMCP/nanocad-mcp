@@ -320,11 +320,15 @@ internal static class CadModifier
         foreach (var handle in args.Operations.OfType<CopySpec>().SelectMany(op => op.Handles))
             if (blockSources.TryGetValue(handle, out var block))
             { blockCopies++; copyAttributes += block.Attributes.Length; copyVertices += block.Definition.PreviewVertices; BlockMoveGeometry.Budget(blockCopies, copyAttributes, copyVertices); }
-        foreach (var facePath in args.Operations.OfType<SolidFaceEditSpec>().Where(edit => edit.PathHandle != null))
+        foreach (var faceEdit in args.Operations.OfType<SolidFaceEditSpec>())
         {
-            var body = (Solid3d)tr.GetObject(sources[facePath.Handles[0]], OpenMode.ForRead);
-            CadSolidFacePath389.Preflight(facePath, body, new(args.BridgeId, args.DocumentId, facePath.Handles[0]),
-                (Entity)tr.GetObject(sources[facePath.PathHandle!], OpenMode.ForRead), db, model, cancel);
+            var body = (Solid3d)tr.GetObject(sources[faceEdit.Handles[0]], OpenMode.ForRead);
+            var reference = new EntityRef(args.BridgeId, args.DocumentId, faceEdit.Handles[0]);
+            if (faceEdit.PathHandle is { } path)
+                CadSolidFacePath389.Preflight(faceEdit, body, reference,
+                    (Entity)tr.GetObject(sources[path], OpenMode.ForRead), db, model, cancel);
+            else
+                CadSolidFaceEditor.Validate(faceEdit, body, reference, cancel);
         }
         var properties = new Dictionary<int, PropertyIds>();
         for (int i = 0; i < args.Operations.Length; i++)

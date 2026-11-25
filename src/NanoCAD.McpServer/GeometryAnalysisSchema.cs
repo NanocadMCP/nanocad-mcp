@@ -33,8 +33,9 @@ internal static class GeometryAnalysisSchema
         guideContacts["properties"]!.AsObject().Remove("workplane");
         guideContacts["properties"]!["mode"] = new JsonObject { ["const"] = NanoCAD.Contracts.LoftGuideContacts.Mode };
         guideContacts["properties"]!["guide_handle"] = BasicModelingSchema.Handle();
-        guideContacts["required"]!.AsArray().Add("guide_handle");
-        guideContacts["description"] = "Inspect point contacts in WCS between one finite spatial guide and each selected closed curve or Region boundary, in handles order. Repeat with each guide of a proposed loft. An empty point list leaves coincident spans unresolved. The solid kernel decides whether the loft can be built.";
+        guideContacts["properties"]!["guide_handles"] = new JsonObject { ["type"] = "array", ["minItems"] = 1, ["uniqueItems"] = true, ["items"] = BasicModelingSchema.Handle() };
+        guideContacts["oneOf"] = JsonNode.Parse("""[{"required":["guide_handle"]},{"required":["guide_handles"]}]""");
+        guideContacts["description"] = "Inspect point contacts in WCS between one finite spatial guide and each selected closed curve or Region boundary, in handles order. Supply guide_handle for one guide or guide_handles to compare the proposed direct Loft guides at the same revision. With one point reported per guide and section, loft_sources returns the corresponding create fields. An empty point list leaves coincident spans unresolved. The solid kernel decides whether the loft can be built.";
         SolidGeometryAnalysisSchema.Extend(root);
         return JsonSerializer.SerializeToElement(new JsonObject
         {

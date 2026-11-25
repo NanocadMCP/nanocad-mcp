@@ -8,6 +8,7 @@ public sealed record GeometryAnalysisArguments(Arguments Read, string Mode, doub
     public SolidMeasurement409? SolidMeasurement { get; init; }
     public SolidSectionRequest? Section { get; init; }
     public string? GuideHandle { get; init; }
+    public string[]? GuideHandles { get; init; }
 }
 
 public static class GeometryAnalysisValidation

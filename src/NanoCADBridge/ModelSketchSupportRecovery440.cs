@@ -32,14 +32,59 @@ internal static class ModelSketchSupportRecovery440
         DrawingViewSketchWriteScope282.RequireSupported(sketch);
         var representation = ModelHistoryEditGuard.CurrentRepresentation(body, state, tx, cancel);
         var support = ModelSketchSupportState396.Capture(request, body, representation, owner, state, tx, args.BridgeId, cancel);
-        var scope = ModelSketchSupportRecoveryState440.Resolve(body, sketch, support.Support, request.ExpectedSupportId, cancel)
+        var (scope, before) = Assess(body, sketch, support, request.ExpectedSupportId, request.FrameReferencePolicy, state, tx, cancel);
+        return new(edit, request, body, sketch, support, scope, before);
+    }
+
+    static (ModelSketchSupportRecoveryState440.Scope Scope, ModelSketchSupportRecoveryState440.Snapshot Before) Assess(
+        Mc3dSolid body, PlanarSketch sketch, ModelSketchSupportState396.Binding support, string oldSupport, string policy,
+        DocumentState state, Db.Transaction tx, Action cancel)
+    {
+        var scope = ModelSketchSupportRecoveryState440.Resolve(body, sketch, support.Support, oldSupport, cancel)
             with
-        { UseTargetDatum = request.FrameReferencePolicy == "use_target_datum" };
+        { UseTargetDatum = policy == "use_target_datum" };
         var supportNodes = support.Stored.GetProperty("nodes").EnumerateArray().SelectMany(row => row.GetProperty("state").TryGetProperty("source_feature_id", out var source) ? new[] { row.GetProperty("id").GetString()!, source.GetString()! } : new[] { row.GetProperty("id").GetString()! });
         Need(!supportNodes.Any(scope.Affected.Contains), "CYCLIC_DEPENDENCY", "The chosen WorkPlane depends on the failed sketch or one of its retained consumers.");
-        var before = ModelSketchSupportRecoveryState440.Capture(body, scope, args, state, tx, cancel, true);
+        var before = ModelSketchSupportRecoveryState440.Capture(body, scope, state, tx, cancel, true);
         NativeSketchSupportReassignment440.EnsureAvailable(scope.UseTargetDatum);
-        return new(edit, request, body, sketch, support, scope, before);
+        return (scope, before);
+    }
+
+    internal static JsonElement Preview(string handle, string sketchId, ModelSupportRecoveryPreview preview,
+        DocumentState state, Db.Transaction tx, Action cancel)
+    {
+        Need((int)state.Document.Database.Insunits == 4, "OUT_OF_SCOPE", "Sketch support recovery requires verified Millimeters.");
+        var body = ModelDatumPlaneRevisionReader354.Body(handle, state, tx, cancel, true);
+        var owner = ModelProfileDiscovery348.OwnerDocument(body, state);
+        var sketch = ModelSketchLifecycleReader362.Resolve(sketchId, owner, cancel);
+        DrawingViewSketchWriteScope282.RequireSupported(sketch);
+        var support = ModelSketchSupportState396.ReadWorkPlane(preview.PlaneId, null, body, owner, state, tx, cancel);
+        var (scope, before) = Assess(body, sketch, support, Key(sketch.PlanarEntityID), preview.FrameReferencePolicy, state, tx, cancel);
+        ModelViewFollowers.CheckStandalone(body, before.Views, cancel);
+        var selected = before.Design.GetProperty("selected_sketch");
+        var definition = new
+        {
+            kind = "workplane",
+            plane_id = Key(support.Support),
+            expected_datum_token = support.Token,
+            recover_lost_support = true,
+            expected_support_id = Key(scope.OldSupport),
+            frame_reference_policy = preview.FrameReferencePolicy
+        };
+        return Wire.Element(new
+        {
+            preflight = "passed",
+            rebuild_outcome = "not_evaluated",
+            part_id = Key(body.ID),
+            owner_document_id = Key(owner.ID),
+            profile_ids = scope.Profiles.Select(Key).ToArray(),
+            affected_history_ids = before.Contents.Select(Key).Where(scope.Affected.Contains).ToArray(),
+            original_sketch_frame_wcs = before.Frame,
+            target_workplane_frame_wcs = support.Plane,
+            original_frame_references = selected.GetProperty("frame_references"),
+            frame_reference_ids_to_retire = scope.UseTargetDatum ? ModelSketchFrameRetirement440.FrameIds(selected) : [],
+            operation = new { operation = "set_model_sketch_support", handles = new[] { handle }, expected_last_item_id = Key(body.LastPartItemID), feature_id = Key(sketch.ID), definition }
+        });
     }
     internal static void Preflight(ModifyArguments args, DocumentState state, Db.Transaction tx, Action? cancel = null) => Resolve(args, state, tx, cancel ?? (() => { }));
     static Result Outcome(Binding binding, ModelSketchSupportRecoveryState440.Snapshot after, ModelSketchSupportState396.Binding support,
@@ -105,7 +150,7 @@ internal static class ModelSketchSupportRecovery440
                 var support = ModelSketchSupportState396.Capture(binding.Request, binding.Body, representation, binding.Before.Owner, state, tx, args.BridgeId, job.CheckCancellation, false);
                 ModelSketchSupportState396.RequireAttached(support, binding.Body, binding.Before.Owner, binding.Sketch, job.CheckCancellation);
                 ModelSketchSupportState396.Retained(binding.Support, support, Key(binding.Sketch.ID), state, tx, job.CheckCancellation, binding.Scope.Affected);
-                var after = ModelSketchSupportRecoveryState440.Capture(binding.Body, binding.Scope, args, state, tx, job.CheckCancellation, false);
+                var after = ModelSketchSupportRecoveryState440.Capture(binding.Body, binding.Scope, state, tx, job.CheckCancellation, false);
                 Need(after.Frame != null, "SKETCH_FRAME_UNAVAILABLE", "The recovered sketch must expose its actual finite native WCS frame.");
                 if (binding.Scope.UseTargetDatum) Need(ModelSketchFrameRetirement440.EmptyFrame(after.Design.GetProperty("selected_sketch")) &&
                     ModelSketchSupportRecoveryFrame440.Same(after.Frame, binding.Support.Plane) && ModelSketchSupportRecoveryFrame440.Same(after.Frame, support.Plane),

@@ -12,7 +12,7 @@ internal static class GeometryAnalyzer
     {
         if (args.BoundaryTrace is { } trace) return CadBoundaryTrace408.Read(args.Read, trace, state, transaction, cancellationToken.ThrowIfCancellationRequested);
         if (args.Section != null) return CadSolidSectionAnalysis.Read(args, state, transaction, modelId, instance, cancellationToken);
-        if (args.GuideHandle != null) return CadLoftGuideContacts.Read(args, state, transaction, modelId, instance, cancellationToken.ThrowIfCancellationRequested);
+        if (args.Mode == LoftGuideContacts.Mode) return CadLoftGuideContacts.Read(args, state, transaction, modelId, instance, cancellationToken.ThrowIfCancellationRequested);
         if (args.Mode == SelectedContours.Mode) return CadSelectedContours.Read(args, state, transaction, modelId, cancellationToken.ThrowIfCancellationRequested);
         if (args.SolidMeasurement != null) return CadSolidMeasurement409.Read(args, state, transaction, modelId, instance, cancellationToken);
         if (SolidGeometryAnalysisValidation.Handles(args.Mode))

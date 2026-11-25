@@ -307,7 +307,7 @@ internal static class ModelSketchSupportRecoveryState440
         }
         return ModelManufacturingHistory.Parameters(id, cancel) ?? ModelEdgeFeatureHistory.Parameters(id) ?? ModelPlacementHistory.Parameters(id) ?? SheetMetalHistory.Read(id, id.GetObjectOfType<HistoryItem>()!.HostSolidID);
     }
-    internal static Snapshot Capture(Mc3dSolid body, Scope scope, ModifyArguments args, DocumentState state, Db.Transaction tx, Action cancel, bool before)
+    internal static Snapshot Capture(Mc3dSolid body, Scope scope, DocumentState state, Db.Transaction tx, Action cancel, bool before)
     {
         var owner = ModelProfileDiscovery348.OwnerDocument(body, state); var representation = ModelHistoryEditGuard.CurrentRepresentation(body, state, tx, cancel); var contents = ModelInventoryBudget.History(body, cancel).ToArray();
         var sketch = ModelSketchLifecycleReader362.Resolve(Key(scope.Sketch), owner, cancel); var views = ModelViewFollowers.Resolve(body, contents, cancel, includeStandalone: true);

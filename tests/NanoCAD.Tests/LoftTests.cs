@@ -65,9 +65,20 @@ internal static class LoftTests
             input["handles"] = Array.Empty<string>(); InvalidRead();
             input["handles"] = new[] { "B" }; input.Remove("guide_handle"); InvalidRead();
             input["guide_handle"] = "F"; input.Remove("document_id"); InvalidRead();
+            input["document_id"] = doc;
+            input["guide_handles"] = new[] { "d", "c" }; InvalidRead(); input.Remove("guide_handle");
+            input["handles"] = new[] { "b", "a" };
+            var group = Read();
+            if (group.GuideHandle != null || !group.GuideHandles!.SequenceEqual(new[] { "D", "C" }) ||
+                !group.Read.Handles!.SequenceEqual(new[] { "B", "A" }))
+                throw new Exception("Guide or section order changed.");
+            input["guide_handles"] = new[] { "d", "0D" }; InvalidRead();
+            input["guide_handles"] = new[] { "d", "A" }; InvalidRead();
+            input["guide_handles"] = Array.Empty<string>(); InvalidRead();
             var inputSchema = AuditServerContractSupport.Input("analyze_geometry", LoftGuideContacts.Mode);
             if (inputSchema.GetProperty("properties").GetProperty("mode").GetProperty("const").GetString() != LoftGuideContacts.Mode ||
-                !inputSchema.GetProperty("required").EnumerateArray().Any(p => p.GetString() == "guide_handle"))
+                !inputSchema.GetProperty("properties").TryGetProperty("guide_handles", out _) ||
+                !inputSchema.GetProperty("properties").TryGetProperty("guide_handle", out _))
                 throw new Exception("Guide comparison is missing from the published analysis schema.");
             var outputBranches = AuditServerContractSupport.Output("analyze_geometry").GetProperty("properties")
                 .GetProperty("data").GetProperty("anyOf")[0].GetProperty("oneOf").EnumerateArray();

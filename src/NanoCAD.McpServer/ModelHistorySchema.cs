@@ -36,6 +36,18 @@ internal static class ModelHistorySchema
         };
         schema["properties"]!["profile_element_ids"] = ModelProfileElementsSchema358.HistoryInput();
         schema["properties"]!["extrusion_extent_ids"] = ModelExtrusionExtentsSchema351.HistoryInput();
+        schema["properties"]!["support_recovery_preview"] = new JsonObject
+        {
+            ["type"] = "object",
+            ["additionalProperties"] = false,
+            ["description"] = "Check an explicitly chosen WorkPlane for the failed history_focus sketch and return the current guarded support edit.",
+            ["required"] = new JsonArray("plane_id"),
+            ["properties"] = new JsonObject
+            {
+                ["plane_id"] = ModelDatumPlaneSchema353.Id(),
+                ["frame_reference_policy"] = new JsonObject { ["type"] = "string", ["enum"] = new JsonArray("preserve", "use_target_datum") }
+            }
+        };
         schema["properties"]!["feature_deletion_ids"] = ModelFeatureDeletionSchema378.HistoryInput();
         schema["properties"]!["sketch_constraint_parameter_ids"] = ModelSketchConstraintParameterSchema379.ReadInput();
         schema["allOf"] = new JsonArray(new JsonObject { ["if"] = new JsonObject { ["required"] = new JsonArray("sketch_constraint_parameter_ids") }, ["then"] = new JsonObject { ["required"] = new JsonArray("sketch_ids"), ["properties"] = new JsonObject { ["handles"] = new JsonObject { ["maxItems"] = 1 }, ["sketch_ids"] = new JsonObject { ["maxItems"] = 1 } } } });

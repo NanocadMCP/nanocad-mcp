@@ -74,7 +74,7 @@ public static class TargetedRead407
         if (!input.TryGetProperty("sections", out var value)) return null;
         if (value.ValueKind != JsonValueKind.Array) throw Invalid("sections must be an array; [] requests identities/ownership only.");
         var sections = value.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String && item.GetString() is { } name &&
-            name is "geometry" or "editing" or "appearance" ? name : throw Invalid("sections allows geometry, editing and appearance.")).ToArray();
+            name is "geometry" or "editing" or "appearance" or "drawing_dependencies" ? name : throw Invalid("sections allows geometry, editing, appearance and drawing_dependencies.")).ToArray();
         if (sections.Distinct(StringComparer.Ordinal).Count() != sections.Length) throw Invalid("Duplicate detail sections are not allowed.");
         return sections.OrderBy(name => name, StringComparer.Ordinal).ToArray();
     }

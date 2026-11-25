@@ -6,7 +6,7 @@ namespace NanoCAD.McpServer;
 internal static class TargetedReadSchema407
 {
     internal const string QueryDescription = " Optional bounds filters finite WCS XY or XYZ candidate envelopes, never exact geometric intersections. Ordinary entities use reported native extents. MInsert uses a conservative spacing envelope because its native getter can cover only the seed: absolute row/column travel expanded for plausible owner/definition scale and arbitrary grid orientation. This may overselect; within requires the entire conservative envelope inside the query and may exclude other geometrically contained arrays. No grid cells are enumerated or exploded. Unavailable extents and infinite Ray/Xline entities are excluded explicitly in match_semantics. Optional text searches literal TEXT, decoded plain MTEXT/MLeader and explicit dimension overrides, without evaluating Fields or searching Table cells/nested block attributes. Optional block_definition filters canonical named dynamic definitions or direct ordinary definitions. Predicates combine with AND; carry identical filters and space on every cursor page. Empty filtered pages with next_cursor are valid; continue until complete.";
-    internal const string InspectDescription = " Optional sections selects compact detail: [] returns identity/type/layer/space and owner only; appearance returns stored display properties without geometry; geometry returns the native stored shape; editing also requests available native edit tokens and complete editor observations in geometry. The default omits sections and retains full detail. Select only information needed for the requested task. Polyline2d reports actual stored vertex kinds/WCS positions without converting a fitted contour; Point/Ray/Xline are readable existing entities. Native fitted/periodic Spline observation does not certify every editing or analysis route.";
+    internal const string InspectDescription = " Optional sections selects compact detail: [] returns identity/type/layer/space and owner only; appearance returns stored display properties without geometry; geometry returns the native stored shape; editing also requests available native edit tokens and complete editor observations in geometry. drawing_dependencies is opt-in: inspect a curve before changing a boundary or hole, or distinguish a block insertion from the definition shared with other insertions. The default retains the original full detail. Select only information needed for the requested task. Polyline2d reports actual stored vertex kinds/WCS positions without converting a fitted contour; Point/Ray/Xline are readable existing entities. Native fitted/periodic Spline observation does not certify every editing or analysis route.";
     private static JsonObject Text() => new() { ["type"] = "string" };
     private static JsonObject Flag() => new() { ["type"] = "boolean", ["default"] = false };
     private static JsonObject Enum(params string[] values) => new() { ["type"] = "string", ["enum"] = new JsonArray(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray()) };
@@ -49,8 +49,8 @@ internal static class TargetedReadSchema407
         {
             ["type"] = "array",
             ["uniqueItems"] = true,
-            ["items"] = Enum("geometry", "editing", "appearance"),
-            ["description"] = "Omit for full detail. [] reads identities and owner only. geometry reads shape; editing reads shape plus available native editing metadata/tokens; appearance reads stored display properties. No geometry arrays/history/fields are read for identity-only or appearance-only requests."
+            ["items"] = Enum("geometry", "editing", "appearance", "drawing_dependencies"),
+            ["description"] = "Omit for full detail. [] reads identities and owner only. geometry reads shape; editing reads shape plus available native editing metadata/tokens; appearance reads stored display properties. drawing_dependencies reads selected curve reactors, verified Hatch loop members and native dimension point roles, or an insertion and its current shared definition and direct references. Independent annotations and model history require separate inspection. No geometry arrays/history/fields are read for identity-only or appearance-only requests."
         }
     };
     // Root catalog integration can call this once after building ordinary input;
@@ -81,6 +81,7 @@ internal static class TargetedReadSchema407
             ["coordinate_system"] = new JsonObject { ["const"] = "WCS" },
             ["owner_ref"] = reference.DeepClone(),
             ["geometry"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
+            ["drawing_dependencies"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
             ["properties"] = new JsonObject { ["type"] = "object", ["additionalProperties"] = true },
             ["warnings"] = new JsonObject { ["type"] = "array", ["items"] = Text() }
         }, "ref", "type", "runtime_type", "layer", "space", "detail_support", "coordinate_system", "owner_ref");

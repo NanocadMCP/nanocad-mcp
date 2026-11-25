@@ -22,6 +22,16 @@ For related orthographic projections, select the parent view in `get_drawing_vie
 
 For `analyze_geometry` in `cylindrical_fit` mode, select the outside cylindrical face of the shaft first and the inside cylindrical face of the bore second. The finite engagement length and signed radial clearance account for the actual limits of the two selected surfaces and their axis offset. With no axial overlap, the result reports the axial separation. This measurement covers complete round cylindrical bands with parallel axes.
 
+## Following a selected object into an edit
+
+For a drawing curve or a block insertion, request the `drawing_dependencies` section of `inspect_objects`. For curves it reads persistent native relationships, including associative Hatch loops and actively attached dimensions where the reciprocal source can be verified. An independent paper label has no such link. For a block it distinguishes the selected insertion from the shared definition. Moving the insertion and changing a definition member have different effects on its peers.
+
+For direct solid edits, use `inspect_solid_topology` with `face_query.identity_space="brep"`. Refine an analytic face by its geometry, cylinder role or shared boundary. Review every page and any unresolved surfaces before choosing. The selected face ID and body snapshot token refer to the direct solid. The measurement reference can be passed to `analyze_geometry`. Native feature-history selection retains its separate identity space.
+
+For a guided direct Loft, supply the finite `guide_handles` and ordered section `handles` together to `loft_guide_contacts`. The result lists the native contact points for each guide and section at the same drawing revision. With at least two sections and exactly one point reported per pair, `loft_sources` provides the source fields for the direct Loft. Select the interpolation and inspect the resulting solid section. Coincident spans are not evaluated.
+
+For a failed sketch with lost face support, select the actual sketch in `inspect_model_history` and supply a `support_recovery_preview` with the intended workplane. The preview reports the affected construction and, when eligible, returns the operation for `modify_entities`. The replacement plane is explicit. Frame references are preserved by default; explicitly selecting `use_target_datum` changes that policy. The write rechecks the identifiers and state. Inspect the rebuilt feature and its actual geometry before accepting the repair.
+
 ## Part names and model history
 
 Naming a parametric body sets its top-level caption in the 3D History panel and retains it in the DWG. In nanoCAD 26, a nonparametric solid can show a new caption during the session but reverts to its generated caption on reopen, including when it was renamed in nanoCAD itself. The bridge reports BODY_NAME_PERSISTENCE_UNAVAILABLE before changing any body in a naming request that includes such a solid. The construction history item and its sketches and features keep their individual names. Drawings created with older versions can still be searched by their existing history item names and DWG group labels. Parts that share a name appear as separate search results.

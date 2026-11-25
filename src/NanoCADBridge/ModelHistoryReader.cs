@@ -295,6 +295,12 @@ internal static class ModelHistoryReader
             {
                 var detail = System.Text.Json.JsonSerializer.SerializeToNode(body, Wire.Json)!.AsObject();
                 detail["dependency_trace"] = System.Text.Json.JsonSerializer.SerializeToNode(focus.Describe(args.HistoryFocus!, handle, id.ToString(), nodes, Budget, value => byteBudget.Add(value)), Wire.Json);
+                if (args.SupportRecoveryPreview != null)
+                {
+                    var preview = ModelSketchSupportRecovery440.Preview(handle, args.HistoryFocus!, args.SupportRecoveryPreview, state, transaction, Budget);
+                    byteBudget.Add(preview);
+                    detail["support_recovery_preview"] = System.Text.Json.Nodes.JsonNode.Parse(preview.GetRawText());
+                }
                 items.Add(detail);
             }
         }

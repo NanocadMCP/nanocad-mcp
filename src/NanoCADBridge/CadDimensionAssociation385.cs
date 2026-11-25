@@ -521,9 +521,20 @@ internal static class CadDimensionAssociation385
         Match(Same(diameter.FarChordPoint, opposite), "/circle_diameter/opposite", Point(opposite), Point(diameter.FarChordPoint));
     }
 
+    private static bool AllowsCircleLabelRefresh(DiametricDimension diameter) =>
+        diameter.UsingDefaultTextPosition || diameter.Dimtmove == 2;
+
+    internal static object CircleLabelCondition(DiametricDimension diameter) => new
+    {
+        automatic_text_position = diameter.UsingDefaultTextPosition,
+        text_movement = diameter.Dimtmove,
+        label_allows_geometry_refresh = AllowsCircleLabelRefresh(diameter),
+        scope = "existing diameter label positioning condition for set_curve_geometry; other dependencies are checked on write"
+    };
+
     static void RequireCircleDiameterMovement(DiametricDimension diameter, ObjectId source)
     {
-        if (!diameter.UsingDefaultTextPosition && diameter.Dimtmove != 2)
+        if (!AllowsCircleLabelRefresh(diameter))
             throw new DomainException("UNSUPPORTED_DIMENSION_CONTENT",
                 "The associated diameter has a manually placed label. Updating its definition requires automatic positioning or an existing effective DIMTMOVE of 2.",
                 false, new

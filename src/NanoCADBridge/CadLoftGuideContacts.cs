@@ -12,12 +12,57 @@ internal static class CadLoftGuideContacts
         ObjectId model, string instance, Action cancel)
     {
         var db = state.Document.Database;
-        var guide = (Curve)CadLoftSource409.Resolve(args.GuideHandle!, false, db, tx, model, cancel);
-        if (guide is Ray or Xline)
-            throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Select a finite loft guide.");
         var budget = new SerializedCapacity357(Wire.PayloadBudget - 8192, cancel);
+        var units = new { name = db.Insunits.ToString(), value = (int)db.Insunits };
+        GuideContacts Inspect(string handle)
+        {
+            var curve = (Curve)CadLoftSource409.Resolve(handle, false, db, tx, model, cancel);
+            if (curve is Ray or Xline)
+                throw new DomainException("UNSUPPORTED_ENTITY_TYPE", "Select a finite loft guide.");
+            var reference = new EntityRef(instance, state.Id, handle);
+            budget.Add(reference);
+            return new(reference, ReadSections(curve, args.Read.Handles!, db, tx, model, state, instance, budget, cancel));
+        }
+
+        if (args.GuideHandles == null)
+        {
+            var single = Inspect(args.GuideHandle!);
+            return new
+            {
+                mode = LoftGuideContacts.Mode,
+                coordinate_system = "WCS",
+                solver = "native_kernel",
+                units,
+                single.guide,
+                single.sections,
+                overlap_evaluated = false
+            };
+        }
+
+        var guides = args.GuideHandles.Select(Inspect).ToArray();
+        bool singleContacts = args.Read.Handles!.Length >= 2 &&
+            guides.All(row => row.sections.All(section => section.points.Length == 1 && section.status == "points_reported"));
+        var sources = singleContacts ? new { section_handles = args.Read.Handles, guide_handles = args.GuideHandles, path_handle = (string?)null } : null;
+        budget.Add(sources);
+        return new
+        {
+            mode = LoftGuideContacts.Mode,
+            coordinate_system = "WCS",
+            solver = "native_kernel",
+            units,
+            guides,
+            loft_sources = sources,
+            overlap_evaluated = false
+        };
+    }
+
+    private sealed record GuideContacts(EntityRef guide, List<SectionContacts> sections);
+
+    private static List<SectionContacts> ReadSections(Curve guide, string[] handles, Database db, Transaction tx,
+        ObjectId model, DocumentState state, string instance, SerializedCapacity357 budget, Action cancel)
+    {
         var sections = new List<SectionContacts>();
-        foreach (var handle in args.Read.Handles!)
+        foreach (var handle in handles)
         {
             cancel();
             var reference = new EntityRef(instance, state.Id, handle);
@@ -43,16 +88,7 @@ internal static class CadLoftGuideContacts
             budget.Add(row);
             sections.Add(row);
         }
-        return new
-        {
-            mode = LoftGuideContacts.Mode,
-            coordinate_system = "WCS",
-            solver = "native_kernel",
-            units = new { name = db.Insunits.ToString(), value = (int)db.Insunits },
-            guide = new EntityRef(instance, state.Id, args.GuideHandle!),
-            sections,
-            overlap_evaluated = false
-        };
+        return sections;
     }
 
     private static double[][] ContactPoints(Curve guide, Entity section, Action cancel)

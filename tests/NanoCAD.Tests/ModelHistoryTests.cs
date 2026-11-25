@@ -71,6 +71,33 @@ internal static class ModelHistoryTests
                 throw new Exception("Geometric placement slots were collapsed or did not preserve order.");
             return Task.CompletedTask;
         });
+        await test("lost support preview takes one explicit sketch and WorkPlane and keeps frame references by default", () =>
+        {
+            var sketch = Guid.NewGuid().ToString("B");
+            var plane = Guid.NewGuid().ToString("B");
+            object Request(string? focus, string[] handles, object preview) => new
+            {
+                bridge_instance_id = bridge,
+                document_id = doc,
+                expected_revision = "19",
+                handles,
+                history_focus = focus,
+                support_recovery_preview = preview
+            };
+            var selected = new { plane_id = plane };
+            var args = Validation.Parse("inspect_model_history", Wire.Element(Request(sketch, ["A"], selected)));
+            if (args.SupportRecoveryPreview != new ModelSupportRecoveryPreview(plane.ToUpperInvariant(), "preserve"))
+                throw new Exception("Read preview lost the selected WorkPlane or applied an implicit frame change.");
+            var explicitFrame = new { plane_id = plane, frame_reference_policy = "use_target_datum" };
+            if (Validation.Parse("inspect_model_history", Wire.Element(Request(sketch, ["A"], explicitFrame))).SupportRecoveryPreview?.FrameReferencePolicy != "use_target_datum")
+                throw new Exception("Lost explicit frame replacement.");
+            Reject(Request("issues", ["A"], selected));
+            Reject(Request(sketch, ["A", "B"], selected));
+            Reject(Request(sketch, ["A"], new { plane_id = "nearby" }));
+            Reject(Request(sketch, ["A"], new { plane_id = plane, frame_reference_policy = "automatic" }));
+            Reject(Request(sketch, ["A"], new { x = 0, y = 0, z = 1 }));
+            return Task.CompletedTask;
+        });
         await test("part chain follows only a selected native history ID in one part", () =>
         {
             var sketchId = Guid.NewGuid().ToString("B");

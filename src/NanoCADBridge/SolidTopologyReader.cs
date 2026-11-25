@@ -30,6 +30,8 @@ internal static class SolidTopologyReader
         if (tx.GetObject(id, OpenMode.ForRead) is not Solid3d solid || solid.GetType() != typeof(Solid3d) || solid.OwnerId != model)
             throw new DomainException("OUT_OF_SCOPE", "Topology requires a top-level native Model Space Solid3d.");
         if (solid.IsNull) throw new DomainException("DEGENERATE_GEOMETRY", "Solid is empty.");
+        if (args.FaceQuery is { DirectBrep: true } query)
+            return Capture(solid, new EntityRef(instance, state.Id, solid.Handle.ToString()), cancellation, identifySurfaces: true, directQuery: query);
         if (args.FaceQuery != null || args.EdgeQuery != null) return new { source_ref = new EntityRef(instance, state.Id, solid.Handle.ToString()) };
         return Capture(solid, new EntityRef(instance, state.Id, solid.Handle.ToString()), cancellation, identifySurfaces: true);
     }
@@ -43,7 +45,7 @@ internal static class SolidTopologyReader
         return merged;
     }
     internal static object Capture(Solid3d solid, EntityRef source, CancellationToken cancellation, Action? checkCancel = null, bool identifySurfaces = false,
-        string? selectedFace = null, ISet<string>? selectedBoundaryEdges = null)
+        string? selectedFace = null, ISet<string>? selectedBoundaryEdges = null, ModelFaceQuery? directQuery = null)
     {
         void Budget() { checkCancel?.Invoke(); cancellation.ThrowIfCancellationRequested(); }
         Budget();
@@ -71,6 +73,7 @@ internal static class SolidTopologyReader
         }
         var faces = new List<FaceItem>(); var edges = new List<EdgeItem>();
         var edgeBounds = new Dictionary<string, FaceBounds>(StringComparer.Ordinal);
+        var queryEdges = directQuery == null ? null : new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         var whole = solid.GeometricExtents;
         var wholeBounds = new FaceBounds(new[] { Finite(whole.MinPoint.X), Finite(whole.MinPoint.Y), Finite(whole.MinPoint.Z) }, new[] { Finite(whole.MaxPoint.X), Finite(whole.MaxPoint.Y), Finite(whole.MaxPoint.Z) });
         var faceIds = new HashSet<string>(StringComparer.Ordinal); var edgeIds = new HashSet<string>(StringComparer.Ordinal);
@@ -106,7 +109,14 @@ internal static class SolidTopologyReader
                     var boundary = new List<FaceBounds>();
                     var boundaryBudget = new ModelInventoryBudget(Budget);
                     bool collectBoundary = key == selectedFace && selectedBoundaryEdges != null;
-                    if (planar || collectBoundary) foreach (Teigha.BoundaryRepresentation.BoundaryLoop loop in face.Loops)
+                    string? analyticSurface = identifySurfaces ? IdentifySurface(surface, planar, directQuery != null) : null;
+                    HashSet<string>? incident = null;
+                    if (directQuery != null && (key == directQuery.AdjacentTo || analyticSurface == (directQuery.Surface == "plane" ? "plane" : "circular_cylinder")))
+                    {
+                        incident = new(StringComparer.Ordinal);
+                        queryEdges!.Add(key, incident);
+                    }
+                    if (planar || collectBoundary || incident != null) foreach (Teigha.BoundaryRepresentation.BoundaryLoop loop in face.Loops)
                         using (loop)
                         {
                             Budget(); foreach (Edge edge in loop.Edges) using (edge)
@@ -114,6 +124,7 @@ internal static class SolidTopologyReader
                                 Budget();
                                 var edgeKey = Identity(edge, SubentityType.Edge).IndexPtr.ToInt64().ToString(CultureInfo.InvariantCulture);
                                 if (!edgeBounds.TryGetValue(edgeKey, out var box)) throw new DomainException("SUBENTITY_IDENTITY_UNAVAILABLE", "Face boundary edge does not belong to this B-rep.");
+                                if (incident?.Add(edgeKey) == true) inventoryBudget.Add(edgeKey);
                                 if (collectBoundary) selectedBoundaryEdges!.Add(edgeKey);
                                 if (planar) { boundaryBudget.Add(box); boundary.Add(box); }
                             }
@@ -126,7 +137,6 @@ internal static class SolidTopologyReader
                     // Native face area and BrepEntity.BoundBlock are not implemented.
                     // Never create/dispose CopyFace BODY/SURFACE temporaries to read.
                     double? area = null;
-                    string? analyticSurface = identifySurfaces ? IdentifySurface(surface, planar) : null;
                     var observed = new FaceItem(key, surface.GetType().FullName!, area, area == null ? "Native face area is unavailable; topology inspection does not copy database faces." : null, bounds, face.IsOrientToSurface, boundsKind, analyticSurface);
                     inventoryBudget.Add(observed); faces.Add(observed); Budget();
                 }
@@ -142,6 +152,17 @@ internal static class SolidTopologyReader
         Budget(); var serialized = JsonSerializer.SerializeToUtf8Bytes(new { source, faces = tokenFaces, edges = orderedEdges, record, show }, Wire.Json);
         if (serialized.LongLength > 8L * 1024 * 1024) throw new DomainException("RESPONSE_LIMIT_EXCEEDED", "Native solid topology snapshot exceeds the actual8MiB serialized byte budget.");
         var token = Convert.ToHexString(SHA256.HashData(serialized)); Budget();
+        if (directQuery != null)
+        {
+            var edgeMap = queryEdges!;
+            HashSet<string>? touching = null;
+            if (directQuery.AdjacentTo != null && !edgeMap.TryGetValue(directQuery.AdjacentTo, out touching))
+                throw new DomainException("SUBENTITY_NOT_FOUND", "The adjacency face does not belong to this B-rep snapshot.");
+            var wanted = directQuery.Surface == "plane" ? "plane" : "circular_cylinder";
+            var candidates = orderedFaces.Where(f => f.analytic_surface == wanted && (touching == null ||
+                f.native_id != directQuery.AdjacentTo && edgeMap[f.native_id].Overlaps(touching))).Select(f => f.native_id).ToArray();
+            return CadSolidMeasurement409.ReadDirectFacePage(solid, source, token, directQuery, candidates, edgeMap, Budget);
+        }
         return new
         {
             source_ref = source,
@@ -156,14 +177,20 @@ internal static class SolidTopologyReader
         };
     }
 
-    private static string? IdentifySurface(Teigha.Geometry.Surface surface, bool planar)
+    private static string? IdentifySurface(Teigha.Geometry.Surface surface, bool planar, bool requireClassification)
     {
         if (planar) return "plane";
         try
         {
             return surface is Cylinder || surface is ExternalBoundedSurface bounded && bounded.IsCylinder ? "circular_cylinder" : null;
         }
-        catch (Teigha.Runtime.Exception) { return null; }
+        catch (Teigha.Runtime.Exception error)
+        {
+            if (requireClassification)
+                throw new DomainException("NATIVE_SURFACE_UNAVAILABLE", "A face could not be classified while resolving this direct selection.", false,
+                    new { api_status = error.ErrorStatus.ToString() });
+            return null;
+        }
     }
     private static double Finite(double value) => double.IsFinite(value) ? value : throw new DomainException("OBJECT_READ_FAILED", "Non-finite native topology value.");
 }

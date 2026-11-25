@@ -69,7 +69,7 @@ internal sealed class CadReader
             // every explicit open stays ForRead and every invalidation check below
             // remains in force, including after disposal. No read is committed.
             bool modelOpenCloseRead = request.operation == "get_model_variables" ||
-                request.operation == "inspect_model_history" && args.ModelFeatureDeletionIds?.Length > 0 ||
+                request.operation == "inspect_model_history" && (args.ModelFeatureDeletionIds?.Length > 0 || args.SupportRecoveryPreview != null) ||
                 request.operation == "inspect_objects" && args.EraseAssessment;
             Transaction transaction = modelOpenCloseRead
                 ? document.Database.TransactionManager.StartOpenCloseTransaction()
@@ -148,7 +148,7 @@ internal sealed class CadReader
                 cancellationToken.ThrowIfCancellationRequested();
                 pointScope.Accept();
             }
-            if (request.operation == "inspect_solid_topology" && (args.FaceQuery != null || args.EdgeQuery != null || args.IncludeNativeModelFaces || args.IncludeNativeModelEdges))
+            if (request.operation == "inspect_solid_topology" && (args.FaceQuery is { DirectBrep: false } || args.EdgeQuery != null || args.IncludeNativeModelFaces || args.IncludeNativeModelEdges))
             {
                 long bits = unchecked((long)ulong.Parse(args.Handles![0], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                 if (!document.Database.TryGetObjectId(new Handle(bits), out var sourceId) || sourceId.IsNull || !sourceId.IsValid || sourceId.IsErased)
@@ -339,6 +339,8 @@ internal sealed class CadReader
                 if (args.DetailSections != null)
                 {
                     var detail = CadTargetedRead407.Compact(entity, summary, args.DetailSections, cancellationToken);
+                    if (args.DetailSections.Contains("drawing_dependencies", StringComparer.Ordinal))
+                        detail.Add("drawing_dependencies", CadDrawingDependencies.Read(entity, transaction, cancellationToken.ThrowIfCancellationRequested));
                     if (needsGeometry) CadDynamicBlockObservation.Compact(detail, entity, transaction, _instance, state.Id, cancellationToken.ThrowIfCancellationRequested);
                     items.Add(new { handle, success = true, entity = detail, error = (DomainError?)null });
                 }

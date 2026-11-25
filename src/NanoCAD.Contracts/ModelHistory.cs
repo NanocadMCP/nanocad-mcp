@@ -18,6 +18,10 @@ public static class ModelHistoryValidation
                 focus = focusId.ToString("B").ToUpperInvariant();
             else throw new DomainException("INVALID_ARGUMENT", "history_focus requires a current native history ID in braces or issues.");
         }
+        var recoveryPreview = values.Remove("support_recovery_preview", out var chosenDatum)
+            ? ModelSupportRecoveryPreview.Parse(chosenDatum) : null;
+        if (recoveryPreview != null && (focus is null or "issues"))
+            throw new DomainException("INVALID_ARGUMENT", "Select the failed sketch's exact history_focus ID for support_recovery_preview.");
         bool includeDownstream = false;
         if (values.Remove("include_downstream_history", out var downstream))
         {
@@ -138,7 +142,7 @@ public static class ModelHistoryValidation
         var args = Validation.Parse("inspect_objects", Wire.Element(values));
         if (focus != null && args.Handles?.Length != 1)
             throw new DomainException("INVALID_ARGUMENT", "history_focus selects the history of one identified part.");
-        args = args with { HistoryFocus = focus, IncludeDownstreamHistory = includeDownstream };
+        args = args with { HistoryFocus = focus, IncludeDownstreamHistory = includeDownstream, SupportRecoveryPreview = recoveryPreview };
         if (args.BridgeId == null || args.ExpectedRevision == null)
             throw new DomainException("INVALID_ARGUMENT", "Model history requires explicit bridge/document/revision and distinct handles.");
         if (parameterIds != null && (args.Handles!.Length != 1 || nativeSketchIds?.Length != 1))

@@ -109,6 +109,7 @@ public sealed record Arguments(string? BridgeId, string? DocumentId, string? Exp
     int GeometryStartIndex = 0, int GeometryPageSize = 100,
     bool IncludeDocumentProfiles = false, string? DocumentProfileCursor = null, string[]? ModelProfileIds = null, string[]? ModelProfileRegionIds = null, string[]? ModelExtrusionExtentIds = null, bool IncludeDocumentDatumPlanes = false, string? DocumentDatumCursor = null, string[]? ModelDatumPlaneIds = null, string[]? ModelDatumPlaneRevisionIds = null, string? DrawingViewSourceIdentityHandle = null, string[]? ModelProfileElementIds = null, bool IncludeDocumentSketches = false, string? DocumentSketchCursor = null, string[]? ModelSketchIds = null)
 {
+    public ModelSupportRecoveryPreview? SupportRecoveryPreview { get; init; }
     public string[]? ModelFeatureDeletionIds { get; init; }
     public SheetPlacementRequest? SheetPlacement { get; init; }
     public bool IncludeGeometrySources { get; init; }

@@ -605,6 +605,20 @@ public static class ReadPreparationBindings433
                 return;
             }
             if (!Field("topology_token")) return;
+            if (Text(data, "identity_space") == "brep" && Field("faces/0"))
+            {
+                foreach (var (face, pointer) in Array(data, "candidates", "/data"))
+                {
+                    var selection = Candidate(pointer, Target(reference));
+                    Handle(selection, reference, "/data/source_ref");
+                    Bind(selection, "topology_token", data, "snapshot_token", "/data");
+                    Bind(selection, "faces/0", face, "native_id", pointer);
+                    foreach (string field in new[] { "support_origin", "support_direction", "radius", "datum_distance", "cylinder_role" })
+                        Current(selection, field, face, field, pointer);
+                    output.Add(selection);
+                }
+                return;
+            }
             var candidate = Candidate("/data", Target(reference));
             Handle(candidate, reference, "/data/source_ref");
             Bind(candidate, "topology_token", data, "snapshot_token", "/data");

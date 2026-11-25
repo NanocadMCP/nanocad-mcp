@@ -70,6 +70,26 @@ internal static class QuerySummaryTests
                 throw new Exception("Unexpected supporting plane distance.");
             return Task.CompletedTask;
         });
+        await test("direct face queries distinguish feature identities from editable B-rep faces", () =>
+        {
+            var search = ModelFaceQuery.Parse(Wire.Element(new { surface = "cylinder", identity_space = "brep", cylinder_role = "bore", adjacent_to_face_id = "7" }));
+            if (!search.DirectBrep || search.CylinderRole != "bore" || search.AdjacentTo != "7" ||
+                ModelFaceQuery.Parse(Wire.Element(new { surface = "cylinder" })).DirectBrep)
+                throw new Exception("The explicit direct identity space and default model space must remain distinct.");
+            foreach (var invalid in new object[]
+            {
+                new { surface = "plane", identity_space = "brep", cylinder_role = "external" },
+                new { surface = "cylinder", cylinder_role = "bore" },
+                new { surface = "cylinder", identity_space = "brep", adjacent_to_face_id = "{current-model-guid}" },
+                new { surface = "cylinder", identity_space = "brep", cylinder_role = "unknown" }
+            })
+            {
+                try { ModelFaceQuery.Parse(Wire.Element(invalid)); }
+                catch (DomainException e) when (e.Error.code == "INVALID_ARGUMENT") { continue; }
+                throw new Exception("An incompatible direct query passed validation.");
+            }
+            return Task.CompletedTask;
+        });
         await test("native solid names are searchable across pages and optional in basic observations", () =>
         {
             var doc = Guid.NewGuid().ToString("D");

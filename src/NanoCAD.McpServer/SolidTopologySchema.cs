@@ -36,10 +36,12 @@ internal static class SolidTopologySchema
             ["type"] = "object",
             ["additionalProperties"] = false,
             ["required"] = new JsonArray("surface"),
-            ["description"] = "Find current native planar or cylindrical supports. Direction matches either axis sign. Datum distance is perpendicular to the infinite plane or axis in drawing units. Supply datum_point and max_distance together. adjacent_to_face_id selects faces sharing a native boundary edge. Advance start_index with the same handle, revision and filters. Returns current feature face IDs and token.",
+            ["description"] = "Find planar or cylindrical supports. Default model IDs address parametric features. brep returns direct face and boundary edge IDs and snapshot_token for direct edits and measurements. Adjacency requires a current face ID in the same identity space. Direction is unsigned; datum distance is to the infinite axis or plane. Page with next_index at the same revision. brep pages by surface type and adjacency before geometric or material filters; inspect all pages and unresolved entries before claiming a unique match.",
             ["properties"] = new JsonObject
             {
                 ["surface"] = new JsonObject { ["enum"] = new JsonArray("plane", "cylinder") },
+                ["identity_space"] = new JsonObject { ["enum"] = new JsonArray("model", "brep"), ["default"] = "model" },
+                ["cylinder_role"] = new JsonObject { ["enum"] = new JsonArray("bore", "external"), ["description"] = "For brep cylinders only. Verify the side containing material on a transverse section through a complete cylindrical band." },
                 ["direction"] = Triple(),
                 ["angle_tolerance_degrees"] = new JsonObject { ["type"] = "number", ["minimum"] = 0, ["maximum"] = 90 },
                 ["datum_point"] = Triple(),

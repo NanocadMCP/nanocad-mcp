@@ -307,7 +307,15 @@ internal static class OutputSchemas
             ("edge_token", Text()), ("boundary_of_face_id", Text()), ("curve", Nullable(Text())), ("boundary_edges", Integer()),
             ("unavailable_curve_classifications", Integer()), ("inventory_complete", Bool()), ("total_matches", Integer()),
             ("start_index", Integer()), ("next_index", Nullable(Integer())), ("complete", Bool()), ("edges", modelEdges.DeepClone().AsObject()));
-        return new JsonObject { ["oneOf"] = new JsonArray(result, focused, boundary) };
+        var directFace = Object(("native_id", Text()), ("measurement_face", Object(("handle", Text()), ("native_id", Text()))),
+            ("support_origin", Point()), ("support_direction", Point()), ("radius", Nullable(Number())),
+            ("datum_distance", Nullable(Number())), ("cylinder_role", Nullable(Text())), ("boundary_edge_ids", Array(Text())));
+        var direct = Object(("source_ref", Ref("ref")), ("identity_space", new JsonObject { ["const"] = "brep" }),
+            ("snapshot_token", Text()), ("surface", Text()), ("coordinate_system", Text()),
+            ("candidate_faces_before_geometry_filters", Integer()), ("start_index", Integer()), ("next_index", Nullable(Integer())),
+            ("complete", Bool()), ("page_filters_resolved", Bool()), ("candidates", Array(directFace)),
+            ("unresolved", Array(Object(("native_id", Text()), ("reason", AnyObject())))), ("result_scope", Text()));
+        return new JsonObject { ["oneOf"] = new JsonArray(result, focused, boundary, direct) };
     }
     private static JsonObject DrawingViews()
     {
@@ -444,6 +452,12 @@ internal static class OutputSchemas
         body["properties"]!["body_name"] = Nullable(Text());
         AddBodyNameProvenance(body["properties"]!);
         body["properties"]!["edit_routes"] = AnyObject();
+        body["properties"]!["support_recovery_preview"] = Object(
+            ("preflight", Text()), ("rebuild_outcome", Text()), ("part_id", Text()), ("owner_document_id", Text()),
+            ("profile_ids", Array(Text())), ("affected_history_ids", Array(Text())),
+            ("original_sketch_frame_wcs", Nullable(AnyObject())), ("target_workplane_frame_wcs", AnyObject()),
+            ("original_frame_references", AnyObject()), ("frame_reference_ids_to_retire", Array(Text())),
+            ("operation", Object(("operation", Text()), ("handles", Array(Text())), ("expected_last_item_id", Text()), ("feature_id", Text()), ("definition", AnyObject()))));
         var support = Object(("id", Nullable(Text())), ("kind", Nullable(Text())), ("state", Text()), ("detail", Nullable(AnyObject())));
         var evidence = Object(("notices", Array(Object(("severity", Text()), ("description", Nullable(Text()))))),
             ("notice_state", Text()), ("sketch_support", Nullable(support)));
@@ -514,10 +528,15 @@ internal static class OutputSchemas
         result["oneOf"]!.AsArray().Add(SolidSectionSchema.Output(false));
         result["oneOf"]!.AsArray().Add(SolidSectionSchema.Output(true));
         var guideContacts = Common(NanoCAD.Contracts.LoftGuideContacts.Mode);
-        Add(guideContacts, "guide", Ref("ref"));
         var contactStatus = new JsonObject { ["enum"] = new JsonArray("points_reported", "no_points_reported", "unavailable") };
-        Add(guideContacts, "sections", Array(Object(("section", Ref("ref")), ("status", contactStatus),
-            ("points", Array(Point())), ("reason", Nullable(Text())))));
+        var sectionContacts = Array(Object(("section", Ref("ref")), ("status", contactStatus),
+            ("points", Array(Point())), ("reason", Nullable(Text()))));
+        var contactFields = guideContacts["properties"]!.AsObject();
+        contactFields["guide"] = Ref("ref");
+        contactFields["sections"] = sectionContacts;
+        contactFields["guides"] = Array(Object(("guide", Ref("ref")), ("sections", sectionContacts.DeepClone().AsObject())));
+        contactFields["loft_sources"] = Nullable(Object(("guide_handles", Array(Text())), ("section_handles", Array(Text())), ("path_handle", new JsonObject { ["type"] = "null" })));
+        guideContacts["oneOf"] = JsonNode.Parse("""[{"required":["guide","sections"]},{"required":["guides","loft_sources"]}]""");
         Add(guideContacts, "overlap_evaluated", new JsonObject { ["const"] = false });
         result["oneOf"]!.AsArray().Add(guideContacts);
         result["oneOf"]!.AsArray().Add(JsonNode.Parse("""

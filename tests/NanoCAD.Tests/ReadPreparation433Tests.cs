@@ -97,6 +97,19 @@ internal static class ReadPreparation433Tests
 
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("selected drawing dependency inspection is opt-in and published alongside editing geometry", () =>
+        {
+            var full = Element(new { handles = new[] { "AB" } });
+            var request = Element(new { sections = new[] { "editing", "drawing_dependencies" } });
+            Check(TargetedRead407.Sections(full) == null, "Full legacy inspection must keep its original detail.");
+            Check(TargetedRead407.Sections(request)!.SequenceEqual(new[] { "drawing_dependencies", "editing" }),
+                "Dependency witnesses and edit geometry should be selectable together.");
+            var properties = ToolCatalog.Tools.Single(tool => tool.Name == "nanocad.inspect_objects").InputSchema.GetProperty("properties");
+            var choices = properties.GetProperty("sections").GetProperty("items").GetProperty("enum");
+            Check(choices.EnumerateArray().Any(choice => choice.GetString() == "drawing_dependencies"),
+                "The inspect_objects schema does not advertise the selected drawing dependency section.");
+            return Task.CompletedTask;
+        });
         await test("block433: optional preparation is stripped locally and default reads retain their exact envelope", () =>
         {
             var plain = Element(new { bridge_instance_id = Bridge, document_id = Document, expected_revision = "17", handles = new[] { "A1" } });
