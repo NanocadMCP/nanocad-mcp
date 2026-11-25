@@ -265,7 +265,7 @@ internal static class NativeSketchConstraintWriter385
             {
                 job.CheckCancellation();
                 var data = new ModifiedEntities(args.OperationId, "committed", false, [], [], [], [], "not_applicable", sketch_constraint_changes: [])
-                    { sketch_mobility_plan = before.MobilityPlan, sketch_mobility_after = NativeSketchMobility.Plan(before, [], job.CheckCancellation) };
+                { sketch_mobility_plan = before.MobilityPlan, sketch_mobility_after = NativeSketchMobility.Plan(before, [], job.CheckCancellation) };
                 var noOp = Result.Ok(job.OriginalRequestId, data, context, "All requested geometric relations already follow from the existing constraints. No native relation was added.");
                 Bytes(noOp, job.CheckCancellation); job.BeginCommit(); job.RecordCommit(noOp); return noOp;
             }

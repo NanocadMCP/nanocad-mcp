@@ -12,7 +12,8 @@ internal static class SketchConstraintsSchema
         schema["properties"]!["preserve_motion"] = NativeSketchSchema385.PreserveMotion();
         schema["properties"]!["proposed_constraints"] = new JsonObject
         {
-            ["type"] = "array", ["items"] = NativeSketchSchema385.Constraint(),
+            ["type"] = "array",
+            ["items"] = NativeSketchSchema385.Constraint(),
             ["description"] = "Preview these relations together against the current sketch, using actual native member IDs, sketch-plane coordinates and radians. The preview preserves the drawing."
         };
         schema["properties"]!["measure_smooth"] = new JsonObject

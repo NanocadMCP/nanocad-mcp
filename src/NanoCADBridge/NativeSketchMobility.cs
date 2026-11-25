@@ -63,15 +63,25 @@ internal static class NativeSketchMobility
         {
             string? kind = info.Type switch
             {
-                ConstraintType.GeomHorizontal => "horizontal", ConstraintType.GeomVertical => "vertical",
-                ConstraintType.GeomParallel => "parallel", ConstraintType.GeomPerpendicular => "perpendicular",
-                ConstraintType.GeomCollinear => "collinear", ConstraintType.GeomTangent => "tangent",
-                ConstraintType.GeomEqual => "equal", ConstraintType.GeomSmooth => "smooth",
-                ConstraintType.GeomConcentric => "concentric", ConstraintType.GeomCoincident => "coincident",
-                ConstraintType.GeomFix => "fix", ConstraintType.GeomSymmetric => "symmetric",
-                ConstraintType.DimRadial => "radius", ConstraintType.DimDiametrical => "diameter",
-                ConstraintType.DimAligned => "distance", ConstraintType.DimHorizontal => "distance_x",
-                ConstraintType.DimVertical => "distance_y", ConstraintType.DimAngular => "angle", _ => null
+                ConstraintType.GeomHorizontal => "horizontal",
+                ConstraintType.GeomVertical => "vertical",
+                ConstraintType.GeomParallel => "parallel",
+                ConstraintType.GeomPerpendicular => "perpendicular",
+                ConstraintType.GeomCollinear => "collinear",
+                ConstraintType.GeomTangent => "tangent",
+                ConstraintType.GeomEqual => "equal",
+                ConstraintType.GeomSmooth => "smooth",
+                ConstraintType.GeomConcentric => "concentric",
+                ConstraintType.GeomCoincident => "coincident",
+                ConstraintType.GeomFix => "fix",
+                ConstraintType.GeomSymmetric => "symmetric",
+                ConstraintType.DimRadial => "radius",
+                ConstraintType.DimDiametrical => "diameter",
+                ConstraintType.DimAligned => "distance",
+                ConstraintType.DimHorizontal => "distance_x",
+                ConstraintType.DimVertical => "distance_y",
+                ConstraintType.DimAngular => "angle",
+                _ => null
             };
             if (kind == null || info.IsDimensional && value == null) return null;
             int count = kind switch { "symmetric" => 3, "fix" or "horizontal" or "vertical" or "radius" or "diameter" => 1, _ => 2 };

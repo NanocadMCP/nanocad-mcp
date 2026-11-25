@@ -9,19 +9,19 @@ internal static class NativeConstraintInventory
 {
     internal sealed record Result(List<McObjectId> Ids, bool Complete, string Source, string? Reason)
     {
-        public IReadOnlyDictionary<string,string> Routes { get; init; } = new Dictionary<string,string>();
+        public IReadOnlyDictionary<string, string> Routes { get; init; } = new Dictionary<string, string>();
     }
 
     internal static Result Read(Constraints2D manager, Func<IEnumerable<McObjectId>?>? members, Action cancel)
     {
         var seen = new HashSet<McObjectId>();
-        var routes = new Dictionary<string,string>();
+        var routes = new Dictionary<string, string>();
         var budget = new ModelInventoryBudget(cancel);
         static string Count(int? count) => count?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "null";
-        void RecordFailure(string route,Exception error)
+        void RecordFailure(string route, Exception error)
         {
-            string outcome=$"{error.GetType().Name} (0x{error.HResult:X8})";
-            routes[route]=routes.TryGetValue(route,out var previous) ? $"{previous}, {outcome}" : outcome;
+            string outcome = $"{error.GetType().Name} (0x{error.HResult:X8})";
+            routes[route] = routes.TryGetValue(route, out var previous) ? $"{previous}, {outcome}" : outcome;
         }
         static bool OptionalReadFailure(Exception error) =>
             error is InvalidOperationException or NotSupportedException or NotImplementedException or COMException;
@@ -37,9 +37,9 @@ internal static class NativeConstraintInventory
             }
             return valid;
         }
-        bool CheckMap(Dictionary<McObjectId,List<McObjectId>> map)
+        bool CheckMap(Dictionary<McObjectId, List<McObjectId>> map)
         {
-            var reverse = new Dictionary<McObjectId,HashSet<McObjectId>>();
+            var reverse = new Dictionary<McObjectId, HashSet<McObjectId>>();
             bool valid = true;
             foreach (var (member, ids) in map)
             {
@@ -68,16 +68,16 @@ internal static class NativeConstraintInventory
             return true;
         }
         Result Finish(bool complete, string source, string? reason = null) =>
-            new(seen.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToList(), complete, source, reason) { Routes=routes };
+            new(seen.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToList(), complete, source, reason) { Routes = routes };
 
         cancel();
         try
         {
             var direct = manager.GetAllConstraints();
-            routes["scope_list"]="ids="+Count(direct?.Count);
+            routes["scope_list"] = "ids=" + Count(direct?.Count);
             if (direct != null && Collect(direct)) return Finish(true, "native_scope_list");
         }
-        catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("scope_list",error); }
+        catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("scope_list", error); }
 
         // In the installed 26.0 mapimgd, these full-scope overloads request
         // different outputs from one native enumeration. They can all fail
@@ -86,7 +86,7 @@ internal static class NativeConstraintInventory
         try
         {
             var listed = manager.GetAllConstraints(out var mapped);
-            routes["scope_list_and_map"]="ids="+Count(listed?.Count)+", mapped_objects="+Count(mapped?.Count);
+            routes["scope_list_and_map"] = "ids=" + Count(listed?.Count) + ", mapped_objects=" + Count(mapped?.Count);
             var prior = seen.ToHashSet();
             bool valid = listed != null && Collect(listed);
             if (mapped != null)
@@ -97,34 +97,34 @@ internal static class NativeConstraintInventory
             }
             else if (valid && prior.IsSubsetOf(listed!)) return Finish(true, "native_scope_list_with_map_overload");
         }
-        catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("scope_list_and_map",error); }
+        catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("scope_list_and_map", error); }
         try
         {
             var mapped = manager.GetAllObjectsToConstraints();
-            routes["scope_object_map"]="mapped_objects="+Count(mapped?.Count);
+            routes["scope_object_map"] = "mapped_objects=" + Count(mapped?.Count);
             if (mapped != null)
             {
                 if (CheckMap(mapped) && !disagreement) return Finish(true, "native_verified_scope_object_map");
                 disagreement = true;
             }
         }
-        catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("scope_object_map",error); }
+        catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("scope_object_map", error); }
         if (members != null)
         {
             try
             {
                 var selected = members()?.Where(id => !id.IsNull).Distinct().ToList();
-                routes["member_and_external"]="selected="+Count(selected?.Count);
+                routes["member_and_external"] = "selected=" + Count(selected?.Count);
                 if (selected is { Count: > 0 })
                 {
                     ModelInventoryBudget.Ids(selected, cancel);
                     var attached = manager.GetConstraints(selected, out var external);
-                    routes["member_and_external"]+=", attached="+Count(attached?.Count)+", external="+Count(external?.Count);
+                    routes["member_and_external"] += ", attached=" + Count(attached?.Count) + ", external=" + Count(external?.Count);
                     if (attached != null) Collect(attached);
                     if (external != null) Collect(external);
                 }
             }
-            catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("member_and_external",error); }
+            catch (Exception error) when (OptionalReadFailure(error)) { RecordFailure("member_and_external", error); }
         }
         return Finish(false, "partial_native_observation", disagreement ? "native_inventory_routes_disagree" : "complete_native_inventory_unavailable");
     }

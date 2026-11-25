@@ -31,8 +31,11 @@ public static class SketchConstraintsValidation
         var motion = SketchMotionInput.Read(values.Remove("preserve_motion", out var directions) ? directions : null, SketchMotionInput.NativeId);
         return ModelVariablesValidation.Parse(Wire.Element(values)) with
         {
-            ModelObjectId = id.ToString("B").ToUpperInvariant(), MeasureSmooth = measure,
-            DocumentSketchScope = documentScope, ProposedConstraints = proposed, PreserveMotion = motion
+            ModelObjectId = id.ToString("B").ToUpperInvariant(),
+            MeasureSmooth = measure,
+            DocumentSketchScope = documentScope,
+            ProposedConstraints = proposed,
+            PreserveMotion = motion
         };
     }
 }

@@ -10,52 +10,69 @@ namespace NanoCADBridge;
 // or alternate-manager retry when native HRESULT leaves inventory unavailable.
 internal static class ModelSketchConstraintObservation353
 {
-    internal const string Warning="SKETCH_CONSTRAINT_INVENTORY_UNAVAILABLE: Native sketch constraints could not be enumerated. This is not an empty-network or complete constraint-preservation claim; actual sketch geometry, source/feature identities and owning drivers remain checked. This readonly observation does not itself request a setter or solver.";
-    static void Need([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool value,string code,string message)
-    {if(!value)throw new DomainException(code,message);}
-    internal static JsonElement Read(Mc3dSolid body,PlanarSketch sketch,Action cancel)
+    internal const string Warning = "SKETCH_CONSTRAINT_INVENTORY_UNAVAILABLE: Native sketch constraints could not be enumerated. This is not an empty-network or complete constraint-preservation claim; actual sketch geometry, source/feature identities and owning drivers remain checked. This readonly observation does not itself request a setter or solver.";
+    static void Need([System.Diagnostics.CodeAnalysis.DoesNotReturnIf(false)] bool value, string code, string message)
+    { if (!value) throw new DomainException(code, message); }
+    internal static JsonElement Read(Mc3dSolid body, PlanarSketch sketch, Action cancel)
     {
-        cancel();var owner=body.DbEntity.Document;using var plane=sketch.Plane;
-        using var manager=owner.Get2dConstraintsManager(Constraint2dNetType.Auto,sketch.ID,plane);
-        Need(manager!=null&&manager.DocumentId==owner.ID&&manager.PlanarSketchId==sketch.ID&&!manager.ScopeId.IsNull,
-            "CONSTRAINT_SCOPE_MISMATCH","The readonly sketch constraint manager lacks exact actual owner/document/sketch scope; no solver/bootstrap is used.");
-        var inventory=NativeSketchInventory.Read(manager,sketch,cancel);
-        var ids=inventory.Ids;
-        ModelInventoryBudget.Ids(ids,cancel);var values=new List<JsonElement>();var bytes=new ModelInventoryBudget(cancel);
+        cancel(); var owner = body.DbEntity.Document; using var plane = sketch.Plane;
+        using var manager = owner.Get2dConstraintsManager(Constraint2dNetType.Auto, sketch.ID, plane);
+        Need(manager != null && manager.DocumentId == owner.ID && manager.PlanarSketchId == sketch.ID && !manager.ScopeId.IsNull,
+            "CONSTRAINT_SCOPE_MISMATCH", "The readonly sketch constraint manager lacks exact actual owner/document/sketch scope; no solver/bootstrap is used.");
+        var inventory = NativeSketchInventory.Read(manager, sketch, cancel);
+        var ids = inventory.Ids;
+        ModelInventoryBudget.Ids(ids, cancel); var values = new List<JsonElement>(); var bytes = new ModelInventoryBudget(cancel);
         object? Reference(IConstraintObjectInfo? info)
         {
-            if(info==null||info.ObjectId.IsNull)return null;var p=info.PointRefOnObject;var point=new[]{p.X,p.Y,p.Z};
-            return new{object_id=info.ObjectId.ToString(),subentity_id=ModelProfileDiscovery348.Id(info.SubentId),segment=info.PolylineSegmentIndex,
-                point=point.All(double.IsFinite)?point:null,point_scope=point.All(double.IsFinite)?"reported_native_reference":"unspecified_or_nonfinite"};
+            if (info == null || info.ObjectId.IsNull) return null; var p = info.PointRefOnObject; var point = new[] { p.X, p.Y, p.Z };
+            return new
+            {
+                object_id = info.ObjectId.ToString(),
+                subentity_id = ModelProfileDiscovery348.Id(info.SubentId),
+                segment = info.PolylineSegmentIndex,
+                point = point.All(double.IsFinite) ? point : null,
+                point_scope = point.All(double.IsFinite) ? "reported_native_reference" : "unspecified_or_nonfinite"
+            };
         }
-        foreach(var id in ids.OrderBy(id=>id.ToString(),StringComparer.OrdinalIgnoreCase))
+        foreach (var id in ids.OrderBy(id => id.ToString(), StringComparer.OrdinalIgnoreCase))
         {
-            cancel();using var info=manager.GetConstraintInfo(id);if(info==null&&!inventory.Complete)continue;Need(info!=null,"CONSTRAINTS_UNAVAILABLE","A listed retained constraint has unavailable native metadata.");
-            double parameter=info.Param;var item=Wire.Element(new{id=id.ToString(),type=info.Type.ToString(),info.IsGeometrical,info.IsDimensional,
-                first=Reference(info.FirstObject),second=Reference(info.SecondObject),third=Reference(info.ThirdObject),
-                parameter=double.IsFinite(parameter)?(double?)parameter:null,variable_id=ModelProfileDiscovery348.Id(info.VarId),variable_name=info.VarName,
-                variable_expression=info.VarExpression,dimension_id=ModelProfileDiscovery348.Id(info.DimId)});
-            bytes.Add(item);values.Add(item);
+            cancel(); using var info = manager.GetConstraintInfo(id); if (info == null && !inventory.Complete) continue; Need(info != null, "CONSTRAINTS_UNAVAILABLE", "A listed retained constraint has unavailable native metadata.");
+            double parameter = info.Param; var item = Wire.Element(new
+            {
+                id = id.ToString(),
+                type = info.Type.ToString(),
+                info.IsGeometrical,
+                info.IsDimensional,
+                first = Reference(info.FirstObject),
+                second = Reference(info.SecondObject),
+                third = Reference(info.ThirdObject),
+                parameter = double.IsFinite(parameter) ? (double?)parameter : null,
+                variable_id = ModelProfileDiscovery348.Id(info.VarId),
+                variable_name = info.VarName,
+                variable_expression = info.VarExpression,
+                dimension_id = ModelProfileDiscovery348.Id(info.DimId)
+            });
+            bytes.Add(item); values.Add(item);
         }
-        return Wire.Element(new NanoCAD.Contracts.ModelSketchConstraintObservation353(owner.ID.ToString(),sketch.ID.ToString(),manager.ScopeId.ToString(),
-            manager.ConstraintsNetworkType.ToString(),"not_evaluated",inventory.Complete,values.Count>0||inventory.Complete?values.ToArray():null,inventory.Reason,inventory.Complete?null:Warning));
+        return Wire.Element(new NanoCAD.Contracts.ModelSketchConstraintObservation353(owner.ID.ToString(), sketch.ID.ToString(), manager.ScopeId.ToString(),
+            manager.ConstraintsNetworkType.ToString(), "not_evaluated", inventory.Complete, values.Count > 0 || inventory.Complete ? values.ToArray() : null, inventory.Reason, inventory.Complete ? null : Warning));
     }
-    internal static bool Complete(JsonElement observation)=>observation.GetProperty("constraints_complete").GetBoolean();
-    internal static string[] Warnings(IEnumerable<JsonElement> observations)=>observations.Any(value=>!Complete(value))?[Warning]:[];
-    internal static bool Equivalent(JsonElement before,JsonElement after,Action cancel)
+    internal static bool Complete(JsonElement observation) => observation.GetProperty("constraints_complete").GetBoolean();
+    internal static string[] Warnings(IEnumerable<JsonElement> observations) => observations.Any(value => !Complete(value)) ? [Warning] : [];
+    internal static bool Equivalent(JsonElement before, JsonElement after, Action cancel)
     {
-        if(Complete(before)&&Complete(after))return ModelProfileRebindState349.Equivalent(before,after,cancel);
-        return Scope(before).GetRawText()==Scope(after).GetRawText();
+        if (Complete(before) && Complete(after)) return ModelProfileRebindState349.Equivalent(before, after, cancel);
+        return Scope(before).GetRawText() == Scope(after).GetRawText();
     }
     static JsonElement Scope(JsonElement observation)
     {
-        var node=JsonNode.Parse(observation.GetRawText())!.AsObject();
-        foreach(string key in new[]{"constraints_complete","constraints","unavailable_reason","warning"})node.Remove(key);
+        var node = JsonNode.Parse(observation.GetRawText())!.AsObject();
+        foreach (string key in new[] { "constraints_complete", "constraints", "unavailable_reason", "warning" }) node.Remove(key);
         return Wire.Element(node);
     }
     internal static JsonElement WithoutUnavailableDetails(JsonElement sketch)
     {
-        var node=JsonNode.Parse(sketch.GetRawText())!.AsObject();node["constraints"]=JsonNode.Parse(Scope(sketch.GetProperty("constraints")).GetRawText());return Wire.Element(node);
+        var node = JsonNode.Parse(sketch.GetRawText())!.AsObject(); node["constraints"] = JsonNode.Parse(Scope(sketch.GetProperty("constraints")).GetRawText()); return Wire.Element(node);
     }
-    internal sealed record HistoryOutcome(object Data,string[] Warnings);
+    internal sealed record HistoryOutcome(object Data, string[] Warnings);
 }
