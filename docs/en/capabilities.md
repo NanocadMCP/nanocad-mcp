@@ -10,15 +10,17 @@ See [installation](installation.md) for requirements and connection instructions
 
 Part sketches and ordinary drawing geometry can report their remaining local degrees of freedom with driving dimensions held fixed. Preview a group of proposed constraints to see which conditions are independent, already implied or in conflict. Each decision identifies the affected proposal and its reason. A sliding direction can be protected explicitly. An additional geometric condition already implied by the current set is omitted. An overlapping driving dimension requires a decision about which dimension should control the geometry.
 
+Use `inspect_sketch_constraints` for a part sketch and `inspect_constraints` for 2D drawing entities. Pass `proposed_constraints` to preview the changes. When `require_verified_constraints` is set, automatic selection stops before adding a constraint whose independence it cannot verify.
+
 The calculation uses the actual selected geometry, its relations and the sketch plane. Where the native inventory, references or equations are incomplete, the affected count is unavailable. A fully constrained flag alone cannot supply a count. Sketch angles use radians and ordinary drawing angles use degrees.
 
 ## Drawing layout and part inspection
 
-For a sheet with related orthographic projections, select the parent view and request group placement. The preview considers paper boundaries, title-block graphics, the alignment side of each child, room for dimensions and the measured extents of attached annotations. Review the proposed origins and label conflicts before applying the group of view edits. An independent paper dimension stays at its paper coordinates.
+For related orthographic projections, select the parent view in `get_drawing_views` and set `sheet_placement.include_aligned_group=true`. The preview considers paper boundaries, title-block graphics, the alignment side of each child, room for dimensions and the measured extents of attached annotations. Review the proposed origins and label conflicts before applying the group of view edits. An independent paper dimension stays at its paper coordinates.
 
-A part history inspection focused on issues can trace a failing feature through its observed inputs to an earlier failing sketch, profile or operation. It reports native messages and the sketch support when available. Missing links limit how far the failure can be traced.
+`inspect_model_history` with `history_focus=issues` traces a failing feature through its observed inputs to an earlier failing sketch, profile or operation. It reports native messages and the sketch support when available. Missing links limit how far the failure can be traced.
 
-For a shaft in a bore, select the outside cylindrical face of the shaft and the inside cylindrical face of the bore. The finite engagement length and signed radial clearance account for the actual limits of the two selected surfaces and their axis offset. With no axial overlap, the result reports the axial separation. This measurement covers complete round cylindrical bands with parallel axes.
+For `analyze_geometry` in `cylindrical_fit` mode, select the outside cylindrical face of the shaft first and the inside cylindrical face of the bore second. The finite engagement length and signed radial clearance account for the actual limits of the two selected surfaces and their axis offset. With no axial overlap, the result reports the axial separation. This measurement covers complete round cylindrical bands with parallel axes.
 
 ## Part names and model history
 

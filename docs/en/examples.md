@@ -78,6 +78,15 @@ If you need a drawing contour, add:
 
 Choose the fitting accuracy from your task and source quality. A fit tolerance does not establish manufacturing tolerance or the accuracy of unseen scan data.
 
+## Inspect constraints, part history and fits
+
+| Task | Example request |
+|---|---|
+| Preserve motion in a sketch | Preview the constraints on these two guide edges. They must stay horizontal and slide together along X. Tell me which proposed relations are redundant and how many degrees of freedom would remain. |
+| Arrange existing drawing views | Arrange the front view and its aligned projections together at their current scale. Leave room for the attached dimensions and the title block, then show me the whole sheet. |
+| Trace a rebuild error | Trace the errors on this part to the first failing feature you can identify. Show the native message and which later features depend on it. |
+| Measure a pin in a bore | Measure how far the pin enters the left cheek and the minimum radial clearance over that length. Repeat for the right cheek. |
+
 ## Save the reviewed result
 
 After checking the drawing, provide an actual writable destination:

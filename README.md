@@ -27,9 +27,9 @@ Each operation has its own requirements. Read [capabilities and limits](docs/en/
 
 The release includes the MCP server runtime. You do not need Python, a compiler or the nanoCAD SDK to use the packaged application. The integration runs locally; your AI client may send drawing information and images to its provider. Read [data and privacy](docs/en/privacy.md).
 
-## What's new in 461
+## What's new in 462
 
-Parametric body names now appear on the top row of 3D History. Contour edits preserve associated hatches and dimensions. Parameter changes can report the updated dimensions on a drawing sheet. Loft inspection now checks guide contacts and measures sections with spline or elliptical edges. [Release notes](RELEASE-NOTES.md#build-461)
+Sketch and drawing constraints can now be previewed to see which degrees of freedom they remove. Related orthographic views can be arranged together on a sheet. Part history traces rebuild errors to the first observed failing feature. Shaft and bore measurements now include axial engagement and radial clearance. [Release notes](RELEASE-NOTES.md#build-462)
 
 ## Download
 
@@ -37,10 +37,10 @@ Published installers and ready-to-run archives are available on [GitHub Releases
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-461.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-461.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-462.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-462.zip` | Manual setup, or installation from an extracted folder |
 
-Checksums for this build are listed in `SHA256SUMS-461.txt`.
+Checksums for this build are listed in `SHA256SUMS-462.txt`.
 
 ## Get started
 

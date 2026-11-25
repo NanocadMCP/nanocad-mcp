@@ -2,6 +2,13 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 462
+
+- Added degrees-of-freedom analysis for part sketches and 2D drawing geometry. Constraint previews identify redundant or conflicting relations. Automatic constraint selection can preserve a sliding direction and skip redundant geometric constraints.
+- Added group placement for aligned drawing views. The layout preview accounts for attached dimensions, the title block and reserved areas, and returns positions for the whole group at its current scale.
+- Added rebuild diagnostics to part history. Errors are traced through feature dependencies to the first observed failure, with the native message and sketch support where available.
+- Added shaft and bore measurements for finite cylindrical faces with parallel axes. Results include axial engagement, axis offset and minimum radial clearance. Axially separated faces report their end gap.
+
 ## Build 461
 
 - Fixed write recovery when the bridge connection is interrupted. Oversized requests report that no write started. If a native command leaves writes isolated, new requests identify that command immediately.
