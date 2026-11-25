@@ -2,6 +2,13 @@
 
 [Documentation](docs/en/index.md)
 
+## Build 463
+
+- Added dependency inspection for drawing curves and block insertions. Curves report associated hatch loops, dimension attachment points and restrictions on moving diameter labels. Block insertions report other references to the same definition.
+- Added face selection for direct solid edits by surface geometry, cylinder role and shared edges. Face validation now rejects stale selections before an edit starts.
+- Loft contact analysis now checks multiple guides against all ordered sections in one request. It returns the source handles for Loft creation when every guide meets each section at a single point.
+- Added a preview for replacing a parametric sketch's support plane. It identifies affected profiles and features and shows which datum references the replacement would release.
+
 ## Build 462
 
 - Added degrees-of-freedom analysis for part sketches and 2D drawing geometry. Constraint previews identify redundant or conflicting relations. Automatic constraint selection can preserve a sliding direction and skip redundant geometric constraints.

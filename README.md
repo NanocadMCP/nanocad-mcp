@@ -27,9 +27,9 @@ Each operation has its own requirements. Read [capabilities and limits](docs/en/
 
 The release includes the MCP server runtime. You do not need Python, a compiler or the nanoCAD SDK to use the packaged application. The integration runs locally; your AI client may send drawing information and images to its provider. Read [data and privacy](docs/en/privacy.md).
 
-## What's new in 462
+## What's new in 463
 
-Sketch and drawing constraints can now be previewed to see which degrees of freedom they remove. Related orthographic views can be arranged together on a sheet. Part history traces rebuild errors to the first observed failing feature. Shaft and bore measurements now include axial engagement and radial clearance. [Release notes](RELEASE-NOTES.md#build-462)
+Drawing inspection now identifies the hatches and dimensions attached to a curve and the insertions that share a block definition. Direct solid edits can select a face by geometry and shared edges. Loft analysis checks multiple guides at once. Sketch support replacement can be previewed before editing the part. [Release notes](RELEASE-NOTES.md#build-463)
 
 ## Download
 
@@ -37,10 +37,10 @@ Published installers and ready-to-run archives are available on [GitHub Releases
 
 | File | Use it for |
 |---|---|
-| `NanoCAD-MCP-Setup-462.exe` | Guided installation and assistant configuration |
-| `nanocad-mcp-local-462.zip` | Manual setup, or installation from an extracted folder |
+| `NanoCAD-MCP-Setup-463.exe` | Guided installation and assistant configuration |
+| `nanocad-mcp-local-463.zip` | Manual setup, or installation from an extracted folder |
 
-Checksums for this build are listed in `SHA256SUMS-462.txt`.
+Checksums for this build are listed in `SHA256SUMS-463.txt`.
 
 ## Get started
 
