@@ -111,7 +111,7 @@ internal static class AuditServerRoutingTests
                                 throw new Exception("Compact constraint preview changed its call envelope.");
                             continue;
                         }
-                        if (tool.Name is "nanocad.inspect_model_history" or "nanocad.set_model_parameter" or "nanocad.analyze_point_cloud")
+                        if (tool.Name is "nanocad.inspect_model_history" or "nanocad.set_model_parameter" or "nanocad.analyze_point_cloud" or "nanocad.get_drawing_views")
                         {
                             var operationName = tool.Name["nanocad.".Length..];
                             if (!JsonNode.DeepEquals(WithoutDescriptions(tool.InputSchema), WithoutDescriptions(published.InputSchema)) ||
